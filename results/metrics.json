@@ -1,0 +1,5 @@
+{
+  "roc_auc_full_fit": 0.9570601851851852,
+  "best_model": "svm",
+  "best_cv_roc_auc": 0.9185570987654321
+}
