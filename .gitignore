@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Data and models
+data/*
+!data/README.md
+models/*
+!models/.gitkeep
+
+# Results and logs
+results/*
+!results/.gitkeep
+
+# Streamlit
+.ui_cache/
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
