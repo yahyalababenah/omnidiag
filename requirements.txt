@@ -3,5 +3,5 @@ pandas
 scikit-learn
 matplotlib
 joblib
-streamlit
+streamlit>=1.30.0
 imbalanced-learn
