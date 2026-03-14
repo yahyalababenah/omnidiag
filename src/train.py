@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 import matplotlib.pyplot as plt
+from sklearn.model_selection import GridSearchCV
 
 base = Path(__file__).resolve().parents[1]
 df = pd.read_csv(base / "data" / "heart.csv")
@@ -67,7 +68,8 @@ else:
     param_dist = {}
 
 if param_dist:
-    search = RandomizedSearchCV(best_pipe, param_distributions=param_dist, n_iter=8, cv=cv, scoring="roc_auc", random_state=42, n_jobs=-1)
+    # استخدام GridSearchCV أأمن هنا لأن بعض النماذج احتمالاتها أقل من 8
+    search = GridSearchCV(best_pipe, param_grid=param_dist, cv=cv, scoring="roc_auc", n_jobs=-1)
     search.fit(X, y)
     final_model = search.best_estimator_
     best_cv = float(search.best_score_)
@@ -82,36 +84,50 @@ models_dir.mkdir(exist_ok=True)
 results_dir.mkdir(exist_ok=True)
 
 dump(final_model, models_dir / "final_model.pkl")
-pd.DataFrame(results).to_csv(results_dir / "cv_scores.csv", index=False)
-meta = {"numeric_columns": num_cols, "categorical_columns": cat_cols, "all_columns": X.columns.tolist(), "target":"target", "best_model": best_name, "best_cv_roc_auc": best_cv}
-with open(models_dir / "metadata.json","w",encoding="utf-8") as f:
+
+# تحويل النتائج إلى DataFrame وتصديرها
+df_results = pd.DataFrame(results)
+df_results.to_csv(results_dir / "cv_scores.csv", index=False)
+
+meta = {
+    "numeric_columns": num_cols, 
+    "categorical_columns": cat_cols, 
+    "all_columns": X.columns.tolist(), 
+    "target": "target", 
+    "best_model": best_name, 
+    "best_cv_roc_auc": best_cv
+}
+
+with open(models_dir / "metadata.json", "w", encoding="utf-8") as f:
     json.dump(meta, f, ensure_ascii=False, indent=2)
 
-proba = final_model.predict_proba(X)[:,1]
+proba = final_model.predict_proba(X)[:, 1]
 roc = roc_auc_score(y, proba)
 fpr, tpr, thr = roc_curve(y, proba)
+
 plt.figure()
 plt.plot(fpr, tpr, label=f"AUC={roc:.3f}")
-plt.plot([0,1],[0,1],"--")
+plt.plot([0, 1], [0, 1], "--")
 plt.xlabel("FPR")
 plt.ylabel("TPR")
 plt.legend()
 plt.tight_layout()
 plt.savefig(results_dir / "roc_curve.png", dpi=160)
 
-with open(results_dir / "metrics.json","w",encoding="utf-8") as f:
+with open(results_dir / "metrics.json", "w", encoding="utf-8") as f:
     json.dump({"roc_auc_full_fit": float(roc), "best_model": best_name, "best_cv_roc_auc": best_cv}, f, ensure_ascii=False, indent=2)
 
-from pathlib import Path as _P
-report_path = _P(results_dir) / "evaluation_metrics.txt"
+# إصلاح تقرير المقاييس ليأخذ أرقام أفضل نموذج فقط بدلاً من متوسط كل النماذج
+report_path = results_dir / "evaluation_metrics.txt"
 try:
-    import pandas as pd 
-    df_scores = _pd.read_csv(_P(results_dir)/"cv_scores.csv")
-    cols = [c for c in df_scores.columns if c.startswith("mean_")]
-    with open(report_path,"w",encoding="utf-8") as f:
+    best_model_row = df_results[df_results["model"] == best_name].iloc[0]
+    cols = [c for c in df_results.columns if c.startswith("mean_")]
+    
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(f"Best Model: {best_name}\n")
+        f.write("-" * 20 + "\n")
         for c in cols:
-            f.write(f"{c}:{df_scores[c].mean():.4f}\n")
-        f.write(f"best_model:{best_name}\n")
-except Exception:
-    with open(report_path,"w",encoding="utf-8") as f:
-        f.write("metrics summary unavailable\n")
+            f.write(f"{c}: {best_model_row[c]:.4f}\n")
+except Exception as e:
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(f"Metrics summary unavailable. Error: {str(e)}\n")
