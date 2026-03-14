@@ -1,1 +1,7 @@
-metrics summary unavailable
+Best Model: svm
+--------------------
+mean_roc_auc: 0.9186
+mean_f1: 0.8547
+mean_precision: 0.8690
+mean_recall: 0.8417
+mean_accuracy: 0.8569
