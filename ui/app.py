@@ -43,7 +43,7 @@ st.markdown("""
         color: #005b96 !important;
     }
     </style>
-    """, unsafe_base64=True)
+    """, unsafe_allow_html=True)
 
 @st.cache_resource
 def load_model():
