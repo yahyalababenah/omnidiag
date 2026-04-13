@@ -5,23 +5,53 @@ from pathlib import Path
 from joblib import load
 import streamlit as st
 
-# 1. إعدادات الصفحة والسمة العامة
+# 1. إعدادات الصفحة
 st.set_page_config(
-    page_title="نظام التشخيص الذكي لأمراض القلب",
-    page_icon="❤️",
-    layout="wide" # استخدام العرض الكامل للشاشة
+    page_title="نظام التشخيص الطبي لأمراض القلب",
+    page_icon="🩺",
+    layout="wide"
 )
 
-# 2. تحميل النموذج والبيانات الوصفية مع التخزين المؤقت
+# 2. حقن CSS لتكبير الخطوط وإعطاء طابع طبي (أزرق سريري)
+st.markdown("""
+    <style>
+    /* تكبير الخطوط في كامل التطبيق */
+    html, body, [class*="css"] {
+        font-size: 1.15rem !important; 
+    }
+    /* تغيير لون الأزرار إلى الأزرق الطبي */
+    .stButton>button {
+        background-color: #005b96;
+        color: white;
+        font-weight: bold;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #004370;
+    }
+    /* تخصيص صناديق المقاييس */
+    .stMetric {
+        background-color: #eaf4fc;
+        border-right: 5px solid #005b96;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    /* تلوين العناوين */
+    h1, h2, h3 {
+        color: #005b96 !important;
+    }
+    </style>
+    """, unsafe_base64=True)
+
 @st.cache_resource
 def load_model():
     base = Path(__file__).resolve().parents[1]
     meta_path = base / "models" / "metadata.json"
     model_path = base / "models" / "final_model.pkl"
-    
     if not meta_path.exists() or not model_path.exists():
         return None, None
-    
     with open(meta_path, "r", encoding="utf-8") as f:
         meta = json.load(f)
     model = load(model_path)
@@ -29,86 +59,87 @@ def load_model():
 
 meta, model = load_model()
 
-# 3. واجهة الشريط الجانبي (Sidebar) للمعلومات الفنية
-with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/heart-with-pulse.png")
-    st.title("معلومات النظام")
-    if meta:
-        st.info(f"🏆 أفضل نموذج: {meta['best_model'].upper()}")
-        st.metric("دقة النموذج (AUC)", f"{meta['best_cv_roc_auc']:.1%}")
-    st.markdown("---")
-    st.write("🔧 **إعدادات التحليل**")
-    thr = st.slider("عتبة القرار (Sensitivity)", 0.1, 0.9, 0.5, 0.05, 
-                    help="رفع العتبة يجعل النموذج أكثر صرامة في تشخيص الإصابة.")
+if model is None:
+    st.error("⚠️ النموذج غير موجود. يرجى تشغيل التدريب أولاً.")
+    st.stop()
 
-# 4. العنوان الرئيسي والتبويبات
-st.title("🏥 نظام التحليل التنبؤي لمخاطر القلب")
-tab1, tab2 = st.tabs(["🔍 إدخال البيانات والتحليل", "📊 حول المشروع"])
+# 3. الواجهة الرئيسية
+st.title("🩺 السجل الطبي: تقييم مخاطر أمراض القلب")
+st.markdown("يرجى إدخال القيم المخبرية والسريرية بدقة في الحقول المخصصة أدناه.")
 
-with tab1:
-    # تنسيق المدخلات في حاوية منظمة
-    with st.container():
-        st.subheader("📋 البيانات الحيوية للمريض")
-        
-        # توزيع المدخلات على 3 أعمدة بدلاً من 2 لتقليل الفراغات
-        c1, c2, c3 = st.columns(3)
-        
-        with c1:
-            age = st.number_input("👤 العمر", 20, 100, 50)
-            sex = st.selectbox("🚻 الجنس", ["أنثى", "ذكر"], index=1)
-            cp = st.selectbox("💔 نوع ألم الصدر", ["نموذجي", "غير نمطي", "بدون ألم", "إقفاري"])
-            trestbps = st.slider("🩸 ضغط الدم (الراحة)", 80, 200, 120)
-
-        with c2:
-            chol = st.slider("🧪 الكولسترول", 100, 600, 200)
-            fbs = st.radio("🍬 سكر صائم ≥ 120", ["لا", "نعم"], horizontal=True)
-            restecg = st.selectbox("📈 تخطيط القلب", ["طبيعي", "شذوذ ST-T", "تضخم البطين"])
-            thalach = st.slider("💓 أقصى نبض", 60, 220, 150)
-
-        with c3:
-            exang = st.radio("🏃 ألم مجهودي؟", ["لا", "نعم"], horizontal=True)
-            oldpeak = st.number_input("📉 انخفاض ST", 0.0, 6.0, 1.0, 0.1)
-            slope = st.selectbox("📏 ميل ST", ["هابط", "مسطّح", "صاعد"])
-            ca = st.selectbox("🚢 الأوعية المصبوغة", [0, 1, 2, 3])
-            thal = st.selectbox("🧬 الثلاسيميا", ["طبيعي", "عيب ثابت", "عيب قابل للعكس"])
-
-    st.markdown("---")
+# الحاوية الرئيسية للنموذج
+with st.container():
+    st.subheader("📋 البيانات السريرية للمريض")
     
-    # أزرار الإجراءات بتنسيق جذاب
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
-    with col_btn1:
-        go = st.button("🚀 بدء التحليل الذكي", use_container_width=True)
-    with col_btn2:
-        demo_low = st.button("✅ مثال حالة مستقرة", use_container_width=True)
-    with col_btn3:
-        demo_high = st.button("⚠️ مثال حالة حرجة", use_container_width=True)
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        # إدخال يدوي دقيق بدلاً من Sliders
+        age = st.number_input("العمر (سنوات)", min_value=20, max_value=100, value=50, step=1)
+        sex = st.selectbox("الجنس", ["أنثى", "ذكر"], index=1)
+        cp = st.selectbox("نوع ألم الصدر", ["نموذجي", "غير نمطي", "بدون ألم", "إقفاري"])
+        trestbps = st.number_input("ضغط الدم الانقباضي (الراحة)", min_value=80, max_value=220, value=120, step=1)
 
-# 5. منطق المعالجة وعرض النتائج
-def process_and_show(input_row):
-    p = model.predict_proba(input_row)[0, 1]
+    with c2:
+        chol = st.number_input("الكولسترول الكلي (mg/dl)", min_value=100, max_value=600, value=200, step=1)
+        fbs = st.selectbox("سكر صائم ≥ 120 mg/dl", ["لا", "نعم"], index=0)
+        restecg = st.selectbox("نتائج تخطيط القلب", ["طبيعي", "شذوذ ST-T", "تضخم البطين الأيسر"])
+        thalach = st.number_input("أقصى نبض تم الوصول إليه", min_value=60, max_value=220, value=150, step=1)
+
+    with c3:
+        exang = st.selectbox("ألم صدري ناتج عن مجهود", ["لا", "نعم"], index=0)
+        oldpeak = st.number_input("انخفاض ST (Oldpeak)", min_value=0.0, max_value=6.0, value=1.0, step=0.1, format="%.1f")
+        slope = st.selectbox("ميل مقطع ST", ["هابط", "مسطّح", "صاعد"], index=1)
+        ca = st.number_input("عدد الأوعية المصبوغة", min_value=0, max_value=3, value=0, step=1)
+        thal = st.selectbox("نتائج فحص الثلاسيميا", ["طبيعي", "عيب ثابت", "عيب قابل للعكس"], index=2)
+
+st.markdown("---")
+
+col_action1, col_action2 = st.columns([1, 3])
+with col_action1:
+    analyze_btn = st.button("استخراج التقرير الطبي", use_container_width=True)
+with col_action2:
+    thr = st.number_input("عتبة القرار السريري (Threshold)", min_value=0.10, max_value=0.90, value=0.50, step=0.05)
+
+# 4. معالجة البيانات
+if analyze_btn:
+    mapping = {"أنثى": 0, "ذكر": 1, "لا": 0, "نعم": 1, 
+               "نموذجي": 0, "غير نمطي": 1, "بدون ألم": 2, "إقفاري": 3,
+               "طبيعي": 0, "شذوذ ST-T": 1, "تضخم البطين الأيسر": 2,
+               "هابط": 0, "مسطّح": 1, "صاعد": 2}
+    
+    # تصحيح قيم الثلاسيميا حسب الكود الخاص بك
+    thal_mapping = {"طبيعي": 1, "عيب ثابت": 2, "عيب قابل للعكس": 3}
+    # في بعض النسخ 'طبيعي' للـ ecg تكون 0 أو 1، نعتمد المابينج هنا:
+    restecg_val = mapping.get(restecg, 0)
+    
+    input_df = pd.DataFrame([{
+        "age": age,
+        "sex": mapping[sex],
+        "cp": mapping[cp],
+        "trestbps": trestbps,
+        "chol": chol,
+        "fbs": mapping[fbs],
+        "restecg": restecg_val,
+        "thalach": thalach,
+        "exang": mapping[exang],
+        "oldpeak": oldpeak,
+        "slope": mapping[slope],
+        "ca": ca,
+        "thal": thal_mapping[thal]
+    }])
+
+    p = model.predict_proba(input_df)[0, 1]
     is_risk = p >= thr
     
-    st.markdown("### 🧬 مخرجات التحليل الرقمي")
+    st.markdown("### 📊 التقرير التشخيصي")
+    r1, r2 = st.columns([1, 2])
     
-    res_c1, res_c2 = st.columns([1, 2])
-    
-    with res_c1:
-        st.metric("احتمال الإصابة", f"{p:.1%}", delta=f"{p-thr:.1%}", delta_color="inverse")
-    
-    with res_c2:
+    with r1:
+        st.metric("احتمالية الخطر المئوية", f"{p:.1%}")
+        
+    with r2:
         if is_risk:
-            st.error(f"⚠️ النتيجة: خطر مرتفع ({p:.1%})")
-            st.write("💡 **توصية:** يرجى مراجعة طبيب المختص لإجراء فحوصات معمقة.")
+            st.error("⚠️ تقييم النظام: مؤشرات عالية الخطورة. يُنصح بتحويل المريض لتقييم قلبي شامل.")
         else:
-            st.success(f"✅ النتيجة: خطر منخفض ({p:.1%})")
-            st.write("💡 **توصية:** المؤشرات الحيوية ضمن النطاق الآمن حالياً.")
-    
-    st.progress(p)
-
-# استدعاء الدوال بناءً على الأزرار
-if go:
-    # تحويل المدخلات لـ DataFrame (استخدم دالة make_row الأصلية هنا)
-    pass 
-elif demo_low:
-    # محاكاة بيانات الحالة المنخفضة
-    pass
+            st.success("✅ تقييم النظام: مؤشرات مستقرة. لا توجد علامات خطورة حادة حالياً.")
