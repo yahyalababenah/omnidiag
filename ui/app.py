@@ -13,6 +13,7 @@ st.set_page_config(
 )
 
 # 2. حقن CSS لتكبير الخطوط وإعطاء طابع طبي (أزرق سريري)
+# 2. حقن CSS لتكبير الخطوط وإعطاء طابع طبي (مع إصلاح الألوان)
 st.markdown("""
     <style>
     /* تكبير الخطوط في كامل التطبيق */
@@ -31,12 +32,16 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #004370;
     }
-    /* تخصيص صناديق المقاييس */
-    .stMetric {
-        background-color: #eaf4fc;
-        border-right: 5px solid #005b96;
-        padding: 15px;
-        border-radius: 5px;
+    /* تخصيص صناديق المقاييس وإجبار لون النص على التباين */
+    [data-testid="metric-container"] {
+        background-color: #eaf4fc !important;
+        border-right: 5px solid #005b96 !important;
+        padding: 15px !important;
+        border-radius: 5px !important;
+    }
+    /* إجبار كافة النصوص داخل الصندوق على اللون الكحلي الداكن */
+    [data-testid="metric-container"] * {
+        color: #002244 !important; 
     }
     /* تلوين العناوين */
     h1, h2, h3 {
@@ -44,7 +49,6 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-
 @st.cache_resource
 def load_model():
     base = Path(__file__).resolve().parents[1]
@@ -60,7 +64,7 @@ def load_model():
 meta, model = load_model()
 
 if model is None:
-    st.error("⚠️ النموذج غير موجود. يرجى تشغيل التدريب أولاً.")
+    st.error(" النموذج غير موجود. يرجى تشغيل التدريب أولاً.")
     st.stop()
 
 # 3. الواجهة الرئيسية
@@ -69,7 +73,7 @@ st.markdown("يرجى إدخال القيم المخبرية والسريرية 
 
 # الحاوية الرئيسية للنموذج
 with st.container():
-    st.subheader("📋 البيانات السريرية للمريض")
+    st.subheader(" البيانات السريرية للمريض")
     
     c1, c2, c3 = st.columns(3)
     
@@ -132,7 +136,7 @@ if analyze_btn:
     p = model.predict_proba(input_df)[0, 1]
     is_risk = p >= thr
     
-    st.markdown("### 📊 التقرير التشخيصي")
+    st.markdown("###  التقرير التشخيصي")
     r1, r2 = st.columns([1, 2])
     
     with r1:
@@ -140,6 +144,6 @@ if analyze_btn:
         
     with r2:
         if is_risk:
-            st.error("⚠️ تقييم النظام: مؤشرات عالية الخطورة. يُنصح بتحويل المريض لتقييم قلبي شامل.")
+            st.error(" تقييم النظام: مؤشرات عالية الخطورة. يُنصح بتحويل المريض لتقييم قلبي شامل.")
         else:
-            st.success("✅ تقييم النظام: مؤشرات مستقرة. لا توجد علامات خطورة حادة حالياً.")
+            st.success("تقييم النظام: مؤشرات مستقرة. لا توجد علامات خطورة حادة حالياً.")
