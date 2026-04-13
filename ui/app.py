@@ -8,7 +8,7 @@ import streamlit as st
 # 1. إعدادات الصفحة
 st.set_page_config(
     page_title="نظام التشخيص الطبي لأمراض القلب",
-    page_icon="🩺",
+    page_icon="",
     layout="wide"
 )
 
