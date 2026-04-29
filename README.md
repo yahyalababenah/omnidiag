@@ -1,25 +1,25 @@
 https://heartdiseaseproject-xku9hnxglpqmf6ktajerwx.streamlit.app/
 ```markdown
-# Heart Disease Prediction & Analysis System 🫀
+# Heart Disease Prediction & Analysis System 
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)
 ![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-Machine%20Learning-orange.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Web%20App-red.svg)
 ![Status](https://img.shields.io/badge/Status-Completed-success.svg)
 
-## 📌 About The Project
+##  About The Project
 This project was developed as part of an advanced data science training program in collaboration with **Sprite & Microsoft**. It is an end-to-end Machine Learning pipeline designed to predict the risk of heart disease based on clinical parameters. 
 
 The project goes beyond simple classification by incorporating comprehensive data preprocessing, hyperparameter tuning, unsupervised learning for data exploration, and an interactive Arabic web application for real-time risk assessment.
 
-## 🚀 Key Features
+##  Key Features
 - **Robust ML Pipeline:** Utilizes `scikit-learn` Pipelines with `ColumnTransformer` to handle both numerical scaling (`StandardScaler`) and categorical encoding (`OneHotEncoder`) seamlessly.
 - **Model Evaluation:** Evaluates multiple algorithms (Logistic Regression, Decision Tree, Random Forest, SVC) using Stratified K-Fold Cross Validation.
 - **Hyperparameter Tuning:** Implements `GridSearchCV` to find the optimal parameters for the Random Forest Classifier.
 - **Unsupervised Learning:** Explores natural data groupings using KMeans Clustering, PCA (Principal Component Analysis) for dimensionality reduction, and Hierarchical Clustering dendrograms.
 - **Interactive UI:** Features a fully functional web interface built with **Streamlit** (in Arabic), allowing users to input medical parameters, adjust decision thresholds, and view prediction probabilities interactively.
 
-## 📂 Repository Structure
+##  Repository Structure
 ```text
 Heart_Disease_Project/
 │
@@ -34,7 +34,7 @@ Heart_Disease_Project/
 
 ```
 
-## 🛠️ Installation & Setup
+##  Installation & Setup
 
 **1. Clone the repository:**
 
@@ -72,15 +72,15 @@ streamlit run ui/app.py
 
 *(Note: Replace `app.py` with the exact name of your python file inside the `ui` folder)*
 
-## 📊 Data Source
+##  Data Source
 
 The dataset used in this project features clinical attributes such as age, sex, chest pain type (cp), resting blood pressure (trestbps), cholesterol levels (chol), and ECG results to predict the presence of heart disease (`target` variable). Provided via the Sprite & Microsoft training program.
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions, issues, and feature requests are welcome! Feel free to check the issues page if you want to contribute.
 
-## 📝 License
+##  License
 
 This project is open-source and available under the [MIT License](LICENSE).
 
