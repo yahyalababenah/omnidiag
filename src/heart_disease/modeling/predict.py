@@ -4,51 +4,57 @@ from pathlib import Path
 import logging
 
 # إعداد الـ Logger
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def predict_patient(patient_data: dict):
     """
-    يقوم بتحميل النموذج الجاهز (final_model.pkl) وعمل تنبؤ لمريض جديد.
+    يتلقى بيانات المريض الخام (نصوص وأرقام)، يمررها عبر الـ Pipeline الجاهز، ويعيد التوقع.
     
     Args:
-        patient_data (dict): قاموس يحتوي على بيانات المريض (مثل {'Age': 40, 'Sex': 'M', ...})
-        
-    Returns:
-        prediction (int): 0 أو 1 (سليم أو مصاب)
-        probability (float): نسبة ثقة النموذج في التوقع
+        patient_data (dict): قاموس ببيانات المريض مثل:
+                             {'Age': 50, 'Sex': 'M', 'ChestPainType': 'ATA', ...}
+                             يجب أن تكون القيم النصية (Categories) مطابقة للقيم الأصلية في CSV.
     """
-    # 1. تحديد مسار الموديل (نصعد من هذا الملف إلى الجذر ثم models)
+    # 1. تحديد مسار الموديل ديناميكياً
     root_dir = Path(__file__).resolve().parents[3]
     model_path = root_dir / "models" / "final_model.pkl"
     
     if not model_path.exists():
         logger.error(f"الموديل غير موجود في: {model_path}")
-        raise FileNotFoundError("لم يتم العثور على الموديل. هل قمت بتشغيل train.py؟")
+        raise FileNotFoundError(f"لم يتم العثور على ملف final_model.pkl في مجلد models.")
         
-    # 2. تحميل الموديل
-    model = joblib.load(model_path)
+    # 2. تحميل الموديل المجمع (بما في ذلك Pipeline المعالجة)
+    logger.info("جاري تحميل الموديل والـ Pipeline...")
+    final_pipeline = joblib.load(model_path)
     
-    # 3. تحويل بيانات المريض إلى DataFrame (ضروري لكي تعمل الـ Pipeline)
+    # 3. تحويل القاموس إلى DataFrame (خطوة إجبارية لعمل الـ Scikit-Learn Pipeline)
     df = pd.DataFrame([patient_data])
     
-    # 4. التوقع
-    prediction = model.predict(df)
-    probability = model.predict_proba(df)
+    # 4. التوقع عبر خط الإنتاج الشامل (التحويل والتصنيف يحدث هنا تلقائياً)
+    logger.info("جاري المعالجة وعمل التنبؤ...")
+    prediction = final_pipeline.predict(df)
+    probability = final_pipeline.predict_proba(df)
     
-    logger.info(f"تم التوقع بنجاح: {prediction[0]} بنسبة ثقة {probability[0][1]:.2f}")
+    # النتيجة النهائية: 1 (مصاب) أو 0 (سليم)
+    is_risk = int(prediction[0])
+    risk_prob = float(probability[0][1])
     
-    return prediction[0], probability[0][1]
+    logger.info(f"النتيجة: {is_risk}، احتمالية: {risk_prob:.2f}")
+    
+    return is_risk, risk_prob
 
 if __name__ == "__main__":
-    # تجربة سريعة للتأكد أن الموديل يعمل
-    sample_patient = {
-        'Age': 40, 'Sex': 'M', 'ChestPainType': 'ATA', 'RestingBP': 140, 
-        'Cholesterol': 289, 'FastingBS': 0, 'RestingECG': 'Normal', 
-        'MaxHR': 172, 'ExerciseAngina': 'N', 'Oldpeak': 0.0, 'ST_Slope': 'Up'
+    # حالة تجريبية لمريض مصاب (بيانات خام نصية مطابقة لـ CSV)
+    test_patient = {
+        'Age': 49, 'Sex': 'F', 'ChestPainType': 'NAP', 'RestingBP': 160, 
+        'Cholesterol': 180, 'FastingBS': 0, 'RestingECG': 'Normal', 
+        'MaxHR': 156, 'ExerciseAngina': 'N', 'Oldpeak': 1.0, 'ST_Slope': 'Flat'
     }
     
     try:
-        pred, prob = predict_patient(sample_patient)
-        print(f"التوقع: {'مصاب' if pred == 1 else 'سليم'} (نسبة الثقة: {prob:.2%})")
+        # تشغيل التنبؤ (Inference)
+        res, prob = predict_patient(test_patient)
+        print(f"\n--- نتيجة فحص V2 ---\nالتشخيص: {res}\nالاحتمالية: {prob:.2%}")
     except Exception as e:
-        print(f"حدث خطأ أثناء التوقع: {e}")
+        print(f"حدث خطأ: {e}")
