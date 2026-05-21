@@ -1,34 +1,33 @@
 import pandas as pd
-from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
-import logging
-
-logger = logging.getLogger(__name__)
+from sklearn.impute import KNNImputer
 
 def get_preprocessor() -> ColumnTransformer:
     """
-    يبني Pipeline موحد لمعالجة البيانات الرقمية والنصية.
-    هذا هو "السورس الوحيد" للمعالجة في المشروع بأكمله.
+    يجهز معالج البيانات (Pipeline) الذي يقوم بـ:
+    1. ملء القيم المفقودة (KNN Imputer)
+    2. معالجة النصوص (OneHotEncoder)
+    3. توحيد المقاييس (StandardScaler)
     """
-    # 1. تحديد الأعمدة بناءً على نوعها
+    
+    # تحديد الأعمدة بناءً على طبيعتها
     numeric_features = ['Age', 'RestingBP', 'Cholesterol', 'FastingBS', 'MaxHR', 'Oldpeak']
     categorical_features = ['Sex', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']
 
-    # 2. معالجة الأرقام: سد الفراغات بالمتوسط (إن وجدت) ثم التقييس
+    # معالجة البيانات الرقمية
     numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
+        ('imputer', KNNImputer(n_neighbors=5)),
         ('scaler', StandardScaler())
     ])
 
-    # 3. معالجة النصوص: سد الفراغات ثم تحويلها لأرقام (One-Hot Encoding)
+    # معالجة البيانات النصية
     categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='most_frequent')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))
+        ('encoder', OneHotEncoder(handle_unknown='ignore'))
     ])
 
-    # 4. دمج المعالجين في محول واحد
+    # تجميعهم
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', numeric_transformer, numeric_features),
@@ -37,29 +36,9 @@ def get_preprocessor() -> ColumnTransformer:
     
     return preprocessor
 
-if __name__ == "__main__":
-    # تجربة سريعة للتأكد من عمل الـ Pipeline
-    import sys
-    from pathlib import Path
-    
-    # إضافة مسار المشروع للتمكن من استدعاء dataset
-    root_dir = Path(__file__).resolve().parents[2]
-    sys.path.append(str(root_dir))
-    
-    from src.heart_disease.dataset import load_raw_data
-    
-    try:
-        # تحميل البيانات
-        df = load_raw_data()
-        X = df.drop(columns=['HeartDisease'])
-        
-        # استدعاء وتطبيق المعالجة
-        preprocessor = get_preprocessor()
-        X_processed = preprocessor.fit_transform(X)
-        
-        print("\n--- نجاح المعالجة! ---")
-        print(f"شكل البيانات قبل المعالجة: {X.shape}")
-        print(f"شكل البيانات بعد المعالجة (بسبب One-Hot Encoding): {X_processed.shape}")
-        
-    except Exception as e:
-        print(f"حدث خطأ: {e}")
+def process_features(X: pd.DataFrame, preprocessor: ColumnTransformer) -> pd.DataFrame:
+    """
+    تطبيق الـ preprocessor على البيانات (X).
+    """
+    X_processed = preprocessor.fit_transform(X)
+    return X_processed
