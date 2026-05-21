@@ -218,7 +218,7 @@ with tab_stats:
                 st.subheader("توزيع الجنسين")
                 fig_sex, ax_sex = plt.subplots(figsize=(5, 5))
                 # حساب النسب يدوياً لـ Streamlit
-                sex_dist = df_raw.groupby('Sex')['HeartDisease'].value_spacing(normalize=True).unstack() * 100
+                sex_dist = df_raw.groupby('Sex')['HeartDisease'].value_counts(normalize=True).unstack() * 100
                 sex_dist.plot(kind='bar', stacked=True, color=['#eaf4fc', '#005b96'], ax=ax_sex)
                 ax_sex.set_title("Sex Distribution by Diagnosis")
                 ax_sex.set_xlabel("Sex (M/F)")
