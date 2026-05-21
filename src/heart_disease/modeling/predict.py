@@ -1,60 +1,79 @@
-import joblib
+import sys
 import pandas as pd
+import numpy as np
 from pathlib import Path
-import logging
+from typing import Union, Tuple
 
-# إعداد الـ Logger
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# إضافة المسار الجذري لضمان التعرف على الحزم الداخلية
+root_dir = Path(__file__).resolve().parents[3]
+if str(root_dir) not in sys.path:
+    sys.path.append(str(root_dir))
 
-def predict_patient(patient_data: dict):
+from src.heart_disease.dataset import load_raw_data, get_X_y
+from src.heart_disease.modeling.train import build_classic_stacking_model
+
+# --- ميزة التسريع (Memory Caching) ---
+# متغير عام (Global) لتخزين النموذج بعد تدريبه لأول مرة، لمنع إعادة التدريب
+_trained_pipeline = None
+
+def get_trained_model():
     """
-    يتلقى بيانات المريض الخام (نصوص وأرقام)، يمررها عبر الـ Pipeline الجاهز، ويعيد التوقع.
-    
-    Args:
-        patient_data (dict): قاموس ببيانات المريض مثل:
-                             {'Age': 50, 'Sex': 'M', 'ChestPainType': 'ATA', ...}
-                             يجب أن تكون القيم النصية (Categories) مطابقة للقيم الأصلية في CSV.
+    يقوم بتدريب النموذج مرة واحدة فقط عند أول استدعاء، ثم يحتفظ به في الذاكرة.
+    هذا يجعل استجابة واجهة Streamlit سريعة جداً (فورية).
     """
-    # 1. تحديد مسار الموديل ديناميكياً
-    root_dir = Path(__file__).resolve().parents[3]
-    model_path = root_dir / "models" / "final_model.pkl"
+    global _trained_pipeline
+    if _trained_pipeline is None:
+        print("⚙️ جاري تدريب النموذج لأول مرة وحفظه في الذاكرة...")
+        df = load_raw_data()
+        X, y = get_X_y(df)
+        pipeline = build_classic_stacking_model()
+        pipeline.fit(X, y)
+        _trained_pipeline = pipeline
+    return _trained_pipeline
+
+def predict_patient(patient_data: Union[dict, list, pd.DataFrame]) -> Tuple[Union[int, np.ndarray], Union[float, np.ndarray]]:
+    """
+    يستقبل بيانات مريض واحد (من الواجهة الرئيسية) أو دفعة مرضى (من تبويب الإحصائيات).
+    """
+    # 1. جلب النموذج السريع من الذاكرة
+    pipeline = get_trained_model()
     
-    if not model_path.exists():
-        logger.error(f"الموديل غير موجود في: {model_path}")
-        raise FileNotFoundError(f"لم يتم العثور على ملف final_model.pkl في مجلد models.")
-        
-    # 2. تحميل الموديل المجمع (بما في ذلك Pipeline المعالجة)
-    logger.info("جاري تحميل الموديل والـ Pipeline...")
-    final_pipeline = joblib.load(model_path)
+    # 2. تحويل البيانات إلى DataFrame بذكاء
+    if isinstance(patient_data, dict):
+        patient_df = pd.DataFrame([patient_data])
+    elif isinstance(patient_data, list):
+        patient_df = pd.DataFrame(patient_data)
+    elif isinstance(patient_data, pd.DataFrame):
+        patient_df = patient_data
+    else:
+        raise ValueError("صيغة البيانات غير مدعومة. يرجى إرسال dict أو list أو DataFrame.")
     
-    # 3. تحويل القاموس إلى DataFrame (خطوة إجبارية لعمل الـ Scikit-Learn Pipeline)
-    df = pd.DataFrame([patient_data])
+    # 3. حساب الاحتماليات
+    risk_probabilities = pipeline.predict_proba(patient_df)[:, 1]
     
-    # 4. التوقع عبر خط الإنتاج الشامل (التحويل والتصنيف يحدث هنا تلقائياً)
-    logger.info("جاري المعالجة وعمل التنبؤ...")
-    prediction = final_pipeline.predict(df)
-    probability = final_pipeline.predict_proba(df)
-    
-    # النتيجة النهائية: 1 (مصاب) أو 0 (سليم)
-    is_risk = int(prediction[0])
-    risk_prob = float(probability[0][1])
-    
-    logger.info(f"النتيجة: {is_risk}، احتمالية: {risk_prob:.2f}")
-    
-    return is_risk, risk_prob
+    # 4. إرجاع النتيجة بناءً على عدد المرضى
+    if len(patient_df) == 1:
+        # إذا كان مريضاً واحداً -> نرجع رقم مفرد (Float) لتناسب شاشة الواجهة
+        prob = float(risk_probabilities[0])
+        base_prediction = 1 if prob >= 0.50 else 0
+        return base_prediction, prob
+    else:
+        # إذا كانت مجموعة مرضى -> نرجع مصفوفة كاملة (Array) لرسم الإحصائيات
+        preds = (risk_probabilities >= 0.50).astype(int)
+        return preds, risk_probabilities
 
 if __name__ == "__main__":
-    # حالة تجريبية لمريض مصاب (بيانات خام نصية مطابقة لـ CSV)
-    test_patient = {
-        'Age': 49, 'Sex': 'F', 'ChestPainType': 'NAP', 'RestingBP': 160, 
-        'Cholesterol': 180, 'FastingBS': 0, 'RestingECG': 'Normal', 
-        'MaxHR': 156, 'ExerciseAngina': 'N', 'Oldpeak': 1.0, 'ST_Slope': 'Flat'
+    # اختبار سريع للتأكد من المزامنة
+    mock_patient = {
+        "Age": 50, "Sex": "M", "ChestPainType": "ASY", "RestingBP": 120,
+        "Cholesterol": 200, "FastingBS": 0, "RestingECG": "Normal",
+        "MaxHR": 150, "ExerciseAngina": "N", "Oldpeak": 1.0, "ST_Slope": "Flat"
     }
     
-    try:
-        # تشغيل التنبؤ (Inference)
-        res, prob = predict_patient(test_patient)
-        print(f"\n--- نتيجة فحص V2 ---\nالتشخيص: {res}\nالاحتمالية: {prob:.2%}")
-    except Exception as e:
-        print(f"حدث خطأ: {e}")
+    print("--- الاختبار الأول (سيطول قليلاً للتدريب) ---")
+    pred, prob = predict_patient(mock_patient)
+    print(f"Test Probability: {prob:.2%}")
+    
+    print("\n--- الاختبار الثاني (سيكون لحظياً بفضل الكاش) ---")
+    pred, prob = predict_patient(mock_patient)
+    print(f"Test Probability: {prob:.2%}")
