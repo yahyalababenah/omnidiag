@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import logging
+from typing import Tuple
 
 # إعداد الـ Logger لتسجيل الأحداث (ممارسة هندسية احترافية)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,10 +40,25 @@ def load_raw_data(filename: str = "heart.csv") -> pd.DataFrame:
     
     return df
 
+def get_X_y(df: pd.DataFrame, target_col: str = 'HeartDisease') -> Tuple[pd.DataFrame, pd.Series]:
+    """
+    فصل إطار البيانات إلى ميزات (X) والهدف (y).
+    """
+    if target_col not in df.columns:
+        logger.error(f"العمود الهدف '{target_col}' غير موجود في البيانات.")
+        raise ValueError(f"Target column '{target_col}' not found in the dataset.")
+    
+    X = df.drop(columns=[target_col])
+    y = df[target_col]
+    logger.info(f"تم فصل البيانات بنجاح: مدخلات (X) {X.shape} ، هدف (y) {y.shape}")
+    return X, y
+
 if __name__ == "__main__":
-    # هذا الجزء يعمل فقط إذا قمت بتشغيل هذا الملف مباشرة للتجربة
+    # اختبار سريع للتأكد من عمل الدوال
     try:
         df = load_raw_data()
-        print(df.head())
+        X, y = get_X_y(df)
+        print("\n--- عينة من الميزات (X) ---")
+        print(X.head(2))
     except Exception as e:
-        print(f"حدث خطأ أثناء تحميل البيانات: {e}")
+        logger.error(f"حدث خطأ أثناء تحميل البيانات: {e}")
