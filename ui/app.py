@@ -6,21 +6,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 
-# 1. إعداد المسارات للربط مع المحرك الخلفي (Backend)
-# تصحيح المسار ليعمل من أي مكان
-current_dir = Path(__file__).resolve().parents[0]
-if current_dir.name == 'src': # إذا تم تشغيله من داخل src مباشرة
-    root_dir = current_dir.parents[1]
-else: # المسار الطبيعي لـ repo
-    root_dir = current_dir.parents[1]
+# --- الإصلاح السحري للمسارات (يعمل من أي مكان) ---
+current_file_path = Path(__file__).resolve()
+# إذا كان الملف داخل مجلد 'ui'، نصعد خطوة واحدة للأعلى. وإلا، نبقى في مكاننا.
+root_dir = current_file_path.parent if current_file_path.parent.name != 'ui' else current_file_path.parents[1]
 
 if str(root_dir) not in sys.path:
     sys.path.append(str(root_dir))
 
-# استدعاء دالة الاستنتاج من ملف predict.py (تأكد أن الملف يحتوي على الدالة باسم predict_patient)
+# الآن سيتعرف بايثون على مجلد src بكل تأكيد
 from src.heart_disease.modeling.predict import predict_patient
-# استدعاء الدوال اللازمة لإظهار الإحصائيات
 from src.heart_disease.dataset import load_raw_data
+
 
 # 2. إعدادات الصفحة
 st.set_page_config(
