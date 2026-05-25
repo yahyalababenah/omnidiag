@@ -1,15 +1,29 @@
-# استخدم نسخة بايثون خفيفة
-FROM python:3.13-slim
+# =============================================================================
+# OmniDiag — Multi-Disease Diagnostic Platform
+# Production Dockerfile for Hugging Face Spaces deployment
+# =============================================================================
 
-# تحديد المجلد داخل الحاوية
+FROM python:3.9-slim
+
+# Set working directory
 WORKDIR /app
 
-# نسخ ملف متطلبات المكتبات وتثبيتها
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install system dependencies required by scikit-learn / shap
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# نسخ باقي ملفات المشروع
+# Copy and install Python dependencies first (leverage Docker layer caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copy the entire project code
 COPY . .
 
-# الأمر الذي سيشغل مشروعك (استبدل main.py بالملف الرئيسي لديك)
-CMD ["python", "main.py"]
+# Expose the FastAPI port
+EXPOSE 8000
+
+# Run the FastAPI application with uvicorn
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
