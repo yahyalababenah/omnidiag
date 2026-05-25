@@ -1,6 +1,13 @@
 # Core dump files (Linux)
 core.*
 
+# Hugging Face Spaces — binary files rejected by HF
+mlruns.db
+*.pkl
+*.zip
+*.xlsx
+results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
