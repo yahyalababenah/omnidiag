@@ -29,3 +29,4 @@ watchfiles==1.2.0
 websockets==16.0
 shap==0.46.0
 xgboost==2.1.4
+python-multipart==0.0.20
