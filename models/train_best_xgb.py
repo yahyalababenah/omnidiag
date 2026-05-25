@@ -1,32 +1,54 @@
 import pandas as pd
 import xgboost as xgb
-import joblib
+import pickle
+import os
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
-print("🚀 جاري تدريب وحفظ XGBoost بالإعدادات الذهبية...")
+print("🚀 جاري بدء تدريب وحفظ XGBoost بالإعدادات الذهبية المكتشفة...")
 
-# 1. جلب البيانات
-df = pd.read_csv("data/processed/final_ready_data.csv")
-X = df.drop(columns=['HeartDisease']).values
-y = df['HeartDisease'].values
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# 1. قراءة البيانات الفائزة في تجربة الـ A/B Testing
+data_path = "data/processed/data_heuristic.csv"
+if not os.path.exists(data_path):
+    raise FileNotFoundError(f"⚠️ لم يتم العثور على ملف البيانات: {data_path}. تأكد من تشغيل سكريبت هندسة الميزات أولاً.")
 
-# 2. الإعدادات الذهبية من Optuna
+df = pd.read_csv(data_path)
+
+# 2. فصل الميزات عن عمود الهدف (Target)
+# ملاحظة: تأكد أن اسم عمود الهدف مطابق لما في بياناتك (غالباً 'target' أو 'HeartDisease')
+target_col = 'target' if 'target' in df.columns else df.columns[-1]
+X = df.drop(columns=[target_col])
+y = df[target_col]
+
+# 3. تقسيم البيانات إلى مجموعات تدريب واختبار بنفس النسبة السابقة لضمان عادلة المقارنة
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_test_split=0.2, random_state=42)
+
+# 4. تثبيت الإعدادات الذهبية المستخرجة من Trial 83 في Optuna
 best_params = {
-    'n_estimators': 536, 
-    'max_depth': 4, 
-    'learning_rate': 0.0167535696123816, 
-    'subsample': 0.5039562178974109, 
-    'colsample_bytree': 0.6507129420569848
+    'n_estimators': 898,
+    'max_depth': 5,
+    'learning_rate': 0.013594126498405943,
+    'subsample': 0.963733407970185,
+    'colsample_bytree': 0.5454718650965412,
+    'random_state': 42,
+    'eval_metric': 'logloss'
 }
 
-# 3. التدريب والحفظ
-clf = xgb.XGBClassifier(**best_params, random_state=42, eval_metric='logloss')
-clf.fit(X_train, y_train)
+# 5. بناء وتدريب النموذج النهائي
+best_model = xgb.XGBClassifier(**best_params)
+best_model.fit(X_train, y_train)
 
-preds = clf.predict(X_test)
-print(f"✅ الدقة المؤكدة: {accuracy_score(y_test, preds):.4f}")
+# 6. التحقق النهائي من الدقة على بيانات الاختبار
+y_pred = best_model.predict(X_test)
+final_accuracy = accuracy_score(y_test, y_pred)
+print(f"🎯 الدقة المؤكدة للموديل الجديد في بيئة الاختبار: {final_accuracy:.4f}")
 
-joblib.dump(clf, "models/xgboost_weights/omni_diag_xgb_optimized.pkl")
-print("💾 تم حفظ الموديل المحسن بنجاح!")
+# 7. حفظ الموديل المحسن بصيغة pickle لاستخدامه في نظام التحالف (Ensemble)
+model_dir = "models"
+os.makedirs(model_dir, exist_ok=True)
+model_save_path = os.path.join(model_dir, "omni_diag_xgb_optimized.pkl")
+
+with open(model_save_path, "wb") as f:
+    pickle.dump(best_model, f)
+
+print(f"💾 تم حفظ الموديل المحسن بنجاح في المسار: {model_save_path}")
