@@ -379,8 +379,8 @@ This project is licensed under the **MIT License** — see the [`LICENSE`](LICEN
 For questions, collaboration, or clinical validation inquiries:
 
 - **Author:** Yahya Mohammad Ali Lababneh
-- **Email:** [your-email@example.com](mailto:your-email@example.com)
-- **GitHub:** [github.com/your-org/omnidiag](https://github.com/your-org/omnidiag)
+- **Email:** [yahyalababenah@example.com](yahyalababenah@example.com)
+- **GitHub:** [github.com/yahyalababenah/omnidiag](https://github.com/yhyalababenah/omnidiag)
 
 ---
 
