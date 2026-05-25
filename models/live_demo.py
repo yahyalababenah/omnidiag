@@ -2,19 +2,33 @@ import pandas as pd
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import os
+import sys
+
+# Add project root to path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs.config_loader import load_config, resolve_path
 
 print("🚀 بدء تشغيل نظام OmniDiag للفحص السريري المباشر...")
 
+# Load config for config-driven paths
+cfg = load_config("heart_disease")
+processed_path = resolve_path(cfg, "data", "processed_path")
+model_path = resolve_path(cfg, "model", "weights_path")
+target_col = cfg["disease"]["target_column"]
+
 # 1. تحميل البيانات والموديل الذهبي
-df = pd.read_csv("data/processed/data_heuristic.csv")
-target_col = 'HeartDisease'
+data_path = os.path.join(processed_path, cfg["data"]["heuristic_file"])
+print(f"📂 قراءة البيانات من: {data_path}")
+print(f"📂 تحميل الموديل من: {model_path}")
+df = pd.read_csv(data_path)
 
 # نختار مريضاً محدداً من قاعدة البيانات لاختباره (يمكنك تغيير الرقم لتجربة مرضى آخرين)
-patient_index = 10 
+patient_index = 10
 patient_data = df.drop(columns=[target_col]).iloc[[patient_index]]
 actual_status = df[target_col].iloc[patient_index]
 
-model = joblib.load("models/omni_diag_xgb_optimized.pkl")
+model = joblib.load(model_path)
 
 # 2. إجراء التشخيص
 prediction = model.predict(patient_data)[0]
