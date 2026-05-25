@@ -1,3 +1,14 @@
+---
+title: OmniDiag
+emoji: 🏥
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 8000
+pinned: false
+license: mit
+---
+
 # 🏥 OmniDiag: Multi-Disease Diagnostic Platform
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
