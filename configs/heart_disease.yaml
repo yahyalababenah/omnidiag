@@ -1,0 +1,115 @@
+# =============================================================================
+# OmniDiag Configuration — Heart Disease (XGBoost)
+# =============================================================================
+# This is the single source of truth for the Heart Disease diagnostic module.
+# To add a new disease, create a new YAML file in this directory following
+# the same structure, implement a feature engineer in features/, and the
+# dynamic router will pick it up automatically.
+# =============================================================================
+
+disease:
+  name: "heart_disease"
+  display_name: "Heart Disease"
+  description: "Cardiovascular disease risk assessment using XGBoost with SHAP explainability"
+  target_column: "HeartDisease"
+  version: "4.0.0"
+
+# ---------------------------------------------------------------------------
+# Data paths — all relative to project root
+# ---------------------------------------------------------------------------
+data:
+  raw_path: "data/heart_disease/raw/"
+  processed_path: "data/heart_disease/processed/"
+  interim_path: "data/heart_disease/interim/"
+  raw_files:
+    - "heart.csv"
+    - "Z-Alizadeh sani dataset.xlsx"
+  merged_file: "merged_heart_data.csv"
+  final_clean_file: "final_ready_data.csv"
+  heuristic_file: "data_heuristic.csv"
+  clinical_file: "data_clinical.csv"
+
+# ---------------------------------------------------------------------------
+# Feature engineering configuration
+# ---------------------------------------------------------------------------
+features:
+  module: "features.heart_disease_features"
+  class: "HeartDiseaseFeatureEngineer"
+  categorical_columns:
+    - "Sex"
+    - "ChestPainType"
+    - "RestingECG"
+    - "ExerciseAngina"
+    - "ST_Slope"
+  numerical_columns:
+    - "Age"
+    - "RestingBP"
+    - "Cholesterol"
+    - "MaxHR"
+    - "Oldpeak"
+  imputation_features:
+    - "Age"
+    - "Sex_Num"
+    - "RestingBP"
+    - "MaxHR"
+    - "Cholesterol"
+  heuristic_features:
+    - name: "Age_BP_Interaction"
+      formula: "Age * RestingBP"
+      description: "Multiplicative interaction between age and resting blood pressure"
+    - name: "HR_Age_Ratio"
+      formula: "MaxHR / Age"
+      description: "Ratio of maximum heart rate to age (fitness indicator)"
+    - name: "Chol_Age_Ratio"
+      formula: "Cholesterol / Age"
+      description: "Ratio of cholesterol to age (risk normalization)"
+  clinical_features:
+    - name: "Clinical_Risk_Score"
+      formula: "exp(Age * 0.048 + RestingBP * 0.015 + Cholesterol * 0.002)"
+      description: "Logarithmic risk index based on medical literature weights"
+
+# ---------------------------------------------------------------------------
+# Model configuration
+# ---------------------------------------------------------------------------
+model:
+  type: "xgboost"                    # Model architecture: xgboost | tabnet | deep_learning
+  explainer_type: "tree"             # SHAP explainer: tree (TreeExplainer) | deep (DeepExplainer)
+  weights_path: "models/heart_disease/xgboost_weights/omni_diag_xgb_optimized.pkl"
+  fallback_weights_path: "models/heart_disease/omni_diag_xgb_optimized.pkl"
+  preprocessors_path: "models/heart_disease/preprocessors/"
+  best_params:
+    n_estimators: 898
+    max_depth: 5
+    learning_rate: 0.013594126498405943
+    subsample: 0.963733407970185
+    colsample_bytree: 0.5454718650965412
+    eval_metric: "logloss"
+    random_state: 42
+
+# ---------------------------------------------------------------------------
+# Training configuration
+# ---------------------------------------------------------------------------
+training:
+  test_size: 0.2
+  random_state: 42
+  optimization_trials: 100
+  optimization_direction: "maximize"
+  optimization_metric: "accuracy"
+
+# ---------------------------------------------------------------------------
+# SHAP explainer configuration
+# ---------------------------------------------------------------------------
+explainer:
+  enabled: true
+  type: "shap"
+  plots_output_dir: "reports/figures/"
+  summary_bar_plot: "shap_summary_bar.png"
+  beeswarm_plot: "shap_beeswarm.png"
+  waterfall_plot_prefix: "shap_waterfall_p"
+
+# ---------------------------------------------------------------------------
+# API configuration
+# ---------------------------------------------------------------------------
+api:
+  endpoint_prefix: "/api/v4"
+  version: "4.0.0"
