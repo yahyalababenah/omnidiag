@@ -14,7 +14,11 @@ import joblib
 import pandas as pd
 import numpy as np
 import shap
+import importlib
 from typing import Optional, Dict, Any, List
+
+# Project root: resolve relative paths from the config
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class ModelLoader:
@@ -41,6 +45,8 @@ class ModelLoader:
         self._explainer: Optional[object] = None
         self._preprocessors: Optional[Dict[str, object]] = None
         self._feature_names: Optional[List[str]] = None
+        self._project_root = _PROJECT_ROOT
+        self._feature_engineer: Optional[object] = None
     
     # ------------------------------------------------------------------
     # Properties with lazy loading
@@ -76,6 +82,9 @@ class ModelLoader:
         """Lazy-load and cache preprocessors (label encoders, scaler)."""
         if self._preprocessors is None:
             preprocessors_path = self.config.get("model", {}).get("preprocessors_path", "")
+            # Resolve relative to project root
+            if preprocessors_path and not os.path.isabs(preprocessors_path):
+                preprocessors_path = os.path.join(self._project_root, preprocessors_path)
             self._preprocessors = {}
             if preprocessors_path and os.path.isdir(preprocessors_path):
                 for filename in os.listdir(preprocessors_path):
@@ -86,12 +95,58 @@ class ModelLoader:
         return self._preprocessors
     
     # ------------------------------------------------------------------
+    # Feature engineering
+    # ------------------------------------------------------------------
+    
+    def _get_feature_engineer(self):
+        """
+        Lazy-load the feature engineer class specified in the config.
+        
+        Returns:
+            An instance of the feature engineer (subclass of BaseFeatureEngineer).
+        """
+        if self._feature_engineer is None:
+            module_path = self.config.get("features", {}).get("module", "")
+            class_name = self.config.get("features", {}).get("class", "")
+            if module_path and class_name:
+                try:
+                    module = importlib.import_module(module_path)
+                    engineer_class = getattr(module, class_name)
+                    self._feature_engineer = engineer_class(self.config)
+                except (ImportError, AttributeError) as e:
+                    raise ImportError(
+                        f"Could not load feature engineer '{class_name}' from "
+                        f"'{module_path}': {e}"
+                    )
+        return self._feature_engineer
+    
+    def _engineer_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply feature engineering to a DataFrame.
+        
+        Runs both heuristic and clinical feature engineering pipelines.
+        
+        Args:
+            df: Raw patient DataFrame.
+        
+        Returns:
+            DataFrame with engineered features appended.
+        """
+        engineer = self._get_feature_engineer()
+        if engineer:
+            df = engineer.engineer_heuristic(df)
+            df = engineer.engineer_clinical(df)
+        return df
+    
+    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     
     def predict(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Run prediction on a single patient's data.
+        
+        Applies feature engineering before prediction.
         
         Args:
             patient_data: Dictionary of feature_name -> value.
@@ -103,6 +158,7 @@ class ModelLoader:
                 - diagnosis: str ("Positive" or "Negative")
         """
         df = pd.DataFrame([patient_data])
+        df = self._engineer_features(df)
         pred = int(self.model.predict(df)[0])
         proba = float(self.model.predict_proba(df)[0][1])
         return {
@@ -115,6 +171,8 @@ class ModelLoader:
         """
         Run SHAP explanation on a single patient's data.
         
+        Applies feature engineering before explanation.
+        
         Args:
             patient_data: Dictionary of feature_name -> value.
         
@@ -125,6 +183,7 @@ class ModelLoader:
                 - feature_names: List of feature names in order.
         """
         df = pd.DataFrame([patient_data])
+        df = self._engineer_features(df)
         shap_values = self.explainer(df)
         return {
             "shap_values": shap_values[0].values.tolist(),
@@ -162,14 +221,18 @@ class ModelLoader:
         primary = self.config.get("model", {}).get("weights_path", "")
         fallback = self.config.get("model", {}).get("fallback_weights_path", "")
         
-        if os.path.exists(primary):
-            return primary
-        elif fallback and os.path.exists(fallback):
-            return fallback
+        # Resolve relative paths to absolute from project root
+        primary_abs = primary if os.path.isabs(primary) else os.path.join(self._project_root, primary)
+        fallback_abs = fallback if os.path.isabs(fallback) else os.path.join(self._project_root, fallback) if fallback else ""
+        
+        if os.path.exists(primary_abs):
+            return primary_abs
+        elif fallback_abs and os.path.exists(fallback_abs):
+            return fallback_abs
         else:
             raise FileNotFoundError(
                 f"Model weights not found. Tried:\n"
-                f"  Primary: {primary}\n"
-                f"  Fallback: {fallback}\n"
+                f"  Primary: {primary_abs}\n"
+                f"  Fallback: {fallback_abs}\n"
                 f"Please ensure the model file exists at one of these paths."
             )
