@@ -14,13 +14,16 @@ if not os.path.exists(data_path):
 
 df = pd.read_csv(data_path)
 
-# 2. فصل الميزات عن عمود الهدف (Target)
-# ملاحظة: تأكد أن اسم عمود الهدف مطابق لما في بياناتك (غالباً 'target' أو 'HeartDisease')
-target_col = 'target' if 'target' in df.columns else df.columns[-1]
+# 2. فصل الميزات عن عمود الهدف (Target) بشكل صريح ومباشر
+# نعلم أن عمود الهدف في مشروعك اسمه HeartDisease
+target_col = 'HeartDisease'
+if target_col not in df.columns:
+    raise KeyError(f"⚠️ لم يتم العثور على عمود الهدف '{target_col}' في البيانات. تأكد من اسم العمود.")
+
 X = df.drop(columns=[target_col])
 y = df[target_col]
 
-# 3. تقسيم البيانات إلى مجموعات تدريب واختبار بنفس النسبة السابقة لضمان عادلة المقارنة
+# 3. تقسيم البيانات إلى مجموعات تدريب واختبار
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # 4. تثبيت الإعدادات الذهبية المستخرجة من Trial 83 في Optuna
