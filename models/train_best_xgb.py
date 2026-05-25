@@ -21,7 +21,7 @@ X = df.drop(columns=[target_col])
 y = df[target_col]
 
 # 3. تقسيم البيانات إلى مجموعات تدريب واختبار بنفس النسبة السابقة لضمان عادلة المقارنة
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_test_split=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # 4. تثبيت الإعدادات الذهبية المستخرجة من Trial 83 في Optuna
 best_params = {
