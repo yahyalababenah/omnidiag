@@ -1,12 +1,28 @@
 import pandas as pd
 import numpy as np
+import os
+import sys
 
-def harmonize_and_merge():
+# Add project root to path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs.config_loader import load_config, resolve_path
+
+def harmonize_and_merge(disease_name: str = "heart_disease"):
     print("🔄 جاري بدء عملية التوحيد المعيارية...")
     
+    # Load config for config-driven paths
+    cfg = load_config(disease_name)
+    raw_path = resolve_path(cfg, "data", "raw_path")
+    processed_path = resolve_path(cfg, "data", "processed_path")
+    raw_files = cfg["data"]["raw_files"]
+    
     # 1. قراءة البيانات
-    old_data = pd.read_csv("data/raw/heart.csv",sep='\t')
-    new_data = pd.read_excel("data/raw/Z-Alizadeh sani dataset.xlsx", engine='openpyxl')
+    old_data_path = os.path.join(raw_path, raw_files[0])
+    new_data_path = os.path.join(raw_path, raw_files[1])
+    print(f"📂 قراءة البيانات القديمة من: {old_data_path}")
+    print(f"📂 قراءة البيانات الجديدة من: {new_data_path}")
+    old_data = pd.read_csv(old_data_path, sep='\t')
+    new_data = pd.read_excel(new_data_path, engine='openpyxl')
     
     # القالب الذهبي (الأعمدة الـ 12 بالترتيب الدقيق)
     expected_columns = [
@@ -54,7 +70,8 @@ def harmonize_and_merge():
     final_df = pd.concat([old_data, df_new], axis=0, ignore_index=True)
     
     # 5. الحفظ (سيقوم بالكتابة فوق الملف المشوه القديم)
-    final_df.to_csv("data/processed/merged_heart_data.csv", index=False)
+    merged_path = os.path.join(processed_path, cfg["data"]["merged_file"])
+    final_df.to_csv(merged_path, index=False)
     
     print(f"✅ تم الدمج الاحترافي بنجاح!")
     print(f"📊 حجم البيانات القديمة: {old_data.shape[0]} مريض.")
