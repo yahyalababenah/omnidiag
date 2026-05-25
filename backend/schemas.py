@@ -24,33 +24,37 @@ class HeartDiseaseInput(BaseModel):
     
     All fields correspond to the 11 clinical features used in the
     UCI Heart Disease dataset + Z-Alizadeh Sani harmonized dataset.
+    
+    Categorical fields (Sex, ChestPainType, RestingECG, ExerciseAngina,
+    ST_Slope) accept both raw strings (e.g., 'M', 'ATA', 'Normal') and
+    pre-encoded integers. The ModelLoader applies label encoding internally.
     """
     Age: int = Field(..., description="Age in years", ge=20, le=100)
-    Sex: int = Field(..., description="Sex (1=Male, 0=Female)", ge=0, le=1)
-    ChestPainType: int = Field(..., description="Chest pain type (0=TA, 1=ATA, 2=NAP, 3=ASY)", ge=0, le=3)
+    Sex: str = Field(..., description="Sex: 'M' or 'F' (or encoded 0/1)")
+    ChestPainType: str = Field(..., description="Chest pain type: 'TA', 'ATA', 'NAP', or 'ASY' (or encoded 0-3)")
     RestingBP: int = Field(..., description="Resting blood pressure (mm Hg)", ge=80, le=220)
     Cholesterol: int = Field(..., description="Serum cholesterol (mg/dl)", ge=100, le=600)
     FastingBS: int = Field(..., description="Fasting blood sugar > 120 mg/dl (1=True, 0=False)", ge=0, le=1)
-    RestingECG: int = Field(..., description="Resting ECG results (0=Normal, 1=ST, 2=LVH)", ge=0, le=2)
+    RestingECG: str = Field(..., description="Resting ECG: 'Normal', 'ST', or 'LVH' (or encoded 0-2)")
     MaxHR: int = Field(..., description="Maximum heart rate achieved", ge=60, le=220)
-    ExerciseAngina: int = Field(..., description="Exercise-induced angina (1=Yes, 0=No)", ge=0, le=1)
+    ExerciseAngina: str = Field(..., description="Exercise-induced angina: 'Y' or 'N' (or encoded 0/1)")
     Oldpeak: float = Field(..., description="ST depression induced by exercise relative to rest")
-    ST_Slope: int = Field(..., description="Slope of peak exercise ST segment (0=Up, 1=Flat, 2=Down)", ge=0, le=2)
+    ST_Slope: str = Field(..., description="ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "Age": 54,
-                "Sex": 1,
-                "ChestPainType": 0,
+                "Sex": "M",
+                "ChestPainType": "ATA",
                 "RestingBP": 140,
                 "Cholesterol": 289,
                 "FastingBS": 0,
-                "RestingECG": 1,
+                "RestingECG": "Normal",
                 "MaxHR": 122,
-                "ExerciseAngina": 0,
+                "ExerciseAngina": "N",
                 "Oldpeak": 0.0,
-                "ST_Slope": 1
+                "ST_Slope": "Flat"
             }
         }
 
