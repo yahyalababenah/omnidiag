@@ -4,7 +4,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,13 +15,40 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install deps
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Smoke test
+      - name: Verify backend imports
         run: |
           python -V
-          python -c "import streamlit, sklearn, pandas, numpy; print('ok')"
-          python src/train.py -h 2> /dev/null || true
+          python -c "import sys; sys.path.insert(0, '.'); from backend.router import OmniDiagRouter; from backend.model_loader import ModelLoader; from backend.schemas import get_schema_for_disease; print('All backend modules imported successfully')"
+
+      - name: Verify API starts
+        run: |
+          uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+          sleep 3
+          curl -s http://localhost:8000/ && echo ""
+          kill %1 2>/dev/null || true
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
