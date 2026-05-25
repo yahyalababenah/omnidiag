@@ -13,17 +13,26 @@ Implements two feature engineering paths for heart disease diagnosis:
 
 These features were validated through Optuna A/B testing (100 trials),
 with the heuristic path achieving 88.98% accuracy (winner).
+
+Integration Note:
+    The actual math is delegated to models/advanced_feature_engineering.py
+    to avoid code duplication. This class provides the OOP wrapper for the
+    config-driven architecture while the core logic lives in the original script.
 """
 
 import pandas as pd
-import numpy as np
 from features.base_features import BaseFeatureEngineer
+from models.advanced_feature_engineering import (
+    engineer_heuristic_features,
+    engineer_clinical_features,
+)
 
 
 class HeartDiseaseFeatureEngineer(BaseFeatureEngineer):
     """
     Feature engineer for the Heart Disease module.
     
+    Delegates to models/advanced_feature_engineering.py for the actual math.
     Generates both heuristic (statistical interaction) and clinical
     (medical risk score) features for the heart disease dataset.
     
@@ -38,6 +47,8 @@ class HeartDiseaseFeatureEngineer(BaseFeatureEngineer):
         """
         Generate statistical heuristic features.
         
+        Delegates to models.advanced_feature_engineering.engineer_heuristic_features().
+        
         Features created:
             - Age_BP_Interaction: Captures combined risk of age × blood pressure.
             - HR_Age_Ratio: Heart rate relative to age (lower = fitter).
@@ -49,20 +60,13 @@ class HeartDiseaseFeatureEngineer(BaseFeatureEngineer):
         Returns:
             DataFrame with heuristic features appended.
         """
-        if 'Age' in df.columns and 'RestingBP' in df.columns:
-            df['Age_BP_Interaction'] = df['Age'] * df['RestingBP']
-        
-        if 'Age' in df.columns and 'MaxHR' in df.columns:
-            df['HR_Age_Ratio'] = df['MaxHR'] / df['Age']
-        
-        if 'Cholesterol' in df.columns and 'Age' in df.columns:
-            df['Chol_Age_Ratio'] = df['Cholesterol'] / df['Age']
-        
-        return df
+        return engineer_heuristic_features(df)
     
     def engineer_clinical(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Generate clinical risk score features.
+        
+        Delegates to models.advanced_feature_engineering.engineer_clinical_features().
         
         Features created:
             - Clinical_Risk_Score: A logarithmic risk index using fixed medical weights.
@@ -75,11 +79,4 @@ class HeartDiseaseFeatureEngineer(BaseFeatureEngineer):
         Returns:
             DataFrame with clinical features appended.
         """
-        if all(col in df.columns for col in ['Age', 'RestingBP', 'Cholesterol']):
-            df['Clinical_Risk_Score'] = np.exp(
-                (df['Age'] * 0.048) + 
-                (df['RestingBP'] * 0.015) + 
-                (df['Cholesterol'] * 0.002)
-            )
-        
-        return df
+        return engineer_clinical_features(df)
