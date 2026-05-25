@@ -5,14 +5,26 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 import mlflow
 import joblib
 import os
+import sys
+
+# Add project root to path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs.config_loader import load_config, resolve_path
 
 def run_xgboost_training():
     print("🚀 بدء تشغيل محرك XGBoost...")
     
+    # Load config for config-driven paths
+    cfg = load_config("heart_disease")
+    processed_path = resolve_path(cfg, "data", "processed_path")
+    target_col = cfg["disease"]["target_column"]
+    
     # 1. قراءة البيانات
-    df = pd.read_csv("data/processed/final_ready_data.csv")
-    X = df.drop(columns=['HeartDisease']).values
-    y = df['HeartDisease'].values
+    data_path = os.path.join(processed_path, cfg["data"]["final_clean_file"])
+    print(f"📂 قراءة البيانات من: {data_path}")
+    df = pd.read_csv(data_path)
+    X = df.drop(columns=[target_col]).values
+    y = df[target_col].values
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
@@ -51,8 +63,9 @@ def run_xgboost_training():
         mlflow.log_metric("recall", rec)
         
         # 6. حفظ الموديل
-        os.makedirs("models/xgboost_weights", exist_ok=True)
-        save_path = "models/xgboost_weights/omni_diag_xgb.pkl"
+        xgb_weights_dir = os.path.dirname(resolve_path(cfg, "model", "weights_path"))
+        os.makedirs(xgb_weights_dir, exist_ok=True)
+        save_path = os.path.join(xgb_weights_dir, "omni_diag_xgb.pkl")
         joblib.dump(clf, save_path)
         
         print(f"💾 تم حفظ أوزان الموديل بنجاح في: {save_path}")

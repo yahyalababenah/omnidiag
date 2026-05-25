@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import sys
 import torch  # أضفنا استدعاء مكتبة PyTorch المباشر
 from pytorch_tabnet.tab_model import TabNetClassifier
 from sklearn.model_selection import train_test_split
@@ -8,11 +9,21 @@ from sklearn.metrics import accuracy_score
 import warnings
 warnings.filterwarnings('ignore')
 
+# Add project root to path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs.config_loader import load_config, resolve_path
+
 print("🧠 جاري تدريب شبكة TabNet العصبية على الميزات الإحصائية (Heuristic)...")
 
+# Load config for config-driven paths
+cfg = load_config("heart_disease")
+processed_path = resolve_path(cfg, "data", "processed_path")
+target_col = cfg["disease"]["target_column"]
+
 # 1. قراءة البيانات الفائزة
-df = pd.read_csv("data/processed/data_heuristic.csv")
-target_col = 'HeartDisease'
+data_path = os.path.join(processed_path, cfg["data"]["heuristic_file"])
+print(f"📂 قراءة البيانات من: {data_path}")
+df = pd.read_csv(data_path)
 
 # TabNet يتطلب أن تكون البيانات على شكل Numpy Arrays
 X = df.drop(columns=[target_col]).values
@@ -52,8 +63,11 @@ acc = accuracy_score(y_test, preds)
 print(f"🎯 دقة TabNet الفردية على البيانات المحسنة: {acc:.4f}")
 
 # 5. حفظ الموديل الجديد
-save_dir = "models/tabnet_weights"
-os.makedirs(save_dir, exist_ok=True)
-save_path = os.path.join(save_dir, "omni_diag_tabnet_heuristic")
+tabnet_weights_dir = os.path.join(
+    os.path.dirname(os.path.dirname(resolve_path(cfg, "model", "weights_path"))),
+    "tabnet_weights"
+)
+os.makedirs(tabnet_weights_dir, exist_ok=True)
+save_path = os.path.join(tabnet_weights_dir, "omni_diag_tabnet_heuristic")
 tabnet_model.save_model(save_path)
 print(f"💾 تم حفظ أوزان TabNet المحسنة في: {save_path}.zip")

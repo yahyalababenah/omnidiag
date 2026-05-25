@@ -2,21 +2,32 @@ import pandas as pd
 import numpy as np
 import torch
 import os
+import sys
 from pytorch_tabnet.tab_model import TabNetClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 import mlflow
 
+# Add project root to path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs.config_loader import load_config, resolve_path
+
 def run_tabnet_training():
     print("🚀 بدء تشغيل محرك TabNet...")
     
+    # Load config for config-driven paths
+    cfg = load_config("heart_disease")
+    processed_path = resolve_path(cfg, "data", "processed_path")
+    target_col = cfg["disease"]["target_column"]
+    
     # 1. قراءة البيانات الجاهزة
-    df = pd.read_csv("data/processed/final_ready_data.csv")
+    data_path = os.path.join(processed_path, cfg["data"]["final_clean_file"])
+    print(f"📂 قراءة البيانات من: {data_path}")
+    df = pd.read_csv(data_path)
     
     # فصل المميزات (X) عن الهدف (y)
-    # عمود HeartDisease هو الذي نتوقع منه خطر الإصابة
-    X = df.drop(columns=['HeartDisease']).values
-    y = df['HeartDisease'].values
+    X = df.drop(columns=[target_col]).values
+    y = df[target_col].values
     
     # تقسيم البيانات (80% تدريب - 20% اختبار)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -66,8 +77,12 @@ def run_tabnet_training():
         mlflow.log_metric("recall", rec)
         
         # 6. حفظ أوزان الموديل للمستقبل
-        os.makedirs("models/tabnet_weights", exist_ok=True)
-        save_path = "models/tabnet_weights/omni_diag_model"
+        tabnet_weights_dir = os.path.join(
+            os.path.dirname(os.path.dirname(resolve_path(cfg, "model", "weights_path"))),
+            "tabnet_weights"
+        )
+        os.makedirs(tabnet_weights_dir, exist_ok=True)
+        save_path = os.path.join(tabnet_weights_dir, "omni_diag_model")
         clf.save_model(save_path)
         
         print(f"💾 تم حفظ أوزان الموديل بنجاح في: {save_path}.zip")
