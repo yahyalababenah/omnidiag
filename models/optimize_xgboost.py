@@ -1,14 +1,26 @@
 import pandas as pd
 import xgboost as xgb
 import optuna
+import os
+import sys
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
+# Add project root to path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs.config_loader import load_config, resolve_path
+
+# Load config for config-driven paths
+cfg = load_config("heart_disease")
+processed_path = resolve_path(cfg, "data", "processed_path")
+target_col = cfg["disease"]["target_column"]
+
 def objective(trial):
     # تحميل البيانات
-    df = pd.read_csv("data/processed/data_clinical.csv")
-    X = df.drop(columns=['HeartDisease']).values
-    y = df['HeartDisease'].values
+    data_path = os.path.join(processed_path, cfg["data"]["clinical_file"])
+    df = pd.read_csv(data_path)
+    X = df.drop(columns=[target_col]).values
+    y = df[target_col].values
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     # تحديد نطاق البحث الذكي للمعاملات

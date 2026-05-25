@@ -1,20 +1,35 @@
 import pandas as pd
 import joblib
+import os
+import sys
 from pytorch_tabnet.tab_model import TabNetClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import warnings
 warnings.filterwarnings('ignore') # لإخفاء تحذيرات الـ CPU من TabNet
 
+# Add project root to path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from configs.config_loader import load_config, resolve_path
+
 print("🤝 جاري بدء جلسة التشاور الطبي النهائية بين TabNet و XGBoost...")
 
-# تحديد الهدف بشكل صريح وآمن
-target_col = 'HeartDisease'
+# Load config for config-driven paths
+cfg = load_config("heart_disease")
+processed_path = resolve_path(cfg, "data", "processed_path")
+model_path = resolve_path(cfg, "model", "weights_path")
+target_col = cfg["disease"]["target_column"]
+tabnet_weights_dir = os.path.join(
+    os.path.dirname(os.path.dirname(resolve_path(cfg, "model", "weights_path"))),
+    "tabnet_weights"
+)
 
 # =========================================
 # 1. تجهيز بيانات TabNet (الأساسية)
 # =========================================
-df_base = pd.read_csv("data/processed/final_ready_data.csv")
+base_data_path = os.path.join(processed_path, cfg["data"]["final_clean_file"])
+print(f"📂 قراءة بيانات TabNet من: {base_data_path}")
+df_base = pd.read_csv(base_data_path)
 X_base = df_base.drop(columns=[target_col]).values # TabNet يحتاج Numpy Array
 y_base = df_base[target_col].values
 _, X_test_base, _, y_test = train_test_split(X_base, y_base, test_size=0.2, random_state=42)
@@ -22,18 +37,23 @@ _, X_test_base, _, y_test = train_test_split(X_base, y_base, test_size=0.2, rand
 # =========================================
 # 2. تجهيز بيانات XGBoost (الميزات المحسنة)
 # =========================================
-df_heuristic = pd.read_csv("data/processed/data_heuristic.csv")
+heuristic_data_path = os.path.join(processed_path, cfg["data"]["heuristic_file"])
+print(f"📂 قراءة بيانات XGBoost من: {heuristic_data_path}")
+df_heuristic = pd.read_csv(heuristic_data_path)
 # XGBoost يفضل DataFrame ليطابق أسماء الأعمدة بدقة
-X_heuristic = df_heuristic.drop(columns=[target_col]) 
+X_heuristic = df_heuristic.drop(columns=[target_col])
 _, X_test_heuristic, _, _ = train_test_split(X_heuristic, y_base, test_size=0.2, random_state=42)
 
 # =========================================
 # 3. تحميل الأوزان والموديلات
 # =========================================
+tabnet_zip_path = os.path.join(tabnet_weights_dir, "omni_diag_model.zip")
+print(f"📂 تحميل TabNet من: {tabnet_zip_path}")
 tabnet_model = TabNetClassifier()
-tabnet_model.load_model("models/tabnet_weights/omni_diag_model.zip")
+tabnet_model.load_model(tabnet_zip_path)
 
-xgb_model = joblib.load("models/omni_diag_xgb_optimized.pkl") 
+print(f"📂 تحميل XGBoost من: {model_path}")
+xgb_model = joblib.load(model_path)
 
 # =========================================
 # 4. دمج القرارات (Soft Voting)
