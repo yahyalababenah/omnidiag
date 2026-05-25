@@ -6,3 +6,4 @@ xgboost
 shap
 python-multipart
 joblib
+PyYAML
