@@ -1,0 +1,77 @@
+/**
+ * Pre-defined mock patients for the Clinical EMR Mode.
+ * Each patient has realistic vitals and a unique clinical profile.
+ */
+const mockPatients = [
+  {
+    id: 'P-001',
+    name: 'Ahmed Al-Rashid',
+    age: 54,
+    sex: 'M',
+    avatar: 'AR',
+    history: 'Hypertension (10 yrs), Type 2 Diabetes, Family history of CAD',
+    medications: 'Lisinopril 10mg, Metformin 500mg, Atorvastatin 20mg',
+    admittingComplaint: 'Chest tightness on exertion for 2 weeks',
+    data: {
+      Age: 54,
+      Sex: 'M',
+      ChestPainType: 'ATA',
+      RestingBP: 140,
+      Cholesterol: 289,
+      FastingBS: 0,
+      RestingECG: 'Normal',
+      MaxHR: 122,
+      ExerciseAngina: 'N',
+      Oldpeak: 0.0,
+      ST_Slope: 'Flat',
+    },
+  },
+  {
+    id: 'P-002',
+    name: 'Fatima Hassan',
+    age: 62,
+    sex: 'F',
+    avatar: 'FH',
+    history: 'Dyslipidemia, Obesity (BMI 32), Post-menopausal',
+    medications: 'Rosuvastatin 10mg, Aspirin 81mg',
+    admittingComplaint: 'Shortness of breath and palpitations',
+    data: {
+      Age: 62,
+      Sex: 'F',
+      ChestPainType: 'ASY',
+      RestingBP: 158,
+      Cholesterol: 340,
+      FastingBS: 1,
+      RestingECG: 'LVH',
+      MaxHR: 98,
+      ExerciseAngina: 'Y',
+      Oldpeak: 2.3,
+      ST_Slope: 'Down',
+    },
+  },
+  {
+    id: 'P-003',
+    name: 'Khalid Othman',
+    age: 45,
+    sex: 'M',
+    avatar: 'KO',
+    history: 'No significant history, Active smoker (20 pack-years)',
+    medications: 'None',
+    admittingComplaint: 'Routine check-up, occasional dizziness',
+    data: {
+      Age: 45,
+      Sex: 'M',
+      ChestPainType: 'NAP',
+      RestingBP: 120,
+      Cholesterol: 210,
+      FastingBS: 0,
+      RestingECG: 'Normal',
+      MaxHR: 160,
+      ExerciseAngina: 'N',
+      Oldpeak: 0.5,
+      ST_Slope: 'Up',
+    },
+  },
+];
+
+export default mockPatients;
