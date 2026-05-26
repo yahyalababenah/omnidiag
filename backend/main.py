@@ -6,13 +6,39 @@ using the OmniDiagRouter. New diseases are added by creating a YAML config
 and a feature engineer class — no API code changes needed.
 """
 
+import sys
+import os
+import logging
+
+# Configure startup logging to stdout for HF Spaces debugging
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+log = logging.getLogger("omnidiag.startup")
+log.info("=" * 60)
+log.info("OmniDiag starting up...")
+log.info(f"Python version: {sys.version}")
+log.info(f"Current working directory: {os.getcwd()}")
+log.info(f"Files in cwd: {os.listdir('.')}")
+log.info(f"models/heart_disease/xgboost_weights/ exists: {os.path.isdir('models/heart_disease/xgboost_weights/')}")
+log.info(f"models/heart_disease/preprocessors/ exists: {os.path.isdir('models/heart_disease/preprocessors/')}")
+log.info("=" * 60)
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.router import OmniDiagRouter
 from backend.schemas import get_schema_for_disease
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
-router = OmniDiagRouter(configs_dir="configs")
+log.info("Initializing OmniDiagRouter...")
+try:
+    router = OmniDiagRouter(configs_dir="configs")
+    log.info(f"Router initialized. Available diseases: {router.get_available_diseases()}")
+except Exception as e:
+    log.error(f"Failed to initialize router: {e}", exc_info=True)
+    raise
 
 # 2. تهيئة التطبيق وتوثيقه
 app = FastAPI(

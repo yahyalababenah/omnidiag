@@ -10,12 +10,16 @@ so they are only loaded once (on first request).
 """
 
 import os
+import sys
+import logging
 import joblib
 import pandas as pd
 import numpy as np
 import shap
 import importlib
 from typing import Optional, Dict, Any, List
+
+log = logging.getLogger("omnidiag.model_loader")
 
 # Project root: resolve relative paths from the config
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -81,7 +85,12 @@ class ModelLoader:
         """Lazy-load and cache the trained model."""
         if self._model is None:
             weights_path = self._resolve_weights_path()
+            log.debug(f"Loading model weights from: {weights_path}")
+            log.debug(f"File exists: {os.path.exists(weights_path)}")
+            if os.path.exists(weights_path):
+                log.debug(f"File size: {os.path.getsize(weights_path)} bytes")
             self._model = joblib.load(weights_path)
+            log.debug(f"Model loaded successfully. Type: {type(self._model).__name__}")
         return self._model
     
     @property
@@ -408,6 +417,15 @@ class ModelLoader:
         # Resolve relative paths to absolute from project root
         primary_abs = primary if os.path.isabs(primary) else os.path.join(self._project_root, primary)
         fallback_abs = fallback if os.path.isabs(fallback) else os.path.join(self._project_root, fallback) if fallback else ""
+        
+        log.debug(f"Resolving weights path...")
+        log.debug(f"  Project root: {self._project_root}")
+        log.debug(f"  Primary (config): {primary}")
+        log.debug(f"  Primary (abs): {primary_abs}")
+        log.debug(f"  Fallback (config): {fallback}")
+        log.debug(f"  Fallback (abs): {fallback_abs}")
+        log.debug(f"  Primary exists: {os.path.exists(primary_abs)}")
+        log.debug(f"  Fallback exists: {os.path.exists(fallback_abs) if fallback_abs else 'N/A'}")
         
         if os.path.exists(primary_abs):
             return primary_abs
