@@ -374,8 +374,8 @@ The React frontend provides two complementary interfaces:
 
 ## 📄 License & Contact
 
-This project is licensed under the **MIT License** — see the [`LICENSE`](LICENSE) file for details.
-
+Copyright (c) 2026 Yahya Lababenah. All Rights Reserved. 
+This project is proprietary and confidential. Unauthorized copying, modification, or distribution is strictly prohibited.
 For questions, collaboration, or clinical validation inquiries:
 
 - **Author:** Yahya Mohammad Ali Lababneh
