@@ -7,7 +7,7 @@
 ![XGBoost](https://img.shields.io/badge/XGBoost-2.1-orange.svg)
 ![SHAP](https://img.shields.io/badge/SHAP-0.46-8A2BE2.svg)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+![License](https://img.shields.io/badge/License-All__Rights__Reserved-red.svg)
 ![Status](https://img.shields.io/badge/Status-Production--Ready-success.svg)
 
 > **A config-driven, multi-disease diagnostic platform combining XGBoost with SHAP explainability and bilingual (EN/AR) clinical NLP summaries — served via FastAPI and a modern React dashboard.**
