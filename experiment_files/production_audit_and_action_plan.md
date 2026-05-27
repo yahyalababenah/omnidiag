@@ -32,7 +32,7 @@ OmniDiag is a well-architected clinical decision-support platform using XGBoost 
 | Attribute | Detail |
 |-----------|--------|
 | **File** | [`.git/config`](.git/config) |
-| **Secret** | `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` |
+ |
 | **Remote** | `origin` → `https://yahyalababenah:TOKEN@github.com/yahyalababenah/omnidiag.git` |
 | **Risk** | Anyone with access to this repo (or a backup) can push code, delete repos, and access all repositories belonging to the `yahyalababenah` GitHub account. |
 | **CVSS** | 9.1 (Critical) |
@@ -44,7 +44,7 @@ OmniDiag is a well-architected clinical decision-support platform using XGBoost 
 | Attribute | Detail |
 |-----------|--------|
 | **File** | [`.git/config`](.git/config) |
-| **Secret** | `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` |
+
 | **Remote** | `hf` → `https://yahyoha:TOKEN@huggingface.co/spaces/yahyoha/omnidiag.git` |
 | **Risk** | Full write access to the Hugging Face Space. An attacker can deploy malicious models, delete the space, or steal model artifacts. |
 | **CVSS** | 8.8 (High) |
@@ -207,8 +207,8 @@ The YAML config system ([`configs/heart_disease.yaml`](configs/heart_disease.yam
 
 | Step | Action | Details |
 |------|--------|---------|
-| 0.1 | **Revoke GitHub PAT** | Go to https://github.com/settings/tokens and delete token `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`. |
-| 0.2 | **Revoke HF Token** | Go to https://huggingface.co/settings/tokens and delete token `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`. |
+| 0.1 | **Revoke GitHub PAT** | Go to https://github.com/settings/tokens and delete token 
+| 0.2 | **Revoke HF Token** | Go to https://huggingface.co/settings/tokens and delete token 
 | 0.3 | **Generate new tokens** | Create new tokens with minimal required scopes (repo-only for GitHub, space-only for HF). |
 | 0.4 | **Update Git remotes** | ```bash
 git remote set-url origin https://yahyalababenah:NEW_TOKEN@github.com/yahyalababenah/omnidiag.git
