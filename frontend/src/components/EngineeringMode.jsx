@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Activity,
   Heart,
@@ -46,9 +46,11 @@ const DEFAULT_PATIENT = {
 export default function EngineeringMode() {
   const [form, setForm] = useState({ ...DEFAULT_PATIENT });
   const [loading, setLoading] = useState(false);
+  const [coldStart, setColdStart] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [shapData, setShapData] = useState(null);
+  const coldStartTimer = useRef(null);
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -61,8 +63,21 @@ export default function EngineeringMode() {
     setError(null);
   };
 
+  // Show "Waking up..." message if request takes > 8s (HF Spaces cold start)
+  useEffect(() => {
+    if (loading) {
+      coldStartTimer.current = setTimeout(() => setColdStart(true), 8_000);
+    } else {
+      setColdStart(false);
+    }
+    return () => {
+      if (coldStartTimer.current) clearTimeout(coldStartTimer.current);
+    };
+  }, [loading]);
+
   const runInference = async () => {
     setLoading(true);
+    setColdStart(false);
     setError(null);
     setResult(null);
     setShapData(null);
@@ -151,7 +166,7 @@ export default function EngineeringMode() {
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Running Inference...
+                    {coldStart ? 'Waking up the diagnostic engine...' : 'Running Inference...'}
                   </>
                 ) : (
                   <>
@@ -160,6 +175,11 @@ export default function EngineeringMode() {
                   </>
                 )}
               </button>
+              {coldStart && (
+                <p className="text-xs text-amber-600 text-center mt-2">
+                  This might take a few moments if it's the first scan of the day.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -239,21 +259,16 @@ export default function EngineeringMode() {
               </div>
               <div className="card-body">
                 <ShapBarChart
-                  shapValues={shapData.shap_values}
-                  featureNames={shapData.feature_names}
+                  chartData={shapData.chart_data}
                   baseValue={shapData.base_value}
                 />
 
-                {/* Clinical Summary */}
-                {shapData.clinical_summary && (
+                {/* Textual Explanation */}
+                {shapData.text_explanation && (
                   <div className="mt-4 space-y-2">
                     <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                      <p className="text-xs font-medium text-blue-800 mb-1">Clinical Summary (EN)</p>
-                      <p className="text-sm text-blue-900">{shapData.clinical_summary.en}</p>
-                    </div>
-                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg" dir="rtl">
-                      <p className="text-xs font-medium text-emerald-800 mb-1 font-arabic">الملخص السريري (AR)</p>
-                      <p className="text-sm text-emerald-900 font-arabic">{shapData.clinical_summary.ar}</p>
+                      <p className="text-xs font-medium text-blue-800 mb-1">Feature Impact Summary</p>
+                      <p className="text-sm text-blue-900">{shapData.text_explanation}</p>
                     </div>
 
                     <details>

@@ -15,9 +15,14 @@ const COLOR_NEGATIVE = '#16a34a';
 /**
  * Horizontal bar chart of SHAP values.
  * Positive (risk-increasing) bars are red, negative (protective) are green.
+ *
+ * Props:
+ *   chartData  — Array of { feature: string, shap_value: number } sorted by
+ *                |shap_value| descending (as returned by the backend).
+ *   baseValue  — Optional base (expected) value from the SHAP explainer.
  */
-export default function ShapBarChart({ shapValues, featureNames, baseValue }) {
-  if (!shapValues || !featureNames || shapValues.length === 0) {
+export default function ShapBarChart({ chartData, baseValue }) {
+  if (!chartData || chartData.length === 0) {
     return (
       <div className="text-center text-gray-400 py-8 text-sm">
         No SHAP values to display. Run inference first.
@@ -25,14 +30,12 @@ export default function ShapBarChart({ shapValues, featureNames, baseValue }) {
     );
   }
 
-  // Build data sorted by |SHAP| descending
-  const data = featureNames
-    .map((name, i) => ({
-      name,
-      value: shapValues[i],
-      absValue: Math.abs(shapValues[i]),
-    }))
-    .sort((a, b) => b.absValue - a.absValue);
+  // chartData is already sorted by |shap_value| descending from the backend
+  const data = chartData.map((d) => ({
+    name: d.feature,
+    value: d.shap_value,
+    absValue: Math.abs(d.shap_value),
+  }));
 
   const maxAbs = Math.max(...data.map((d) => d.absValue), 0.01);
   const domainMax = maxAbs * 1.15;

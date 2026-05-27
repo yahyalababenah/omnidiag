@@ -10,7 +10,8 @@ Currently supports:
 Future diseases will add their own schema definitions here.
 """
 
-from typing import Dict, Type
+from typing import Dict, Type, List
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 
@@ -60,6 +61,50 @@ class HeartDiseaseInput(BaseModel):
 
 
 # =============================================================================
+# SHAP Explanation Response Models
+# =============================================================================
+
+class FeatureImpact(BaseModel):
+    """
+    A single feature's SHAP value contribution.
+    
+    Attributes:
+        feature: The name of the feature (e.g., "Age", "ST_Slope").
+        shap_value: The SHAP value for this feature. Positive values indicate
+                    increased risk; negative values indicate decreased risk.
+    """
+    feature: str = Field(..., description="Feature name")
+    shap_value: float = Field(..., description="SHAP value (positive = increased risk, negative = decreased risk)")
+
+
+class ExplainResponse(BaseModel):
+    """
+    Response model for the SHAP explanation endpoint.
+    
+    Attributes:
+        chart_data: List of feature impacts sorted by absolute SHAP value
+                    descending, ready for direct consumption by the React
+                    ShapBarChart component.
+        text_explanation: Human-readable summary of the top 3 most impactful
+                          features with direction labels.
+        base_value: The base (expected) value from the SHAP explainer, useful
+                    for advanced charting.
+    """
+    chart_data: List[FeatureImpact] = Field(
+        ...,
+        description="Sorted list of feature SHAP impacts for chart rendering"
+    )
+    text_explanation: str = Field(
+        ...,
+        description="Human-readable summary of top 3 impactful features"
+    )
+    base_value: float = Field(
+        ...,
+        description="Base (expected) value from the SHAP explainer"
+    )
+
+
+# =============================================================================
 # Schema Registry
 # =============================================================================
 # Maps disease names (from config) to their Pydantic input schemas.
@@ -81,11 +126,12 @@ def get_schema_for_disease(disease_name: str) -> Type[BaseModel]:
         The Pydantic BaseModel class for that disease.
     
     Raises:
-        ValueError: If no schema is registered for the disease.
+        HTTPException 404: If no schema is registered for the disease.
     """
     if disease_name not in DISEASE_SCHEMA_REGISTRY:
-        raise ValueError(
-            f"No schema registered for disease '{disease_name}'. "
-            f"Available: {list(DISEASE_SCHEMA_REGISTRY.keys())}"
+        raise HTTPException(
+            status_code=404,
+            detail=f"No schema registered for disease '{disease_name}'. "
+                   f"Available: {list(DISEASE_SCHEMA_REGISTRY.keys())}"
         )
     return DISEASE_SCHEMA_REGISTRY[disease_name]
