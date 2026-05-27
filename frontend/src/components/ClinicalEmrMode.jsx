@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Activity,
   Heart,
@@ -33,14 +33,29 @@ import ShapBarChart from './ShapBarChart';
 export default function ClinicalEmrMode() {
   const [selectedPatient, setSelectedPatient] = useState(mockPatients[0]);
   const [loading, setLoading] = useState(false);
+  const [coldStart, setColdStart] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [shapData, setShapData] = useState(null);
   const [showLang, setShowLang] = useState('en');
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
+  const coldStartTimer = useRef(null);
+
+  // Show "Waking up..." message if request takes > 8s (HF Spaces cold start)
+  useEffect(() => {
+    if (loading) {
+      coldStartTimer.current = setTimeout(() => setColdStart(true), 8_000);
+    } else {
+      setColdStart(false);
+    }
+    return () => {
+      if (coldStartTimer.current) clearTimeout(coldStartTimer.current);
+    };
+  }, [loading]);
 
   const runDiagnosis = useCallback(async (patient) => {
     setLoading(true);
+    setColdStart(false);
     setError(null);
     setResult(null);
     setShapData(null);
@@ -262,7 +277,14 @@ export default function ClinicalEmrMode() {
               {loading && !result && (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                   <Loader2 className="w-8 h-8 animate-spin mb-3" />
-                  <p className="text-sm">Running AI diagnosis...</p>
+                  <p className="text-sm">
+                    {coldStart ? 'Waking up the diagnostic engine...' : 'Running AI diagnosis...'}
+                  </p>
+                  {coldStart && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      This might take a few moments if it's the first scan of the day.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -336,24 +358,23 @@ export default function ClinicalEmrMode() {
               <div className="card-body">
                 {/* SHAP Bar Chart */}
                 <ShapBarChart
-                  shapValues={shapData.shap_values}
-                  featureNames={shapData.feature_names}
+                  chartData={shapData.chart_data}
                   baseValue={shapData.base_value}
                 />
 
-                {/* Clinical Summary */}
-                {shapData.clinical_summary && (
+                {/* Textual Explanation */}
+                {shapData.text_explanation && (
                   <div className="mt-6 space-y-3 border-t border-clinical-border pt-4">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-gray-500" />
                       <span className="text-sm font-semibold text-gray-700">
-                        {showLang === 'en' ? 'Clinical Note' : '\u0645\u0644\u0627\u062d\u0638\u0629 \u0633\u0631\u064a\u0631\u064a\u0629'}
+                        {showLang === 'en' ? 'Feature Impact Summary' : '\u0645\u0644\u062e\u0635 \u062a\u0623\u062b\u064a\u0631 \u0627\u0644\u0645\u064a\u0632\u0627\u062a'}
                       </span>
                     </div>
 
                     <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
                       <p className="text-sm text-blue-900 leading-relaxed">
-                        {showLang === 'en' ? shapData.clinical_summary.en : shapData.clinical_summary.ar}
+                        {shapData.text_explanation}
                       </p>
                     </div>
 
@@ -379,11 +400,11 @@ export default function ClinicalEmrMode() {
                             </tr>
                           </thead>
                           <tbody>
-                            {shapData.feature_names.map((name, i) => {
-                              const val = shapData.shap_values[i];
+                            {shapData.chart_data.map((item) => {
+                              const val = item.shap_value;
                               return (
-                                <tr key={name} className="border-b border-gray-100">
-                                  <td className="py-2 px-2 font-medium text-gray-800">{name}</td>
+                                <tr key={item.feature} className="border-b border-gray-100">
+                                  <td className="py-2 px-2 font-medium text-gray-800">{item.feature}</td>
                                   <td className="py-2 px-2 text-right font-mono text-gray-600">{val.toFixed(4)}</td>
                                   <td className="py-2 px-2 text-right">
                                     {val > 0 ? (

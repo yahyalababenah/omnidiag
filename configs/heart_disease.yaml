@@ -74,7 +74,7 @@ features:
 model:
   type: "xgboost"                    # Model architecture: xgboost | tabnet | deep_learning
   explainer_type: "tree"             # SHAP explainer: tree (TreeExplainer) | deep (DeepExplainer)
-  weights_path: "models/heart_disease/xgboost_weights/omni_diag_xgb_optimized.pkl"
+  weights_path: "models/heart_disease/omni_diag_xgb_optimized.pkl"
   fallback_weights_path: "models/heart_disease/omni_diag_xgb_optimized.pkl"
   preprocessors_path: "models/heart_disease/preprocessors/"
   best_params:
