@@ -88,14 +88,13 @@ class ModelLoader:
                     self._explainer = shap.TreeExplainer(self.model)
                 except ValueError as e:
                     # XGBoost 3.x stores base_score as a bracket-wrapped string
-                    # e.g. '[5.85041E-1]'. Older SHAP can't parse this, so we
-                    # patch the booster's config before retrying.
-                    emsg = str(e)
-                    if "base_score" in emsg:
-                        log.warning(
-                            "TreeExplainer base_score parse error — patching "
-                            "model booster config and retrying: %s", emsg
-                        )
+                    # e.g. '[5.85041E-1]'. Older SHAP can't parse this with
+                    # float(), so we patch the booster's config and retry.
+                    log.warning(
+                        "TreeExplainer creation failed — attempting base_score "
+                        "bracket patch: %s", e
+                    )
+                    try:
                         booster = self.model.get_booster()
                         cfg = json.loads(booster.save_config())
                         raw = cfg["learner"]["learner_model_param"]["base_score"]
@@ -104,8 +103,9 @@ class ModelLoader:
                         cfg["learner"]["learner_model_param"]["base_score"] = raw_clean
                         booster.load_config(json.dumps(cfg))
                         self._explainer = shap.TreeExplainer(self.model)
-                    else:
-                        raise
+                    except Exception as patch_e:
+                        # If patching also fails, re-raise the original error
+                        raise e from patch_e
             elif explainer_type == "deep":
                 self._explainer = shap.DeepExplainer(self.model)
             else:
