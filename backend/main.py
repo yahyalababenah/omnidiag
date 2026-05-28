@@ -126,14 +126,32 @@ def explain_disease(disease: str, patient: dict):
     Returns:
         قيم SHAP والتفسير الطبي.
     """
-    schema = get_schema_for_disease(disease)
-    if schema:
-        validated = schema(**patient)
-        patient_data = validated.model_dump()
-    else:
-        patient_data = patient
-    
-    return router.explain(disease, patient_data)
+    import traceback
+    log = logging.getLogger("omnidiag.explain")
+    try:
+        schema = get_schema_for_disease(disease)
+        if schema:
+            validated = schema(**patient)
+            patient_data = validated.model_dump()
+        else:
+            patient_data = patient
+        
+        log.debug(f"Explain request for disease={disease}, patient={patient_data}")
+        result = router.explain(disease, patient_data)
+        log.debug("Explain completed successfully")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"Explain failed for disease={disease}: {type(e).__name__}: {e}")
+        log.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"Explain failed: {type(e).__name__}: {str(e)}",
+                "traceback": traceback.format_exc().split("\n")[-5:] if log.isEnabledFor(logging.DEBUG) else []
+            }
+        )
 
 # =========================================================================
 # المسارات القديمة (متوافقة مع الإصدارات السابقة)
