@@ -75,14 +75,18 @@ class ModelLoader:
             # versions cannot parse with float(). Patch it immediately after
             # loading so downstream consumers (TreeExplainer, etc.) never see
             # the broken format.
+            #
+            # Note: booster.load_config() does NOT update base_score in
+            # XGBoost 3.x — it's a protected internal field. Instead we
+            # must use booster.set_attr(), which is what SHAP reads via
+            # booster.attr('base_score').
             try:
                 booster = self._model.get_booster()
                 cfg = json.loads(booster.save_config())
                 raw = cfg["learner"]["learner_model_param"]["base_score"]
                 if isinstance(raw, str) and raw.startswith("[") and raw.endswith("]"):
                     raw_clean = raw.strip("[]")
-                    cfg["learner"]["learner_model_param"]["base_score"] = raw_clean
-                    booster.load_config(json.dumps(cfg))
+                    booster.set_attr(base_score=raw_clean)
                     log.info(
                         "Patched XGBoost base_score from %s to %s",
                         raw, raw_clean
