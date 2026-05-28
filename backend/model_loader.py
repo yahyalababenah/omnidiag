@@ -11,6 +11,7 @@ so they are only loaded once (on first request).
 
 import os
 import sys
+import json
 import logging
 import traceback
 import joblib
@@ -72,11 +73,39 @@ class ModelLoader:
     
     @property
     def explainer(self) -> object:
-        """Lazy-load and cache the SHAP explainer."""
+        """Lazy-load and cache the SHAP explainer.
+
+        Includes a fallback for XGBoost 3.x compatibility where ``base_score``
+        is stored as a bracket-wrapped string (e.g. ``'[5.85041E-1]'``) that
+        older SHAP versions cannot parse. If the initial ``TreeExplainer``
+        creation fails with a ``ValueError`` from the base_score, we patch the
+        model's internal parameter before retrying.
+        """
         if self._explainer is None:
             explainer_type = self.config.get("model", {}).get("explainer_type", "tree")
             if explainer_type == "tree":
-                self._explainer = shap.TreeExplainer(self.model)
+                try:
+                    self._explainer = shap.TreeExplainer(self.model)
+                except ValueError as e:
+                    # XGBoost 3.x stores base_score as a bracket-wrapped string
+                    # e.g. '[5.85041E-1]'. Older SHAP can't parse this, so we
+                    # patch the booster's config before retrying.
+                    emsg = str(e)
+                    if "base_score" in emsg:
+                        log.warning(
+                            "TreeExplainer base_score parse error — patching "
+                            "model booster config and retrying: %s", emsg
+                        )
+                        booster = self.model.get_booster()
+                        cfg = json.loads(booster.save_config())
+                        raw = cfg["learner"]["learner_model_param"]["base_score"]
+                        # Strip surrounding brackets from e.g. '[0.585]'
+                        raw_clean = raw.strip("[]")
+                        cfg["learner"]["learner_model_param"]["base_score"] = raw_clean
+                        booster.load_config(json.dumps(cfg))
+                        self._explainer = shap.TreeExplainer(self.model)
+                    else:
+                        raise
             elif explainer_type == "deep":
                 self._explainer = shap.DeepExplainer(self.model)
             else:
