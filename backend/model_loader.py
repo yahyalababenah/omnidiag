@@ -71,28 +71,74 @@ class ModelLoader:
             log.debug(f"Model loaded successfully. Type: {type(self._model).__name__}")
 
             # XGBoost 3.x compatibility patch: base_score may be stored as a
-            # bracket-wrapped string (e.g. '[5.85041E-1]') which older SHAP
-            # versions cannot parse with float(). Patch it immediately after
-            # loading so downstream consumers (TreeExplainer, etc.) never see
-            # the broken format.
+            # bracket-wrapped string (e.g. '[5.85041E-1]') in the model's raw
+            # UBJSON serialization (save_raw()). Older SHAP versions parse this
+            # with float() which fails on the bracket-wrapped format.
             #
-            # Note: booster.load_config() does NOT update base_score in
-            # XGBoost 3.x — it's a protected internal field. Instead we
-            # must use booster.set_attr(), which is what SHAP reads via
-            # booster.attr('base_score').
+            # Neither booster.load_config() nor booster.set_attr() modify the
+            # save_raw() output, because base_score lives in the C-level
+            # learner_model_param that is serialized from internal state.
+            # Therefore we monkey-patch booster.save_raw() to strip the
+            # brackets from the base_score string in the UBJSON output.
+            import types as _types
+
             try:
                 booster = self._model.get_booster()
                 cfg = json.loads(booster.save_config())
                 raw = cfg["learner"]["learner_model_param"]["base_score"]
                 if isinstance(raw, str) and raw.startswith("[") and raw.endswith("]"):
                     raw_clean = raw.strip("[]")
-                    booster.set_attr(base_score=raw_clean)
+
+                    _original_save_raw = booster.save_raw
+
+                    def _patched_save_raw(self, raw_format="ubj"):
+                        raw = _original_save_raw(raw_format=raw_format)
+                        raw_bytes = bytes(raw)
+                        marker = b"base_score"
+                        idx = raw_bytes.find(marker)
+                        if idx >= 0:
+                            s_pos = idx + len(marker)
+                            if (
+                                raw_bytes[s_pos] == 0x53
+                                and raw_bytes[s_pos + 1] == 0x4C
+                            ):
+                                len_bytes = raw_bytes[
+                                    s_pos + 2 : s_pos + 2 + 8
+                                ]
+                                old_len = int.from_bytes(len_bytes, "big")
+                                content_start = s_pos + 2 + 8
+                                old_content = raw_bytes[
+                                    content_start : content_start + old_len
+                                ]
+                                if old_content.startswith(b"[") and old_content.endswith(b"]"):
+                                    new_content = old_content[1:-1]
+                                    new_len = len(new_content)
+                                    patched = bytearray(raw_bytes)
+                                    patched[
+                                        s_pos + 2 : s_pos + 2 + 8
+                                    ] = new_len.to_bytes(8, "big")
+                                    patched = (
+                                        patched[:content_start]
+                                        + new_content
+                                        + patched[content_start + old_len :]
+                                    )
+                                    return bytearray(patched)
+                        return raw
+
+                    booster.save_raw = _types.MethodType(
+                        _patched_save_raw, booster
+                    )
                     log.info(
-                        "Patched XGBoost base_score from %s to %s",
-                        raw, raw_clean
+                        "Patched XGBoost base_score via save_raw() monkey-patch: "
+                        "%s -> %s",
+                        raw,
+                        raw_clean,
                     )
             except Exception:
-                log.debug("base_score patch skipped (not an XGBoost model or already clean)")
+                log.debug(
+                    "base_score save_raw() patch skipped "
+                    "(not an XGBoost model or already clean)"
+                )
 
         return self._model
     
