@@ -12,6 +12,7 @@ so they are only loaded once (on first request).
 import os
 import sys
 import logging
+import traceback
 import joblib
 import pandas as pd
 import numpy as np
@@ -234,14 +235,31 @@ class ModelLoader:
                   top 3 most impactful features with direction labels.
                 - base_value: Base (expected) value from the explainer.
         """
-        df = pd.DataFrame([patient_data])
-        df = self._engineer_features(df)
-        df = self._apply_preprocessors(df)
-        shap_values = self.explainer(df)
-        
-        feature_names = list(df.columns)
-        
-        return generate_shap_explanation(shap_values, feature_names)
+        try:
+            df = pd.DataFrame([patient_data])
+            log.debug(f"Explain: raw data columns={list(df.columns)}")
+            df = self._engineer_features(df)
+            log.debug(f"Explain: after engineering columns={list(df.columns)}, shape={df.shape}")
+            df = self._apply_preprocessors(df)
+            log.debug(f"Explain: after preprocessors columns={list(df.columns)}, shape={df.shape}")
+            
+            log.debug("Creating SHAP explainer...")
+            explainer = self.explainer
+            log.debug(f"SHAP explainer ready: {type(explainer).__name__}")
+            
+            log.debug("Computing SHAP values...")
+            shap_values = explainer(df)
+            log.debug(f"SHAP values computed, shape={shap_values.values.shape}")
+            
+            feature_names = list(df.columns)
+            
+            result = generate_shap_explanation(shap_values, feature_names)
+            log.debug("SHAP explanation generated successfully")
+            return result
+        except Exception as e:
+            log.error(f"Explain failed: {type(e).__name__}: {e}")
+            log.error(traceback.format_exc())
+            raise
     
     def get_feature_names(self) -> List[str]:
         """Return the feature names expected by the model."""
