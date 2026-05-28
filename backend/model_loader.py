@@ -69,43 +69,41 @@ class ModelLoader:
                 log.debug(f"File size: {os.path.getsize(weights_path)} bytes")
             self._model = joblib.load(weights_path)
             log.debug(f"Model loaded successfully. Type: {type(self._model).__name__}")
+
+            # XGBoost 3.x compatibility patch: base_score may be stored as a
+            # bracket-wrapped string (e.g. '[5.85041E-1]') which older SHAP
+            # versions cannot parse with float(). Patch it immediately after
+            # loading so downstream consumers (TreeExplainer, etc.) never see
+            # the broken format.
+            try:
+                booster = self._model.get_booster()
+                cfg = json.loads(booster.save_config())
+                raw = cfg["learner"]["learner_model_param"]["base_score"]
+                if isinstance(raw, str) and raw.startswith("[") and raw.endswith("]"):
+                    raw_clean = raw.strip("[]")
+                    cfg["learner"]["learner_model_param"]["base_score"] = raw_clean
+                    booster.load_config(json.dumps(cfg))
+                    log.info(
+                        "Patched XGBoost base_score from %s to %s",
+                        raw, raw_clean
+                    )
+            except Exception:
+                log.debug("base_score patch skipped (not an XGBoost model or already clean)")
+
         return self._model
     
     @property
     def explainer(self) -> object:
         """Lazy-load and cache the SHAP explainer.
 
-        Includes a fallback for XGBoost 3.x compatibility where ``base_score``
-        is stored as a bracket-wrapped string (e.g. ``'[5.85041E-1]'``) that
-        older SHAP versions cannot parse. If the initial ``TreeExplainer``
-        creation fails with a ``ValueError`` from the base_score, we patch the
-        model's internal parameter before retrying.
+        The model's ``base_score`` is already patched at load time (see
+        ``model`` property) so ``TreeExplainer`` should never encounter the
+        XGBoost 3.x bracket-wrapped string format.
         """
         if self._explainer is None:
             explainer_type = self.config.get("model", {}).get("explainer_type", "tree")
             if explainer_type == "tree":
-                try:
-                    self._explainer = shap.TreeExplainer(self.model)
-                except ValueError as e:
-                    # XGBoost 3.x stores base_score as a bracket-wrapped string
-                    # e.g. '[5.85041E-1]'. Older SHAP can't parse this with
-                    # float(), so we patch the booster's config and retry.
-                    log.warning(
-                        "TreeExplainer creation failed — attempting base_score "
-                        "bracket patch: %s", e
-                    )
-                    try:
-                        booster = self.model.get_booster()
-                        cfg = json.loads(booster.save_config())
-                        raw = cfg["learner"]["learner_model_param"]["base_score"]
-                        # Strip surrounding brackets from e.g. '[0.585]'
-                        raw_clean = raw.strip("[]")
-                        cfg["learner"]["learner_model_param"]["base_score"] = raw_clean
-                        booster.load_config(json.dumps(cfg))
-                        self._explainer = shap.TreeExplainer(self.model)
-                    except Exception as patch_e:
-                        # If patching also fails, re-raise the original error
-                        raise e from patch_e
+                self._explainer = shap.TreeExplainer(self.model)
             elif explainer_type == "deep":
                 self._explainer = shap.DeepExplainer(self.model)
             else:
