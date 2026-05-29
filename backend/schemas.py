@@ -5,7 +5,9 @@ Dynamic Pydantic model generation for disease-specific patient input schemas.
 Each disease can define its own input fields, validation rules, and example data.
 
 Currently supports:
-    - Heart Disease: 11 clinical features with medical validation ranges.
+    - Heart Disease (CAD): 12 clinical features → 16 total after auto-engineering.
+      Auto-computed features: RPP (RestingBP × MaxHR), Exercise_Risk_Index (Oldpeak × Angina),
+      Age_BP_Interaction, HR_Age_Ratio, Chol_Age_Ratio.
     
 Future diseases will add their own schema definitions here.
 """
@@ -21,10 +23,20 @@ from pydantic import BaseModel, Field
 
 class HeartDiseaseInput(BaseModel):
     """
-    Patient input schema for Heart Disease diagnosis.
+    Patient input schema for Coronary Artery Disease (CAD) risk assessment.
     
-    All fields correspond to the 11 clinical features used in the
-    UCI Heart Disease dataset + Z-Alizadeh Sani harmonized dataset.
+    All fields correspond to the 12 harmonized clinical features from the
+    UCI Cleveland + Z-Alizadeh Sani merged dataset.
+    
+    **Auto-computed features (no input needed):**
+    When a prediction is made, the system automatically computes:
+        - RPP (Rate-Pressure Product): RestingBP × MaxHR
+        - Exercise_Risk_Index: Oldpeak × ExerciseAngina (encoded)
+        - Age_BP_Interaction: Age × RestingBP
+        - HR_Age_Ratio: MaxHR / Age
+        - Chol_Age_Ratio: Cholesterol / Age
+    
+    These are calculated server-side; you only need to provide the 12 base fields.
     
     Categorical fields (Sex, ChestPainType, RestingECG, ExerciseAngina,
     ST_Slope) accept both raw strings (e.g., 'M', 'ATA', 'Normal') and

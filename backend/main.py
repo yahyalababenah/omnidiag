@@ -49,10 +49,18 @@ app = FastAPI(
 
 # 3. CORS — Strict allowlist (production Vercel URL + local dev)
 #    NEVER use ["*"] in production; this prevents unauthorized origins.
-_ALLOWED_ORIGINS = os.getenv(
-    "CORS_ALLOWED_ORIGINS",
-    "https://omnidiag-delta.vercel.app,http://localhost:5173,http://localhost:3000",
-).split(",")
+#
+#    💡 When you deploy the frontend to a NEW Vercel URL (e.g. a preview
+#       deployment), add it here or set the CORS_ALLOWED_ORIGINS env var
+#       on Hugging Face Spaces to override the defaults.
+_DEFAULT_ORIGINS = (
+    "https://omnidiag-delta.vercel.app,"
+    "https://omnidiag-qnhrjmoaq-yahia-s-projects05.vercel.app,"
+    "http://localhost:5173,"
+    "http://localhost:3000"
+)
+
+_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
 
 app.add_middleware(
     CORSMiddleware,
