@@ -211,19 +211,23 @@ class ModelLoader:
         """
         Apply feature engineering to a DataFrame.
         
-        Runs the heuristic feature engineering pipeline (the winning
-        experiment at 88.98% accuracy). The clinical path is available
-        for experimentation but is not used by the production model.
+        Runs two feature engineering pipelines in dependency order:
+            1. Heuristic (Statistical): Age_BP_Interaction, HR_Age_Ratio, Chol_Age_Ratio
+            2. Medical (Cardiology): RPP, Exercise_Risk_Index
+        
+        Note: Age_Bins and Global_Risk_Score were tested (v5.1 beta) but did NOT
+        improve accuracy — removed per A/B diagnostic (diagnose_v5_drop.py).
         
         Args:
-            df: Raw patient DataFrame.
+            df: Raw patient DataFrame (12 base features).
         
         Returns:
-            DataFrame with engineered features appended.
+            DataFrame with engineered features appended (up to 16 total features).
         """
         engineer = self._get_feature_engineer()
         if engineer:
-            df = engineer.engineer_heuristic(df)
+            df = engineer.engineer_heuristic(df)     # Age_BP_Interaction, HR_Age_Ratio, Chol_Age_Ratio
+            df = engineer.engineer_medical(df)       # RPP, Exercise_Risk_Index
         return df
     
     # ------------------------------------------------------------------
