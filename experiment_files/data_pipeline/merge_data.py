@@ -4,7 +4,7 @@ import os
 import sys
 
 # Add project root to path for config import
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from configs.config_loader import load_config, resolve_path
 
 def harmonize_and_merge(disease_name: str = "heart_disease"):
@@ -21,7 +21,7 @@ def harmonize_and_merge(disease_name: str = "heart_disease"):
     new_data_path = os.path.join(raw_path, raw_files[1])
     print(f"📂 قراءة البيانات القديمة من: {old_data_path}")
     print(f"📂 قراءة البيانات الجديدة من: {new_data_path}")
-    old_data = pd.read_csv(old_data_path, sep='\t')
+    old_data = pd.read_csv(old_data_path, sep=',')
     new_data = pd.read_excel(new_data_path, engine='openpyxl')
     
     # القالب الذهبي (الأعمدة الـ 12 بالترتيب الدقيق)
@@ -35,7 +35,7 @@ def harmonize_and_merge(disease_name: str = "heart_disease"):
     df_new = pd.DataFrame()
     
     df_new['Age'] = new_data['Age']
-    df_new['Sex'] = new_data['Sex'].map({'Male': 'M', 'Female': 'F'})
+    df_new['Sex'] = new_data['Sex'].map({'Male': 'M', 'Female': 'F', 'Fmale': 'F'})
     
     # دالة ذكية لترجمة نوع ألم الصدر
     def map_cp(row):
@@ -46,7 +46,7 @@ def harmonize_and_merge(disease_name: str = "heart_disease"):
     df_new['ChestPainType'] = new_data.apply(map_cp, axis=1)
     
     df_new['RestingBP'] = new_data['BP']
-    df_new['Cholesterol'] = np.round(new_data['LDL'] + (new_data['TG'] / 5.0))
+    df_new['Cholesterol'] = np.round(new_data['LDL'] + new_data['HDL'] + (new_data['TG'] / 5.0))
     df_new['FastingBS'] = new_data['DM']
     
     # دالة ذكية لترجمة تخطيط القلب
@@ -68,6 +68,12 @@ def harmonize_and_merge(disease_name: str = "heart_disease"):
     
     # 4. الدمج النهائي (إلغاء الفهرس القديم لتجنب التكرار)
     final_df = pd.concat([old_data, df_new], axis=0, ignore_index=True)
+    
+    # التأكد من عدم وجود قيم مفقودة بعد الدمج
+    assert final_df.isnull().sum().sum() == 0, (
+        f"❌ خطأ: توجد {final_df.isnull().sum().sum()} قيمة مفقودة بعد الدمج!\n"
+        f"{final_df.isnull().sum()[final_df.isnull().sum() > 0].to_dict()}"
+    )
     
     # 5. الحفظ (سيقوم بالكتابة فوق الملف المشوه القديم)
     merged_path = os.path.join(processed_path, cfg["data"]["merged_file"])
