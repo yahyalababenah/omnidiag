@@ -4,6 +4,10 @@ core.*
 # Hugging Face Spaces — binary files rejected by HF
 mlruns.db
 *.pkl
+
+# استثناء: ملفات النموذج والمعالجات المطلوبة للتشغيل
+!models/heart_disease/omni_diag_xgb_optimized.pkl
+!models/heart_disease/preprocessors/*.pkl
 *.zip
 *.xlsx
 results/
