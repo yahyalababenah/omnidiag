@@ -1,6 +1,7 @@
 # =============================================================================
 # OmniDiag — Multi-Disease Diagnostic Platform
 # Production Dockerfile for Hugging Face Spaces deployment
+# Build v3 — includes engineer_medical fix + retrained 16-feature model
 # =============================================================================
 
 FROM python:3.10-slim
