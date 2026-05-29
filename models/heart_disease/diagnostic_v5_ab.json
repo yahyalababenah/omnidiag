@@ -1,0 +1,39 @@
+{
+  "diagnostic": "v5.0_params_on_v5.1_features",
+  "timestamp": "2026-05-28T22:21:28.641179",
+  "n_features": 18,
+  "feature_names": [
+    "Age",
+    "Sex",
+    "ChestPainType",
+    "RestingBP",
+    "Cholesterol",
+    "FastingBS",
+    "RestingECG",
+    "MaxHR",
+    "ExerciseAngina",
+    "Oldpeak",
+    "ST_Slope",
+    "Age_BP_Interaction",
+    "HR_Age_Ratio",
+    "Chol_Age_Ratio",
+    "RPP",
+    "Exercise_Risk_Index",
+    "Age_Bins",
+    "Global_Risk_Score"
+  ],
+  "accuracy": 0.801653,
+  "roc_auc": 0.857018,
+  "params_used": {
+    "n_estimators": 1124,
+    "max_depth": 5,
+    "learning_rate": 0.006308564514079806,
+    "subsample": 0.8331048481710659,
+    "colsample_bytree": 0.4792434452981927,
+    "min_child_weight": 3,
+    "gamma": 1.4459953680077136,
+    "reg_alpha": 0.1902031263838727,
+    "reg_lambda": 0.14167100417623021,
+    "eval_metric": "logloss"
+  }
+}
