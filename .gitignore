@@ -1,3 +1,7 @@
+# Backup files (auto-generated)
+*.bak
+*.bak.v4.pkl
+
 # Core dump files (Linux)
 core.*
 
@@ -8,6 +12,9 @@ mlruns.db
 # استثناء: ملفات النموذج والمعالجات المطلوبة للتشغيل
 !models/heart_disease/omni_diag_xgb_optimized.pkl
 !models/heart_disease/preprocessors/*.pkl
+
+# ولكن استبعاد النسخ الاحتياطية القديمة للمعالجات
+/models/heart_disease/preprocessors/*.bak.v4.pkl
 *.zip
 *.xlsx
 results/
@@ -196,11 +203,10 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+.vscode/
+
+# Gemini AI context
+.gemini_context
 
 # Ruff stuff:
 .ruff_cache/
