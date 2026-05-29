@@ -1,8 +1,37 @@
 {
-  "best_score": 0.9224537037037038,
+  "version": "5.1.0",
+  "optimization_date": "2026-05-28T22:15:36.864775",
+  "dataset_size": 605,
+  "n_features": 16,
+  "best_score": 0.8182,
+  "note": "Using v5.0 PROVEN params — 300-trial Optuna overfit (78.51%). See diagnose_v5_drop.py",
   "best_params": {
-    "clf__max_depth": 10,
-    "clf__min_samples_split": 2,
-    "clf__n_estimators": 200
-  }
+    "n_estimators": 1124,
+    "max_depth": 5,
+    "learning_rate": 0.006308564514079806,
+    "subsample": 0.8331048481710659,
+    "colsample_bytree": 0.4792434452981927,
+    "min_child_weight": 3,
+    "gamma": 1.4459953680077136,
+    "reg_alpha": 0.1902031263838727,
+    "reg_lambda": 0.14167100417623021
+  },
+  "feature_names": [
+    "Age",
+    "Sex",
+    "ChestPainType",
+    "RestingBP",
+    "Cholesterol",
+    "FastingBS",
+    "RestingECG",
+    "MaxHR",
+    "ExerciseAngina",
+    "Oldpeak",
+    "ST_Slope",
+    "Age_BP_Interaction",
+    "HR_Age_Ratio",
+    "Chol_Age_Ratio",
+    "RPP",
+    "Exercise_Risk_Index"
+  ]
 }

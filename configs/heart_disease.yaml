@@ -9,10 +9,10 @@
 
 disease:
   name: "heart_disease"
-  display_name: "Heart Disease"
-  description: "Cardiovascular disease risk assessment using XGBoost with SHAP explainability"
+  display_name: "Coronary Artery Disease Risk"
+  description: "Non-invasive CAD risk triage using XGBoost with SHAP explainability — 12 clinical features + 5 engineered biomarkers"
   target_column: "HeartDisease"
-  version: "4.0.0"
+  version: "5.0.0"
 
 # ---------------------------------------------------------------------------
 # Data paths — all relative to project root
@@ -28,6 +28,7 @@ data:
   final_clean_file: "final_ready_data.csv"
   heuristic_file: "data_heuristic.csv"
   clinical_file: "data_clinical.csv"
+  medical_file: "data_medical.csv"
 
 # ---------------------------------------------------------------------------
 # Feature engineering configuration
@@ -67,6 +68,13 @@ features:
     - name: "Clinical_Risk_Score"
       formula: "exp(Age * 0.048 + RestingBP * 0.015 + Cholesterol * 0.002)"
       description: "Logarithmic risk index based on medical literature weights"
+  medical_features:
+    - name: "RPP"
+      formula: "RestingBP * MaxHR"
+      description: "Rate-Pressure Product — myocardial oxygen consumption indicator (global cardiology standard)"
+    - name: "Exercise_Risk_Index"
+      formula: "Oldpeak * ExerciseAngina (encoded)"
+      description: "Composite marker: ST depression × exercise-induced angina — high value strongly suggests CAD"
 
 # ---------------------------------------------------------------------------
 # Model configuration
@@ -92,7 +100,7 @@ model:
 training:
   test_size: 0.2
   random_state: 42
-  optimization_trials: 100
+  optimization_trials: 300
   optimization_direction: "maximize"
   optimization_metric: "accuracy"
 
@@ -112,4 +120,4 @@ explainer:
 # ---------------------------------------------------------------------------
 api:
   endpoint_prefix: "/api/v4"
-  version: "4.0.0"
+  version: "5.0.0"
