@@ -1,7 +1,7 @@
 """
 OmniDiag — Heart Disease Feature Engineer
 ==========================================
-Implements two feature engineering paths for heart disease diagnosis:
+Implements feature engineering paths for heart disease diagnosis:
 
     1. Heuristic (Statistical) Path:
         - Age_BP_Interaction: Age × RestingBP
@@ -11,8 +11,12 @@ Implements two feature engineering paths for heart disease diagnosis:
     2. Clinical (Medical) Path:
         - Clinical_Risk_Score: exp(Age × 0.048 + RestingBP × 0.015 + Cholesterol × 0.002)
 
-These features were validated through Optuna A/B testing (100 trials),
-with the heuristic path achieving 88.98% accuracy (winner).
+    3. Medical (Cardiology) Path:
+        - RPP (Rate-Pressure Product): RestingBP × MaxHR
+        - Exercise_Risk_Index: Oldpeak × ExerciseAngina (encoded)
+
+Note: Age_Bins and Global_Risk_Score were tested in v5.1 beta but did NOT
+improve accuracy — removed per A/B diagnostic (diagnose_v5_drop.py).
 
 Integration Note:
     The actual math is delegated to models/advanced_feature_engineering.py
@@ -25,6 +29,7 @@ from features.base_features import BaseFeatureEngineer
 from models.advanced_feature_engineering import (
     engineer_heuristic_features,
     engineer_clinical_features,
+    engineer_medical_features,
 )
 
 
@@ -33,14 +38,14 @@ class HeartDiseaseFeatureEngineer(BaseFeatureEngineer):
     Feature engineer for the Heart Disease module.
     
     Delegates to models/advanced_feature_engineering.py for the actual math.
-    Generates both heuristic (statistical interaction) and clinical
-    (medical risk score) features for the heart disease dataset.
+    Generates heuristic, clinical, and medical features.
     
     Usage:
         config = load_yaml_config("configs/heart_disease.yaml")
         engineer = HeartDiseaseFeatureEngineer(config)
         df_heuristic = engineer.engineer_heuristic(df)
         df_clinical = engineer.engineer_clinical(df)
+        df_medical = engineer.engineer_medical(df)
     """
     
     def engineer_heuristic(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -80,3 +85,27 @@ class HeartDiseaseFeatureEngineer(BaseFeatureEngineer):
             DataFrame with clinical features appended.
         """
         return engineer_clinical_features(df)
+
+    def engineer_medical(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generate medical diagnostic features based on cardiology knowledge.
+
+        Delegates to models.advanced_feature_engineering.engineer_medical_features().
+
+        Features created:
+            - RPP (Rate-Pressure Product): RestingBP × MaxHR
+              A global cardiology standard for myocardial oxygen consumption.
+              Higher values = greater cardiac workload and risk.
+
+            - Exercise_Risk_Index: Oldpeak × ExerciseAngina (encoded)
+              If patient has angina + ST depression → high CAD probability.
+              Zero if ExerciseAngina is 'N'.
+
+        Args:
+            df: DataFrame with at least 'RestingBP', 'MaxHR', 'Oldpeak', 'ExerciseAngina'.
+
+        Returns:
+            DataFrame with medical features appended.
+        """
+        return engineer_medical_features(df)
+
