@@ -18,20 +18,33 @@ import {
   Languages,
 } from 'lucide-react';
 import { api } from '../api';
-import mockPatients from '../mockPatients';
+import { useDisease } from '../context/DiseaseContext';
+import { useDiseaseSchema } from '../hooks/useDiseaseSchema';
+import { getPatientsForDisease } from '../mockPatients';
 import ShapBarChart from './ShapBarChart';
 
 /**
  * Clinical EMR Mode — Doctor's View
  *
  * Features:
- * - Mock patient selector (3 pre-defined patients)
- * - Vitals monitor with Tailwind grid cards and Lucide icons
+ * - Dynamic mock patient selector per disease
+ * - Dynamic patient data grid (schema-driven vital cards)
  * - AI Diagnostic Panel with badge (Green/Red)
  * - Clinical Insights rendering bilingual clinical_summary
+ * - Disease-aware API calls via DiseaseContext
  */
 export default function ClinicalEmrMode() {
-  const [selectedPatient, setSelectedPatient] = useState(mockPatients[0]);
+  const { selectedDisease, currentDiseaseInfo } = useDisease();
+  const diseaseLabel = currentDiseaseInfo?.display_name || selectedDisease || 'Heart Disease';
+
+  const { fields, loading: schemaLoading, error: schemaError } = useDiseaseSchema(selectedDisease);
+
+  // Build a lookup map: field name → FieldMetadata
+  const fieldMap = new Map((fields || []).map((f) => [f.name, f]));
+
+  // Get mock patients for the selected disease
+  const patients = getPatientsForDisease(selectedDisease);
+  const [selectedPatient, setSelectedPatient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [coldStart, setColdStart] = useState(false);
   const [error, setError] = useState(null);
@@ -40,6 +53,18 @@ export default function ClinicalEmrMode() {
   const [showLang, setShowLang] = useState('en');
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const coldStartTimer = useRef(null);
+
+  // Reset patient when disease changes or patients list changes
+  useEffect(() => {
+    if (patients.length > 0) {
+      setSelectedPatient(patients[0]);
+    } else {
+      setSelectedPatient(null);
+    }
+    setResult(null);
+    setShapData(null);
+    setError(null);
+  }, [selectedDisease, patients.length]);
 
   // Show "Waking up..." message if request takes > 8s (HF Spaces cold start)
   useEffect(() => {
@@ -54,6 +79,8 @@ export default function ClinicalEmrMode() {
   }, [loading]);
 
   const runDiagnosis = useCallback(async (patient) => {
+    if (!selectedDisease || !patient) return;
+
     setLoading(true);
     setColdStart(false);
     setError(null);
@@ -62,8 +89,8 @@ export default function ClinicalEmrMode() {
 
     try {
       const [pred, expl] = await Promise.all([
-        api.predict('heart_disease', patient.data),
-        api.explain('heart_disease', patient.data),
+        api.predict(selectedDisease, patient.data),
+        api.explain(selectedDisease, patient.data),
       ]);
       setResult(pred);
       setShapData(expl);
@@ -72,14 +99,14 @@ export default function ClinicalEmrMode() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDisease]);
 
   // Auto-run diagnosis when patient changes
   useEffect(() => {
-    if (selectedPatient) {
+    if (selectedPatient && selectedDisease) {
       runDiagnosis(selectedPatient);
     }
-  }, [selectedPatient, runDiagnosis]);
+  }, [selectedPatient, selectedDisease, runDiagnosis]);
 
   const selectPatient = (patient) => {
     setSelectedPatient(patient);
@@ -89,6 +116,78 @@ export default function ClinicalEmrMode() {
   const isPositive = result?.diagnosis === 'Positive';
   const confidencePct = result ? (result.confidence * 100).toFixed(1) : null;
 
+  // ── Derive a status for a patient data field ──
+  const getFieldStatus = (fieldName, value) => {
+    const meta = fieldMap.get(fieldName);
+    if (!meta) return 'normal';
+
+    // Toggle/binary: 1 = risk factor present
+    if (meta.component === 'toggle') {
+      return value === 1 ? 'warning' : 'normal';
+    }
+
+    // Numeric: compare to min/max range
+    if ((meta.type === 'number' || meta.type === 'integer') &&
+        meta.validation.minimum !== undefined && meta.validation.maximum !== undefined) {
+      const range = meta.validation.maximum - meta.validation.minimum;
+      if (range > 0) {
+        const ratio = (value - meta.validation.minimum) / range;
+        // Upper quartile = elevated risk
+        if (ratio > 0.75) return 'warning';
+        if (ratio > 0.5) return 'elevated';
+      }
+    }
+
+    // Select/enum: check if value is a concerning option
+    if (meta.component === 'select' && meta.validation.enum) {
+      const enumVals = meta.validation.enum;
+      // If the value is the last enum entry (usually worst), flag it
+      if (enumVals.length > 1 && value === enumVals[enumVals.length - 1]) return 'warning';
+      if (enumVals.length > 2 && value === enumVals[enumVals.length - 2]) return 'elevated';
+    }
+
+    return 'normal';
+  };
+
+  // ── Format a field value for display ──
+  const formatFieldValue = (fieldName, value) => {
+    const meta = fieldMap.get(fieldName);
+    if (meta?.component === 'toggle') {
+      return value === 1 ? 'Yes' : 'No';
+    }
+    if (typeof value === 'number') {
+      return value % 1 === 0 ? value.toString() : value.toFixed(1);
+    }
+    return String(value ?? '—');
+  };
+
+  // ── Pick an icon for a field based on its name ──
+  const getFieldIcon = (fieldName) => {
+    const name = fieldName.toLowerCase();
+    if (name.includes('heart') || name.includes('cardiac') || name.includes('maxhr')) return Heart;
+    if (name.includes('temp') || name.includes('fever')) return Thermometer;
+    if (name.includes('bp') || name.includes('blood')) return Droplets;
+    if (name.includes('chol') || name.includes('lipid')) return Droplets;
+    if (name.includes('breath') || name.includes('lung') || name.includes('wind') || name.includes('st')) return Wind;
+    if (name.includes('pain') || name.includes('angina') || name.includes('chest')) return AlertCircle;
+    if (name.includes('bmi') || name.includes('weight')) return Activity;
+    if (name.includes('smoke') || name.includes('alcohol')) return Wind;
+    if (name.includes('age')) return User;
+    return Activity;
+  };
+
+  const noDiseaseMsg = !selectedDisease ? (
+    <div className="col-span-full text-center text-gray-400 py-12 text-sm">
+      No disease selected. Please select a disease from the sidebar.
+    </div>
+  ) : null;
+
+  const noPatientsMsg = selectedDisease && patients.length === 0 && !schemaLoading ? (
+    <div className="col-span-full text-center text-gray-400 py-12 text-sm">
+      No mock patients defined for <strong>{diseaseLabel}</strong>.
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -96,7 +195,7 @@ export default function ClinicalEmrMode() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Clinical EMR Mode</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Doctor's view &mdash; AI-assisted cardiovascular risk assessment
+            Doctor's view &mdash; AI-assisted <strong>{diseaseLabel}</strong> risk assessment
           </p>
         </div>
 
@@ -111,347 +210,346 @@ export default function ClinicalEmrMode() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* ── Left Column: Patient Info + Vitals ── */}
-        <div className="xl:col-span-1 space-y-6">
-          {/* Patient Selector */}
-          <div className="card">
-            <div className="card-header">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <User className="w-5 h-5 text-primary-600" />
-                Patient
-              </h2>
-            </div>
-            <div className="card-body">
-              {/* Dropdown selector */}
-              <div className="relative">
-                <button
-                  onClick={() => setPatientSelectOpen((prev) => !prev)}
-                  className="w-full flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-clinical-border hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-bold">
-                      {selectedPatient.avatar}
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-semibold text-gray-900">{selectedPatient.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {selectedPatient.id} &middot; {selectedPatient.age}yrs &middot; {selectedPatient.sex}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                </button>
+      {noDiseaseMsg}
+      {noPatientsMsg}
 
-                {patientSelectOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setPatientSelectOpen(false)} />
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-clinical-border rounded-lg shadow-lg z-20 overflow-hidden">
-                      {mockPatients.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => selectPatient(p)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                            p.id === selectedPatient.id ? 'bg-primary-50' : ''
-                          }`}
-                        >
-                          <div className="w-9 h-9 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold">
-                            {p.avatar}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                            <p className="text-xs text-gray-500">{p.id}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
+      {selectedDisease && patients.length > 0 && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* ── Left Column: Patient Info + Data Grid ── */}
+          <div className="xl:col-span-1 space-y-6">
+            {/* Patient Selector */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <User className="w-5 h-5 text-primary-600" />
+                  Patient
+                </h2>
               </div>
-
-              {/* Patient details */}
-              <div className="mt-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">History</p>
-                    <p className="text-sm text-gray-800">{selectedPatient.history}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Pill className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Medications</p>
-                    <p className="text-sm text-gray-800">{selectedPatient.medications}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Stethoscope className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Admitting Complaint</p>
-                    <p className="text-sm text-gray-800">{selectedPatient.admittingComplaint}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Vitals Monitor */}
-          <div className="card">
-            <div className="card-header">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary-600" />
-                Vitals Monitor
-              </h2>
-            </div>
-            <div className="card-body">
-              <div className="grid grid-cols-2 gap-3">
-                <VitalCard
-                  icon={<Heart className="w-5 h-5 text-red-500" />}
-                  label="Heart Rate"
-                  value={`${selectedPatient.data.MaxHR} bpm`}
-                  status={selectedPatient.data.MaxHR < 100 ? 'normal' : 'warning'}
-                />
-                <VitalCard
-                  icon={<Thermometer className="w-5 h-5 text-orange-500" />}
-                  label="Resting BP"
-                  value={`${selectedPatient.data.RestingBP} mmHg`}
-                  status={selectedPatient.data.RestingBP > 140 ? 'warning' : 'normal'}
-                />
-                <VitalCard
-                  icon={<Droplets className="w-5 h-5 text-blue-500" />}
-                  label="Cholesterol"
-                  value={`${selectedPatient.data.Cholesterol} mg/dl`}
-                  status={selectedPatient.data.Cholesterol > 240 ? 'warning' : 'normal'}
-                />
-                <VitalCard
-                  icon={<Wind className="w-5 h-5 text-teal-500" />}
-                  label="Exercise Angina"
-                  value={selectedPatient.data.ExerciseAngina === 'Y' ? 'Present' : 'Absent'}
-                  status={selectedPatient.data.ExerciseAngina === 'Y' ? 'warning' : 'normal'}
-                />
-                <VitalCard
-                  icon={<Zap className="w-5 h-5 text-purple-500" />}
-                  label="ST Slope"
-                  value={selectedPatient.data.ST_Slope}
-                  status={selectedPatient.data.ST_Slope === 'Down' ? 'warning' : selectedPatient.data.ST_Slope === 'Flat' ? 'elevated' : 'normal'}
-                />
-                <VitalCard
-                  icon={<Activity className="w-5 h-5 text-gray-500" />}
-                  label="Chest Pain"
-                  value={selectedPatient.data.ChestPainType}
-                  status={selectedPatient.data.ChestPainType === 'ASY' ? 'warning' : 'normal'}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Right Column: AI Diagnosis + SHAP ── */}
-        <div className="xl:col-span-2 space-y-6">
-          {/* AI Diagnostic Panel */}
-          <div className="card">
-            <div className="card-header flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-primary-600" />
-                AI Diagnostic Panel
-              </h2>
-              {loading && (
-                <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Analyzing...
-                </span>
-              )}
-            </div>
-            <div className="card-body">
-              {error && (
-                <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-red-800">Diagnosis Error</p>
-                    <p className="text-sm text-red-600 mt-0.5">{error}</p>
-                  </div>
-                </div>
-              )}
-
-              {loading && !result && (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  <Loader2 className="w-8 h-8 animate-spin mb-3" />
-                  <p className="text-sm">
-                    {coldStart ? 'Waking up the diagnostic engine...' : 'Running AI diagnosis...'}
-                  </p>
-                  {coldStart && (
-                    <p className="text-xs text-amber-600 mt-2">
-                      This might take a few moments if it's the first scan of the day.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {result && !error && (
-                <div className="space-y-6">
-                  {/* Diagnosis badge + confidence */}
-                  <div className="flex items-center justify-between p-4 rounded-lg border" style={{
-                    backgroundColor: isPositive ? '#fef2f2' : '#f0fdf4',
-                    borderColor: isPositive ? '#fecaca' : '#bbf7d0',
-                  }}>
+              <div className="card-body">
+                {/* Dropdown selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => setPatientSelectOpen((prev) => !prev)}
+                    className="w-full flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-clinical-border hover:bg-gray-100 transition-colors"
+                  >
                     <div className="flex items-center gap-3">
-                      {isPositive ? (
-                        <AlertCircle className="w-8 h-8 text-red-500" />
-                      ) : (
-                        <CheckCircle2 className="w-8 h-8 text-green-500" />
-                      )}
-                      <div>
-                        <p className="text-lg font-bold" style={{ color: isPositive ? '#dc2626' : '#16a34a' }}>
-                          {isPositive ? 'Heart Disease Detected' : 'No Heart Disease Detected'}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {isPositive
-                            ? 'AI analysis indicates elevated risk. Clinical correlation recommended.'
-                            : 'AI analysis indicates low risk. Continue routine monitoring.'}
+                      <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-bold">
+                        {selectedPatient.avatar}
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-gray-900">{selectedPatient.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {selectedPatient.id} &middot; {selectedPatient.age}yrs &middot; {selectedPatient.sex}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className={isPositive ? 'badge-positive text-base' : 'badge-negative text-base'}>
-                        {confidencePct}%
-                      </span>
-                      <p className="text-xs text-gray-500 mt-1">Confidence</p>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
+
+                  {patientSelectOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setPatientSelectOpen(false)} />
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-clinical-border rounded-lg shadow-lg z-20 overflow-hidden">
+                        {patients.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => selectPatient(p)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                              p.id === selectedPatient.id ? 'bg-primary-50' : ''
+                            }`}
+                          >
+                            <div className="w-9 h-9 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold">
+                              {p.avatar}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                              <p className="text-xs text-gray-500">{p.id}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Patient details */}
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <FileText className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">History</p>
+                      <p className="text-sm text-gray-800">{selectedPatient.history}</p>
                     </div>
                   </div>
-
-                  {/* Key metrics row */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <MetricBox label="Prediction" value={result.prediction === 1 ? 'Positive' : 'Negative'} color={isPositive ? 'red' : 'green'} />
-                    <MetricBox label="Confidence" value={`${confidencePct}%`} color="blue" />
-                    <MetricBox label="SHAP Base Value" value={shapData?.base_value?.toFixed(4) || '\u2014'} color="gray" />
+                  <div className="flex items-start gap-2">
+                    <Pill className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Medications</p>
+                      <p className="text-sm text-gray-800">{selectedPatient.medications}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Stethoscope className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Admitting Complaint</p>
+                      <p className="text-sm text-gray-800">{selectedPatient.admittingComplaint}</p>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
 
-              {!result && !loading && !error && (
-                <div className="text-center text-gray-400 py-8 text-sm">
-                  Select a patient to begin AI diagnosis.
-                </div>
-              )}
+            {/* Patient Data Grid — schema-driven vital cards */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-primary-600" />
+                  Patient Data Summary
+                </h2>
+              </div>
+              <div className="card-body">
+                {schemaLoading ? (
+                  <div className="flex items-center justify-center py-8 text-gray-400">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    <span className="text-sm">Loading schema...</span>
+                  </div>
+                ) : schemaError ? (
+                  <div className="text-center text-gray-400 py-6 text-sm">
+                    Unable to load field definitions.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(selectedPatient.data).map(([fieldName, value]) => {
+                      const meta = fieldMap.get(fieldName);
+                      const status = getFieldStatus(fieldName, value);
+                      const Icon = getFieldIcon(fieldName);
+
+                      return (
+                        <div
+                          key={fieldName}
+                          className={`flex items-center gap-3 p-3 rounded-lg border ${
+                            status === 'warning'
+                              ? 'border-red-200 bg-red-50'
+                              : status === 'elevated'
+                              ? 'border-yellow-200 bg-yellow-50'
+                              : 'border-gray-200 bg-white'
+                          }`}
+                        >
+                          <div className="shrink-0">
+                            <Icon className={`w-5 h-5 ${
+                              status === 'warning' ? 'text-red-500' :
+                              status === 'elevated' ? 'text-yellow-500' :
+                              'text-gray-500'
+                            }`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] text-gray-500 truncate" title={meta?.description || fieldName}>
+                              {meta?.title || fieldName}
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {formatFieldValue(fieldName, value)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* SHAP Explanation + Clinical Insights */}
-          {shapData && (
+          {/* ── Right Column: AI Diagnosis + SHAP ── */}
+          <div className="xl:col-span-2 space-y-6">
+            {/* AI Diagnostic Panel */}
             <div className="card">
               <div className="card-header flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-primary-600" />
-                  Clinical Insights
+                  <Zap className="w-5 h-5 text-primary-600" />
+                  AI Diagnostic Panel
                 </h2>
-                <button
-                  onClick={() => runDiagnosis(selectedPatient)}
-                  disabled={loading}
-                  className="btn-secondary text-xs"
-                  title="Refresh diagnosis"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
+                {loading && (
+                  <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Analyzing...
+                  </span>
+                )}
               </div>
               <div className="card-body">
-                {/* SHAP Bar Chart */}
-                <ShapBarChart
-                  chartData={shapData.chart_data}
-                  baseValue={shapData.base_value}
-                />
-
-                {/* Textual Explanation */}
-                {shapData.text_explanation && (
-                  <div className="mt-6 space-y-3 border-t border-clinical-border pt-4">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-semibold text-gray-700">
-                        {showLang === 'en' ? 'Feature Impact Summary' : '\u0645\u0644\u062e\u0635 \u062a\u0623\u062b\u064a\u0631 \u0627\u0644\u0645\u064a\u0632\u0627\u062a'}
-                      </span>
+                {error && (
+                  <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-red-800">Diagnosis Error</p>
+                      <p className="text-sm text-red-600 mt-0.5">{error}</p>
                     </div>
+                  </div>
+                )}
 
-                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                      <p className="text-sm text-blue-900 leading-relaxed">
-                        {shapData.text_explanation}
+                {loading && !result && (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                    <Loader2 className="w-8 h-8 animate-spin mb-3" />
+                    <p className="text-sm">
+                      {coldStart ? 'Waking up the diagnostic engine...' : 'Running AI diagnosis...'}
+                    </p>
+                    {coldStart && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        This might take a few moments if it's the first scan of the day.
                       </p>
+                    )}
+                  </div>
+                )}
+
+                {result && !error && (
+                  <div className="space-y-6">
+                    {/* Diagnosis badge + confidence */}
+                    <div className="flex items-center justify-between p-4 rounded-lg border" style={{
+                      backgroundColor: isPositive ? '#fef2f2' : '#f0fdf4',
+                      borderColor: isPositive ? '#fecaca' : '#bbf7d0',
+                    }}>
+                      <div className="flex items-center gap-3">
+                        {isPositive ? (
+                          <AlertCircle className="w-8 h-8 text-red-500" />
+                        ) : (
+                          <CheckCircle2 className="w-8 h-8 text-green-500" />
+                        )}
+                        <div>
+                          <p className="text-lg font-bold" style={{ color: isPositive ? '#dc2626' : '#16a34a' }}>
+                            {isPositive
+                              ? `${diseaseLabel} Detected`
+                              : `No ${diseaseLabel} Detected`}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {isPositive
+                              ? 'AI analysis indicates elevated risk. Clinical correlation recommended.'
+                              : 'AI analysis indicates low risk. Continue routine monitoring.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={isPositive ? 'badge-positive text-base' : 'badge-negative text-base'}>
+                          {confidencePct}%
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">Confidence</p>
+                      </div>
                     </div>
 
-                    {/* Feature impact table */}
-                    <details className="mt-4">
-                      <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 flex items-center gap-1">
-                        <ChevronDown className="w-3 h-3" />
-                        {showLang === 'en' ? 'Detailed Feature Impact' : '\u062a\u0623\u062b\u064a\u0631 \u0627\u0644\u0645\u064a\u0632\u0627\u062a \u0627\u0644\u062a\u0641\u0635\u064a\u0644\u064a'}
-                      </summary>
-                      <div className="mt-3 overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-clinical-border">
-                              <th className="text-left py-2 px-2 font-medium text-gray-500">
-                                {showLang === 'en' ? 'Feature' : '\u0627\u0644\u0645\u064a\u0632\u0629'}
-                              </th>
-                              <th className="text-right py-2 px-2 font-medium text-gray-500">
-                                {showLang === 'en' ? 'SHAP Value' : '\u0642\u064a\u0645\u0629 SHAP'}
-                              </th>
-                              <th className="text-right py-2 px-2 font-medium text-gray-500">
-                                {showLang === 'en' ? 'Impact' : '\u0627\u0644\u062a\u0623\u062b\u064a\u0631'}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {shapData.chart_data.map((item) => {
-                              const val = item.shap_value;
-                              return (
-                                <tr key={item.feature} className="border-b border-gray-100">
-                                  <td className="py-2 px-2 font-medium text-gray-800">{item.feature}</td>
-                                  <td className="py-2 px-2 text-right font-mono text-gray-600">{val.toFixed(4)}</td>
-                                  <td className="py-2 px-2 text-right">
-                                    {val > 0 ? (
-                                      <span className="text-red-600 font-medium">{'\u2191'} Risk</span>
-                                    ) : val < 0 ? (
-                                      <span className="text-green-600 font-medium">{'\u2193'} Protective</span>
-                                    ) : (
-                                      <span className="text-gray-400">{'\u2014'}</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </details>
+                    {/* Key metrics row */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <MetricBox label="Prediction" value={result.prediction === 1 ? 'Positive' : 'Negative'} color={isPositive ? 'red' : 'green'} />
+                      <MetricBox label="Confidence" value={`${confidencePct}%`} color="blue" />
+                      <MetricBox label="SHAP Base Value" value={shapData?.base_value?.toFixed(4) || '\u2014'} color="gray" />
+                    </div>
+                  </div>
+                )}
+
+                {!result && !loading && !error && (
+                  <div className="text-center text-gray-400 py-8 text-sm">
+                    Select a patient to begin AI diagnosis.
                   </div>
                 )}
               </div>
             </div>
-          )}
+
+            {/* SHAP Explanation + Clinical Insights */}
+            {shapData && (
+              <div className="card">
+                <div className="card-header flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary-600" />
+                    Clinical Insights
+                  </h2>
+                  <button
+                    onClick={() => runDiagnosis(selectedPatient)}
+                    disabled={loading}
+                    className="btn-secondary text-xs"
+                    title="Refresh diagnosis"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </div>
+                <div className="card-body">
+                  {/* SHAP Bar Chart — maxVisible=10 by default, with "Show All" toggle for large feature sets */}
+                  <ShapBarChart
+                    chartData={shapData.chart_data}
+                    baseValue={shapData.base_value}
+                    maxVisible={10}
+                  />
+
+                  {/* Textual Explanation */}
+                  {shapData.text_explanation && (
+                    <div className="mt-6 space-y-3 border-t border-clinical-border pt-4">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm font-semibold text-gray-700">
+                          {showLang === 'en' ? 'Feature Impact Summary' : '\u0645\u0644\u062e\u0635 \u062a\u0623\u062b\u064a\u0631 \u0627\u0644\u0645\u064a\u0632\u0627\u062a'}
+                        </span>
+                      </div>
+
+                      <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                        <p className="text-sm text-blue-900 leading-relaxed">
+                          {shapData.text_explanation}
+                        </p>
+                      </div>
+
+                      {/* Feature impact table */}
+                      <details className="mt-4">
+                        <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 flex items-center gap-1">
+                          <ChevronDown className="w-3 h-3" />
+                          {showLang === 'en' ? 'Detailed Feature Impact' : '\u062a\u0623\u062b\u064a\u0631 \u0627\u0644\u0645\u064a\u0632\u0627\u062a \u0627\u0644\u062a\u0641\u0635\u064a\u0644\u064a'}
+                        </summary>
+                        <div className="mt-3 overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-clinical-border">
+                                <th className="text-left py-2 px-2 font-medium text-gray-500">
+                                  {showLang === 'en' ? 'Feature' : '\u0627\u0644\u0645\u064a\u0632\u0629'}
+                                </th>
+                                <th className="text-right py-2 px-2 font-medium text-gray-500">
+                                  {showLang === 'en' ? 'SHAP Value' : '\u0642\u064a\u0645\u0629 SHAP'}
+                                </th>
+                                <th className="text-right py-2 px-2 font-medium text-gray-500">
+                                  {showLang === 'en' ? 'Impact' : '\u0627\u0644\u062a\u0623\u062b\u064a\u0631'}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {shapData.chart_data.map((item) => {
+                                const val = item.shap_value;
+                                return (
+                                  <tr key={item.feature} className="border-b border-gray-100">
+                                    <td className="py-2 px-2 font-medium text-gray-800">{item.feature}</td>
+                                    <td className="py-2 px-2 text-right font-mono text-gray-600">{val.toFixed(4)}</td>
+                                    <td className="py-2 px-2 text-right">
+                                      {val > 0 ? (
+                                        <span className="text-red-600 font-medium">{'\u2191'} Risk</span>
+                                      ) : val < 0 ? (
+                                        <span className="text-green-600 font-medium">{'\u2193'} Protective</span>
+                                      ) : (
+                                        <span className="text-gray-400">{'\u2014'}</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 /* ── Sub-components ── */
-
-function VitalCard({ icon, label, value, status }) {
-  const statusColors = {
-    normal: 'border-gray-200 bg-white',
-    warning: 'border-red-200 bg-red-50',
-    elevated: 'border-yellow-200 bg-yellow-50',
-  };
-
-  return (
-    <div className={`flex items-center gap-3 p-3 rounded-lg border ${statusColors[status] || statusColors.normal}`}>
-      <div className="shrink-0">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-xs text-gray-500 truncate">{label}</p>
-        <p className="text-sm font-semibold text-gray-900 truncate">{value}</p>
-      </div>
-    </div>
-  );
-}
 
 function MetricBox({ label, value, color }) {
   const colorMap = {
