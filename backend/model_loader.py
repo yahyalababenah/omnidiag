@@ -324,6 +324,12 @@ class ModelLoader:
             df = self._apply_preprocessors(df)
             log.debug(f"Explain: after preprocessors columns={list(df.columns)}, shape={df.shape}")
             
+            # Cast any object dtype columns to category for SHAP TreeExplainer compatibility
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    df[col] = df[col].astype('category')
+                    log.debug(f"Cast column '{col}' from object to category for SHAP compatibility")
+
             log.debug("Creating SHAP explainer...")
             explainer = self.explainer
             log.debug(f"SHAP explainer ready: {type(explainer).__name__}")

@@ -66,6 +66,12 @@ export default function ClinicalEmrMode() {
     setError(null);
   }, [selectedDisease, patients.length]);
 
+  // Reset selected patient to first patient of the new disease when switching diseases
+  useEffect(() => {
+    const newPatients = getPatientsForDisease(selectedDisease);
+    setSelectedPatient(newPatients.length > 0 ? newPatients[0] : null);
+  }, [selectedDisease]);
+
   // Show "Waking up..." message if request takes > 8s (HF Spaces cold start)
   useEffect(() => {
     if (loading) {
