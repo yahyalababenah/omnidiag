@@ -2,6 +2,9 @@
 *.bak
 *.bak.v4.pkl
 
+# Kaggle backup files (too large for HF Spaces)
+*.kaggle_backup
+
 # Core dump files (Linux)
 core.*
 
