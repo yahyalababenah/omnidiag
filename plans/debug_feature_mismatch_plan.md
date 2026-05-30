@@ -2,7 +2,9 @@
 
 ## 1. ملخص المشاكل التي تم حلها
 
+
 ### المشكلة الأولى: خطأ CORS/iframe (تم الحل ✅)
+
 - **الخطأ**: `Unsafe attempt to load URL... chrome-error://chromewebdata/`
 - **السبب**: عدم وجود ملف `vercel.json` لتوجيه مسارات SPA على Vercel
 - **الحل**: 
