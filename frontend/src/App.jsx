@@ -5,6 +5,8 @@ import {
   Stethoscope,
   Menu,
 } from 'lucide-react';
+import { DiseaseProvider } from './context/DiseaseContext';
+import DiseaseSelector from './components/DiseaseSelector';
 import EngineeringMode from './components/EngineeringMode';
 import ClinicalEmrMode from './components/ClinicalEmrMode';
 
@@ -13,7 +15,7 @@ const VIEWS = [
   { id: 'clinical', label: 'Clinical EMR Mode', icon: Stethoscope, component: ClinicalEmrMode },
 ];
 
-export default function App() {
+function AppContent() {
   const [activeView, setActiveView] = useState('engineering');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -38,7 +40,7 @@ export default function App() {
           lg:translate-x-0 lg:block
         `}
       >
-        {/* Logo */}
+        {/* Logo + Disease Selector */}
         <div className="h-16 flex items-center gap-3 px-6 border-b border-clinical-border">
           <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center">
             <Heart className="w-5 h-5 text-white" />
@@ -48,6 +50,9 @@ export default function App() {
             <p className="text-[10px] text-gray-500 leading-tight">Multi-Disease Diagnostic Platform</p>
           </div>
         </div>
+
+        {/* Disease Selector */}
+        <DiseaseSelector />
 
         {/* Navigation */}
         <nav className="p-4 space-y-1">
@@ -101,5 +106,13 @@ export default function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <DiseaseProvider>
+      <AppContent />
+    </DiseaseProvider>
   );
 }
