@@ -29,7 +29,7 @@ log.info("=" * 60)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.router import OmniDiagRouter
-from backend.schemas import get_schema_for_disease
+from backend.schemas import get_schema_for_disease, ExplainResponse
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
 log.info("Initializing OmniDiagRouter...")
@@ -96,6 +96,20 @@ def list_diseases():
         ]
     }
 
+
+@app.get("/api/v4/{disease}/schema", tags=["Clinical Diagnosis"])
+def get_disease_schema(disease: str):
+    """
+    Get the JSON Schema for a disease's patient input fields.
+    
+    Returns the complete Pydantic model JSON Schema including all field names,
+    types, descriptions, validation constraints (ge/le), and example values.
+    Enables dynamic form generation in the React frontend without hardcoding
+    field definitions per disease.
+    """
+    schema = get_schema_for_disease(disease)
+    return schema.model_json_schema()
+
 # =========================================================================
 # المسارات الديناميكية (التشخيص)
 # =========================================================================
@@ -122,7 +136,7 @@ def predict_disease(disease: str, patient: dict):
     
     return router.predict(disease, patient_data)
 
-@app.post("/api/v4/{disease}/explain", tags=["Clinical Diagnosis"])
+@app.post("/api/v4/{disease}/explain", response_model=ExplainResponse, tags=["Clinical Diagnosis"])
 def explain_disease(disease: str, patient: dict):
     """
     تفسير قرار التشخيص باستخدام SHAP.
@@ -157,6 +171,48 @@ def explain_disease(disease: str, patient: dict):
             status_code=500,
             detail={
                 "error": f"Explain failed: {type(e).__name__}: {str(e)}",
+                "traceback": traceback.format_exc().split("\n")[-5:] if log.isEnabledFor(logging.DEBUG) else []
+            }
+        )
+
+@app.post("/api/v4/{disease}/counterfactuals", tags=["Clinical Diagnosis"])
+def counterfactuals_disease(disease: str, patient: dict):
+    """
+    توليد سيناريوهات "ماذا لو" لتقليل المخاطر.
+    
+    يُنشئ 3 سيناريوهات متنوعة (DiCE) تُظهر التغييرات الممكنة
+    التي يمكن للمريض إجراؤها لتقليل خطر الإصابة بالمرض.
+    
+    Args:
+        disease: اسم المرض.
+        patient: بيانات المريض.
+    
+    Returns:
+        قائمة بسيناريوهات "ماذا لو" مع التغييرات المقترحة ونسبة تقليل المخاطر.
+    """
+    import traceback
+    log = logging.getLogger("omnidiag.counterfactuals")
+    try:
+        schema = get_schema_for_disease(disease)
+        if schema:
+            validated = schema(**patient)
+            patient_data = validated.model_dump()
+        else:
+            patient_data = patient
+        
+        log.debug(f"Counterfactuals request for disease={disease}, patient={patient_data}")
+        result = router.counterfactuals(disease, patient_data)
+        log.debug(f"Counterfactuals completed: status={result.get('status')}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"Counterfactuals failed for disease={disease}: {type(e).__name__}: {e}")
+        log.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"Counterfactuals generation failed: {type(e).__name__}: {str(e)}",
                 "traceback": traceback.format_exc().split("\n")[-5:] if log.isEnabledFor(logging.DEBUG) else []
             }
         )
