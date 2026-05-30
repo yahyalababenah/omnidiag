@@ -13,6 +13,10 @@ mlruns.db
 !models/heart_disease/omni_diag_xgb_optimized.pkl
 !models/heart_disease/preprocessors/*.pkl
 
+# Diabetes module model artifacts (must be tracked for Docker builds)
+!models/diabetes/*.pkl
+!models/diabetes/preprocessors/*.pkl
+
 # ولكن استبعاد النسخ الاحتياطية القديمة للمعالجات
 /models/heart_disease/preprocessors/*.bak.v4.pkl
 *.zip
