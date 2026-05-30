@@ -213,7 +213,7 @@ export default function ClinicalEmrMode() {
       {noDiseaseMsg}
       {noPatientsMsg}
 
-      {selectedDisease && patients.length > 0 && (
+      {selectedDisease && patients.length > 0 && selectedPatient && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* ── Left Column: Patient Info + Data Grid ── */}
           <div className="xl:col-span-1 space-y-6">
