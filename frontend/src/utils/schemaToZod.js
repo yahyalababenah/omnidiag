@@ -81,16 +81,17 @@ export function buildZodSchema(fields) {
 
       // ── Number (float or wide-range integer) ──
       case 'number': {
+        // Build the base numeric validator first (BEFORE .or() string-coercion)
+        // so that .min()/.max() chain directly on ZodNumber, not on ZodUnion.
         let numVal;
         if (field.type === 'number') {
-          numVal = z
-            .number({ invalid_type_error: `${field.title} must be a number` })
-            .or(z.string().transform((v) => parseFloat(v)));
+          numVal = z.number({
+            invalid_type_error: `${field.title} must be a number`,
+          });
         } else {
           numVal = z
             .number({ invalid_type_error: `${field.title} must be a number` })
-            .int()
-            .or(z.string().transform((v) => parseInt(v, 10)));
+            .int();
         }
         if (field.validation.minimum !== undefined) {
           numVal = numVal.min(field.validation.minimum, {
@@ -101,6 +102,12 @@ export function buildZodSchema(fields) {
           numVal = numVal.max(field.validation.maximum, {
             message: `${field.title} must be ≤ ${field.validation.maximum}`,
           });
+        }
+        // Now chain the string-coercion AFTER min/max are set
+        if (field.type === 'number') {
+          numVal = numVal.or(z.string().transform((v) => parseFloat(v)));
+        } else {
+          numVal = numVal.or(z.string().transform((v) => parseInt(v, 10)));
         }
         validator = numVal;
         break;
