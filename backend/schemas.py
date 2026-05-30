@@ -43,16 +43,16 @@ class HeartDiseaseInput(BaseModel):
     pre-encoded integers. The ModelLoader applies label encoding internally.
     """
     Age: int = Field(..., description="Age in years", ge=20, le=100)
-    Sex: str = Field(..., description="Sex: 'M' or 'F' (or encoded 0/1)")
-    ChestPainType: str = Field(..., description="Chest pain type: 'TA', 'ATA', 'NAP', or 'ASY' (or encoded 0-3)")
+    Sex: Literal['M', 'F'] = Field(..., description="Sex: 'M' or 'F' (or encoded 0/1)")
+    ChestPainType: Literal['TA', 'ATA', 'NAP', 'ASY'] = Field(..., description="Chest pain type: 'TA', 'ATA', 'NAP', or 'ASY' (or encoded 0-3)")
     RestingBP: int = Field(..., description="Resting blood pressure (mm Hg)", ge=80, le=220)
     Cholesterol: int = Field(..., description="Serum cholesterol (mg/dl)", ge=100, le=600)
     FastingBS: int = Field(..., description="Fasting blood sugar > 120 mg/dl (1=True, 0=False)", ge=0, le=1)
-    RestingECG: str = Field(..., description="Resting ECG: 'Normal', 'ST', or 'LVH' (or encoded 0-2)")
+    RestingECG: Literal['Normal', 'ST', 'LVH'] = Field(..., description="Resting ECG: 'Normal', 'ST', or 'LVH' (or encoded 0-2)")
     MaxHR: int = Field(..., description="Maximum heart rate achieved", ge=60, le=220)
-    ExerciseAngina: str = Field(..., description="Exercise-induced angina: 'Y' or 'N' (or encoded 0/1)")
+    ExerciseAngina: Literal['Y', 'N'] = Field(..., description="Exercise-induced angina: 'Y' or 'N' (or encoded 0/1)")
     Oldpeak: float = Field(..., description="ST depression induced by exercise relative to rest")
-    ST_Slope: str = Field(..., description="ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)")
+    ST_Slope: Literal['Up', 'Flat', 'Down'] = Field(..., description="ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)")
 
     class Config:
         json_schema_extra = {
