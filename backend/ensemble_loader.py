@@ -468,6 +468,12 @@ class EnsembleModelLoader:
                 model_agreement = "low"
 
             # ── Compute per-model SHAP values (P0: with robust fallback) ─
+            # Cast any object dtype columns to category for SHAP TreeExplainer compatibility
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    df[col] = df[col].astype('category')
+                    log.debug(f"Cast column '{col}' from object to category for SHAP compatibility")
+
             # Cast to float64 for SHAP compatibility with sklearn 1.8.0
             df_float = df.astype(np.float64)
             per_model_shap = {}
@@ -486,6 +492,57 @@ class EnsembleModelLoader:
                     # with sklearn 1.8.0 + SHAP TreeExplainer)
                     import joblib as _joblib
                     fresh_model = _joblib.load(shap_model_paths[name])
+
+                    # XGBoost 3.x compatibility: base_score may be stored as a
+                    # bracket-wrapped string (e.g. '[5.000088E-1]') in UBJSON.
+                    # Safely parse using ast.literal_eval before float conversion.
+                    import ast as _ast
+                    try:
+                        booster = fresh_model.get_booster()
+                        cfg = json.loads(booster.save_config())
+                        raw_bs = cfg["learner"]["learner_model_param"]["base_score"]
+                        if isinstance(raw_bs, str):
+                            stripped = raw_bs.strip()
+                            if stripped.startswith("[") and stripped.endswith("]"):
+                                parsed = _ast.literal_eval(stripped)
+                                if isinstance(parsed, (list, tuple)) and len(parsed) == 1:
+                                    clean_bs = float(parsed[0])
+                                    import types as _types
+                                    # Patch save_raw() to return clean UBJSON without brackets
+                                    _original_save_raw = booster.save_raw
+                                    def _patched_save_raw(self, raw_format="ubj"):
+                                        raw = _original_save_raw(raw_format=raw_format)
+                                        raw_bytes = bytes(raw)
+                                        marker = b"base_score"
+                                        idx = raw_bytes.find(marker)
+                                        if idx >= 0:
+                                            s_pos = idx + len(marker)
+                                            if raw_bytes[s_pos] == 0x53 and raw_bytes[s_pos + 1] == 0x4C:
+                                                len_bytes = raw_bytes[s_pos + 2 : s_pos + 2 + 8]
+                                                old_len = int.from_bytes(len_bytes, "big")
+                                                content_start = s_pos + 2 + 8
+                                                old_content = raw_bytes[content_start : content_start + old_len]
+                                                if old_content.startswith(b"[") and old_content.endswith(b"]"):
+                                                    new_content = old_content[1:-1]
+                                                    new_len = len(new_content)
+                                                    patched = bytearray(raw_bytes)
+                                                    patched[s_pos + 2 : s_pos + 2 + 8] = new_len.to_bytes(8, "big")
+                                                    patched = patched[:content_start] + new_content + patched[content_start + old_len:]
+                                                    return bytearray(patched)
+                                        return raw
+                                    booster.save_raw = _types.MethodType(_patched_save_raw, booster)
+                                    log.info(
+                                        "Patched XGBoost base_score via save_raw() monkey-patch "
+                                        "for ensemble model '%s': '%s' -> %s",
+                                        name, raw_bs, clean_bs,
+                                    )
+                    except Exception:
+                        log.debug(
+                            "base_score save_raw() patch skipped for ensemble model '%s' "
+                            "(not XGBoost or already clean)",
+                            name,
+                        )
+
                     explainer = shap.TreeExplainer(fresh_model)
                     sv = explainer(df_float)
                     # For binary classifiers, sv.values shape is (1, n_features, 2)
