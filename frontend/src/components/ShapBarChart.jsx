@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -20,8 +21,11 @@ const COLOR_NEGATIVE = '#16a34a';
  *   chartData  — Array of { feature: string, shap_value: number } sorted by
  *                |shap_value| descending (as returned by the backend).
  *   baseValue  — Optional base (expected) value from the SHAP explainer.
+ *   maxVisible — Maximum number of features to show before "Show All" (default 10).
  */
-export default function ShapBarChart({ chartData, baseValue }) {
+export default function ShapBarChart({ chartData, baseValue, maxVisible = 10 }) {
+  const [showAll, setShowAll] = useState(false);
+
   if (!chartData || chartData.length === 0) {
     return (
       <div className="text-center text-gray-400 py-8 text-sm">
@@ -37,6 +41,9 @@ export default function ShapBarChart({ chartData, baseValue }) {
     absValue: Math.abs(d.shap_value),
   }));
 
+  const truncated = !showAll && data.length > maxVisible;
+  const displayData = truncated ? data.slice(0, maxVisible) : data;
+
   const maxAbs = Math.max(...data.map((d) => d.absValue), 0.01);
   const domainMax = maxAbs * 1.15;
 
@@ -44,6 +51,8 @@ export default function ShapBarChart({ chartData, baseValue }) {
     `SHAP: ${value.toFixed(4)}`,
     value >= 0 ? '↑ Increases risk' : '↓ Decreases risk',
   ];
+
+  const chartHeight = Math.max(200, displayData.length * 36);
 
   return (
     <div className="space-y-3">
@@ -53,9 +62,9 @@ export default function ShapBarChart({ chartData, baseValue }) {
         </div>
       )}
 
-      <ResponsiveContainer width="100%" height={Math.max(200, data.length * 36)}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart
-          data={data}
+          data={displayData}
           layout="vertical"
           margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
           barSize={20}
@@ -86,7 +95,7 @@ export default function ShapBarChart({ chartData, baseValue }) {
             }}
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-            {data.map((entry, i) => (
+            {displayData.map((entry, i) => (
               <Cell
                 key={i}
                 fill={entry.value >= 0 ? COLOR_POSITIVE : COLOR_NEGATIVE}
@@ -96,6 +105,19 @@ export default function ShapBarChart({ chartData, baseValue }) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+
+      {/* Show All / Show Less toggle */}
+      {data.length > maxVisible && (
+        <button
+          type="button"
+          onClick={() => setShowAll((prev) => !prev)}
+          className="w-full text-xs text-primary-600 hover:text-primary-700 font-medium py-1.5 transition-colors"
+        >
+          {truncated
+            ? `Show All ${data.length} Features`
+            : `Show Less (${maxVisible} features)`}
+        </button>
+      )}
 
       <div className="flex justify-center gap-6 text-xs text-gray-500">
         <span className="flex items-center gap-1.5">
