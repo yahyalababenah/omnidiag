@@ -55,6 +55,11 @@ class OmniDiagApi {
     return this._fetch('/api/v4/diseases');
   }
 
+  /** GET /api/v4/{disease}/schema — get JSON Schema for a disease's patient input fields */
+  getSchema(disease) {
+    return this._fetch(`/api/v4/${disease}/schema`);
+  }
+
   /** POST /api/v4/{disease}/predict — run inference */
   predict(disease, patientData) {
     return this._fetch(`/api/v4/${disease}/predict`, {
