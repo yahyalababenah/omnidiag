@@ -10,6 +10,9 @@ Key Design:
       file in configs/ and implement a feature engineer in features/.
     - Lazy model loading: models are loaded on first request, not at startup.
     - Consistent API: all diseases use the same predict() and explain() interface.
+    - Auto-detects ensemble configs: if config has 'model.ensemble' section,
+      uses EnsembleModelLoader instead of ModelLoader — zero changes to
+      existing heart disease module.
 
 Usage:
     router = OmniDiagRouter()
@@ -31,7 +34,7 @@ class OmniDiagRouter:
     Attributes:
         configs_dir: Path to the directory containing YAML config files.
         disease_configs: Dict mapping disease_name -> parsed config dict.
-        model_loaders: Dict mapping disease_name -> ModelLoader instance.
+        model_loaders: Dict mapping disease_name -> ModelLoader | EnsembleModelLoader instance.
     """
     
     def __init__(self, configs_dir: str = "configs"):
@@ -44,7 +47,7 @@ class OmniDiagRouter:
         """
         self.configs_dir = configs_dir
         self.disease_configs: Dict[str, dict] = {}
-        self.model_loaders: Dict[str, ModelLoader] = {}
+        self.model_loaders: Dict[str, object] = {}
         self._load_all_configs()
     
     # ------------------------------------------------------------------
@@ -92,6 +95,7 @@ class OmniDiagRouter:
         
         Returns:
             Prediction result dict with 'prediction', 'confidence', 'diagnosis'.
+            For ensemble models, also includes 'model_contributions'.
         
         Raises:
             HTTPException 404: If the disease is not registered.
@@ -108,13 +112,44 @@ class OmniDiagRouter:
             patient_data: Dictionary of feature_name -> value for the patient.
         
         Returns:
-            Explanation dict with 'shap_values', 'base_value', 'feature_names'.
+            Explanation dict with 'chart_data', 'text_explanation', 'base_value'.
+            For ensemble models, also includes 'per_model_shap' and 'shap_weights'.
         
         Raises:
             HTTPException 404: If the disease is not registered.
         """
         loader = self._get_loader(disease)
         return loader.explain(patient_data)
+    
+    def counterfactuals(self, disease: str, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Route a counterfactual generation request to the correct disease model.
+        
+        Generates diverse "what-if" scenarios showing what features a patient
+        could change to alter their diagnosis (DiCE-inspired).
+        
+        Args:
+            disease: The disease name (must match a YAML config filename).
+            patient_data: Dictionary of feature_name -> value for the patient.
+        
+        Returns:
+            Dictionary with 'counterfactuals' list, 'status', 'baseline_probability'.
+        
+        Raises:
+            HTTPException 404: If the disease is not registered.
+            HTTPException 400: If the loader doesn't support counterfactuals.
+        """
+        loader = self._get_loader(disease)
+        
+        # Check if loader has generate_counterfactuals method
+        if not hasattr(loader, "generate_counterfactuals"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Counterfactual generation is not supported for disease '{disease}'. "
+                       f"This feature is only available for ensemble models."
+            )
+        
+        return loader.generate_counterfactuals(patient_data)
     
     def reload_configs(self) -> int:
         """
@@ -152,7 +187,7 @@ class OmniDiagRouter:
                         continue
                     
                     self.disease_configs[disease_name] = config
-                    self.model_loaders[disease_name] = ModelLoader(config)
+                    self.model_loaders[disease_name] = self._create_loader(config)
                     display = config.get("disease", {}).get("display_name", disease_name)
                     print(f"✅ Registered disease: {display} ({disease_name})")
                     
@@ -164,15 +199,41 @@ class OmniDiagRouter:
         if not self.disease_configs:
             print("⚠️  No disease configs loaded. The API will return 404 for all diseases.")
     
-    def _get_loader(self, disease: str) -> ModelLoader:
+    def _create_loader(self, config: dict) -> object:
         """
-        Get the ModelLoader for a disease, raising HTTPException if not found.
+        Create the appropriate loader for a disease config.
+        
+        Auto-detects ensemble vs single model based on config:
+          - If 'model.ensemble' key exists → EnsembleModelLoader
+          - Otherwise → standard ModelLoader
+        
+        Args:
+            config: Parsed YAML config dict.
+        
+        Returns:
+            ModelLoader or EnsembleModelLoader instance.
+        """
+        # Check if this disease uses an ensemble
+        ensemble_config = config.get("model", {}).get("ensemble")
+        if ensemble_config is not None:
+            from backend.ensemble_loader import EnsembleModelLoader
+            loader = EnsembleModelLoader(config)
+            print(f"  └─ Using EnsembleModelLoader (type={ensemble_config.get('type', 'unknown')})")
+            return loader
+        
+        # Default: single model loader
+        return ModelLoader(config)
+    
+    def _get_loader(self, disease: str) -> object:
+        """
+        Get the loader (ModelLoader or EnsembleModelLoader) for a disease,
+        raising HTTPException if not found.
         
         Args:
             disease: The disease name.
         
         Returns:
-            The ModelLoader instance.
+            The loader instance.
         
         Raises:
             HTTPException 404: If disease is not registered.
