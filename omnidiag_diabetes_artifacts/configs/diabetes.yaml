@@ -1,0 +1,59 @@
+disease:
+  name: "Diabetes"
+  description: "Diabetes prediction using BRFSS health indicators"
+  active: true
+
+data:
+  raw_dir: "data/diabetes/raw"
+  raw_file: "diabetes_binary_5050split_health_indicators_BRFSS2015.csv"
+  target_col: "Diabetes_binary"
+
+preprocessing:
+  continuous_features:
+    - BMI
+    - MentHlth
+    - PhysHlth
+    - GenHlth
+    - Age
+    - Education
+    - Income
+  binary_features:
+    - HighBP
+    - HighChol
+    - CholCheck
+    - Smoker
+    - Stroke
+    - HeartDiseaseorAttack
+    - PhysActivity
+    - Fruits
+    - Veggies
+    - HvyAlcoholConsump
+    - AnyHealthcare
+    - NoDocbcCost
+    - DiffWalk
+    - Sex
+  test_size: 0.2
+  random_state: 42
+
+model:
+  type: "ensemble"
+  ensemble_type: "stacking"
+  base_models:
+    - XGBoost
+    - LightGBM
+    - RandomForest
+  meta_learner: "LogisticRegression"
+  weights_dir: "models/diabetes"
+  preprocessors_dir: "models/diabetes/preprocessors"
+  metrics_file: "ensemble_metrics.json"
+  inference_threshold: 0.2750  # Clinical-optimized (FN penalty=2.0)
+
+features:
+  module: "features.diabetes_features"
+  class: "DiabetesFeatureEngineer"
+  feature_count: 26
+
+backend:
+  loader: "ensemble_loader"
+  class: "EnsembleModelLoader"
+
