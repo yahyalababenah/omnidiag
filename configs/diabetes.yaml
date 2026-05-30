@@ -1,0 +1,145 @@
+# =============================================================================
+# OmniDiag Configuration — Diabetes (Stacking Ensemble)
+# =============================================================================
+# This is the single source of truth for the Diabetes diagnostic module.
+# Follows the same structure as heart_disease.yaml for consistency.
+#
+# Ensemble Architecture:
+#   - Base models: XGBoost, LightGBM, Random Forest
+#   - Meta-learner: Logistic Regression (trained on out-of-fold predictions)
+#   - Fallback: Soft Voting (equal-weight average of base models)
+# =============================================================================
+
+disease:
+  name: "diabetes"
+  display_name: "Diabetes Risk Assessment"
+  description: "CDC BRFSS 2015 — Diabetes Health Indicators prediction using stacking ensemble (XGBoost + LightGBM + Random Forest) with Logistic Regression meta-learner and SHAP explainability — 21 clinical features"
+  target_column: "Diabetes_binary"
+  version: "1.1.0"                    # Updated for ensemble
+
+# ---------------------------------------------------------------------------
+# Data paths — all relative to project root
+# ---------------------------------------------------------------------------
+data:
+  raw_path: "data/diabetes/raw/"
+  processed_path: "data/diabetes/processed/"
+  interim_path: "data/diabetes/interim/"
+  raw_files:
+    - "diabetes_binary_5050split_health_indicators_BRFSS2015.csv"
+  final_clean_file: "final_ready_data.csv"
+  heuristic_file: "data_heuristic.csv"
+  clinical_file: "data_clinical.csv"
+
+# ---------------------------------------------------------------------------
+# Feature engineering configuration
+# ---------------------------------------------------------------------------
+features:
+  module: "features.diabetes_features"
+  class: "DiabetesFeatureEngineer"
+  binary_columns:
+    - "HighBP"
+    - "HighChol"
+    - "CholCheck"
+    - "Smoker"
+    - "Stroke"
+    - "HeartDiseaseorAttack"
+    - "PhysActivity"
+    - "Fruits"
+    - "Veggies"
+    - "HvyAlcoholConsump"
+    - "AnyHealthcare"
+    - "NoDocbcCost"
+    - "DiffWalk"
+    - "Sex"
+  numerical_columns:
+    - "BMI"
+    - "MentHlth"
+    - "PhysHlth"
+    - "GenHlth"
+    - "Age"
+    - "Education"
+    - "Income"
+  imputation_features: []          # No missing values in BRFSS 2015
+  heuristic_features:
+    - name: "BMI_Age_Interaction"
+      formula: "BMI * Age"
+      description: "Multiplicative interaction between BMI and age category — captures compounding obesity risk across lifespan"
+    - name: "Health_Index"
+      formula: "GenHlth * (MentHlth + PhysHlth)"
+      description: "Composite morbidity index — general health perception amplified by total poor-health days"
+    - name: "Lifestyle_Score"
+      formula: "PhysActivity + Fruits + Veggies - Smoker - HvyAlcoholConsump"
+      description: "Aggregate healthy-lifestyle indicator — higher = healthier behaviours"
+    - name: "SES_Composite"
+      formula: "Education * Income"
+      description: "Socioeconomic status proxy — captures combined effect of education and income"
+  clinical_features:
+    - name: "Diabetes_Clinical_Risk"
+      formula: "exp(BMI * 0.05 + Age * 0.03 + GenHlth * 0.2 + HighBP * 0.5)"
+      description: "Logarithmic diabetes risk index based on epidemiological weights — BMI and hypertension dominate"
+
+# ---------------------------------------------------------------------------
+# Model configuration — Stacking Ensemble
+# ---------------------------------------------------------------------------
+model:
+  type: "ensemble"                    # Signals EnsembleModelLoader in router
+  explainer_type: "tree"              # All base models use TreeExplainer
+  inference_threshold: 0.275          # Clinical-optimised (FN penalty=2x) — 91.7% sensitivity at 54.6% specificity
+  weights_path: "models/diabetes/xgb_model.pkl"
+  fallback_weights_path: "models/diabetes/voting_ensemble.pkl"
+  preprocessors_path: "models/diabetes/preprocessors/"
+  best_params:
+    n_estimators: 657
+    max_depth: 4
+    learning_rate: 0.03779493074351997
+    subsample: 0.8965687942005924
+    colsample_bytree: 0.9754108845215046
+    min_child_weight: 1
+    gamma: 0.7219090968031097
+    reg_alpha: 3.5203884938406915
+    reg_lambda: 0.4777340917171181
+
+  # ── Ensemble configuration ──────────────────────────────────────────
+  ensemble:
+    type: "stacking"                    # "stacking" or "voting" — stacking improves by +0.13% with Kaggle-trained models
+    base_models:
+      - name: "xgboost"
+        weights_path: "models/diabetes/xgb_model.pkl"
+        explainer_type: "tree"
+      - name: "lightgbm"
+        weights_path: "models/diabetes/lgb_model.pkl"
+        explainer_type: "tree"
+      - name: "random_forest"
+        weights_path: "models/diabetes/rf_model.pkl"
+        explainer_type: "tree"
+    meta_learner:
+      type: "logistic_regression"
+      weights_path: "models/diabetes/meta_learner.pkl"
+
+# ---------------------------------------------------------------------------
+# Training configuration
+# ---------------------------------------------------------------------------
+training:
+  test_size: 0.2
+  random_state: 42
+  optimization_trials: 100
+  optimization_direction: "maximize"
+  optimization_metric: "accuracy"
+
+# ---------------------------------------------------------------------------
+# SHAP explainer configuration
+# ---------------------------------------------------------------------------
+explainer:
+  enabled: true
+  type: "shap"
+  plots_output_dir: "reports/figures/"
+  summary_bar_plot: "shap_summary_bar.png"
+  beeswarm_plot: "shap_beeswarm.png"
+  waterfall_plot_prefix: "shap_waterfall_p"
+
+# ---------------------------------------------------------------------------
+# API configuration
+# ---------------------------------------------------------------------------
+api:
+  endpoint_prefix: "/api/v4"
+  version: "1.1.0"
