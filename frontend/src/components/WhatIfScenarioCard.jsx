@@ -1,4 +1,5 @@
 import { Zap, Lightbulb, TrendingDown, CheckCircle2, Loader2 } from 'lucide-react';
+import MedicalTooltip from './MedicalTooltip';
 
 /**
  * WhatIfScenarioCard — DiCE Counterfactuals Viewer
@@ -161,9 +162,11 @@ export default function WhatIfScenarioCard({ counterfactuals, loading }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingDown className="w-4 h-4 text-green-500 shrink-0" />
-                      <span className="text-sm font-semibold text-gray-800">
-                        {s.feature}
-                      </span>
+                      <MedicalTooltip term={s.feature}>
+                        <span className="text-sm font-semibold text-gray-800">
+                          {s.feature}
+                        </span>
+                      </MedicalTooltip>
                       {isHighImpact && (
                         <span className="text-[10px] font-medium text-green-600 bg-green-100 px-1.5 py-0.5 rounded">
                           High Impact
@@ -226,9 +229,11 @@ export default function WhatIfScenarioCard({ counterfactuals, loading }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <TrendingDown className="w-4 h-4 text-green-500 shrink-0" />
-                    <span className="text-sm font-semibold text-gray-800">
-                      {featureNames}
-                    </span>
+                    <MedicalTooltip term={featureNames.split(', ')[0]}>
+                      <span className="text-sm font-semibold text-gray-800">
+                        {featureNames}
+                      </span>
+                    </MedicalTooltip>
                     {isHighImpact && (
                       <span className="text-[10px] font-medium text-green-600 bg-green-100 px-1.5 py-0.5 rounded">
                         High Impact
