@@ -43,6 +43,16 @@ export function buildZodSchema(fields) {
         break;
       }
 
+      // ── Segmented (binary 0/1 radio-group, e.g. Sex) ──
+      case 'segmented': {
+        validator = z
+          .number({ invalid_type_error: `${field.title} is required` })
+          .int()
+          .min(0)
+          .max(1);
+        break;
+      }
+
       // ── Dropdown (string enum) ──
       case 'select': {
         if (field.validation.enum && field.validation.enum.length > 0) {
