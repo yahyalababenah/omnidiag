@@ -130,30 +130,55 @@ function SliderField({ field, meta, error }) {
 
 /**
  * Number Input — for float or wide-range integer fields.
+ * Shows a range slider alongside the number input when min/max bounds exist.
  */
 function NumberField({ field, meta, error }) {
   const min = meta.validation.minimum;
   const max = meta.validation.maximum;
   const step = meta.validation.step ?? (meta.type === 'number' ? 0.1 : 1);
 
+  // Show a slider when we have finite numeric bounds and the range isn't excessive
+  const showSlider = min !== undefined && max !== undefined && (max - min) <= 500;
+  const currentVal = field.value ?? min ?? 0;
+
   return (
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
         {meta.title}
       </label>
-      <input
-        id={meta.name}
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        {...field}
-        onChange={(e) => {
-          const raw = e.target.value;
-          field.onChange(raw === '' ? '' : Number(raw));
-        }}
-        className={`input-field ${error ? 'border-red-400 ring-1 ring-red-400' : ''}`}
-      />
+      <div className="flex items-center gap-3">
+        {showSlider && (
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={currentVal}
+            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+            className="flex-1 h-2 rounded-full appearance-none cursor-pointer
+                       bg-gray-200 accent-primary-500
+                       [&::-webkit-slider-thumb]:appearance-none
+                       [&::-webkit-slider-thumb]:w-4
+                       [&::-webkit-slider-thumb]:h-4
+                       [&::-webkit-slider-thumb]:rounded-full
+                       [&::-webkit-slider-thumb]:bg-primary-500
+                       [&::-webkit-slider-thumb]:shadow-sm"
+          />
+        )}
+        <input
+          id={meta.name}
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={field.value ?? ''}
+          onChange={(e) => {
+            const raw = e.target.value;
+            field.onChange(raw === '' ? '' : Number(raw));
+          }}
+          className={`input-field w-24 ${error ? 'border-red-400 ring-1 ring-red-400' : ''}`}
+        />
+      </div>
       {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
       {(min !== undefined || max !== undefined) && (
         <p className="text-[10px] text-gray-400 mt-0.5">
