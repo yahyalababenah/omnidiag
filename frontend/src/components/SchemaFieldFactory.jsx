@@ -65,8 +65,9 @@ function ToggleField({ field, meta, error }) {
 }
 
 /**
- * Segmented Button Group — styled radio-group for distinct binary states (e.g., Sex: Male/Female).
- * Renders two buttons side by side; active state uses primary color.
+ * Segmented Button Group — premium radio-group for distinct binary states (e.g., Sex: Male/Female).
+ * Active state uses bg-blue-600 with shadow for clear visual distinction.
+ * Smooth 200ms transitions on all interactive elements.
  */
 function SegmentedField({ field, meta, error }) {
   const val = field.value ?? 0;
@@ -76,33 +77,33 @@ function SegmentedField({ field, meta, error }) {
       <label className="block text-xs font-medium text-gray-600 mb-2">
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
       </label>
-      <div className="flex rounded-lg border border-gray-300 overflow-hidden" role="radiogroup">
+      <div className="flex rounded-lg border border-gray-300 overflow-hidden shadow-sm" role="radiogroup">
         <button
           type="button"
           role="radio"
           aria-checked={val === 1}
           onClick={() => field.onChange(1)}
           className={`
-            flex-1 px-4 py-2 text-sm font-medium transition-colors duration-150
+            flex-1 px-4 py-2.5 text-sm font-semibold transition-all duration-200
             ${val === 1
-              ? 'bg-primary-500 text-white shadow-sm'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
             }
           `}
         >
           Male
         </button>
-        <div className="w-px bg-gray-300" />
+        <div className="w-px bg-gray-200" />
         <button
           type="button"
           role="radio"
           aria-checked={val === 0}
           onClick={() => field.onChange(0)}
           className={`
-            flex-1 px-4 py-2 text-sm font-medium transition-colors duration-150
+            flex-1 px-4 py-2.5 text-sm font-semibold transition-all duration-200
             ${val === 0
-              ? 'bg-primary-500 text-white shadow-sm'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
             }
           `}
         >
@@ -144,7 +145,7 @@ function SelectField({ field, meta, error }) {
 
 /**
  * Slider — range input for small-range integer fields.
- * Renders the current value as a bold badge next to the label.
+ * Renders the current value as a prominent live badge next to the label.
  */
 function SliderField({ field, meta, error }) {
   const min = meta.validation.minimum ?? 0;
@@ -156,9 +157,9 @@ function SliderField({ field, meta, error }) {
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
         {' '}
-        <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5
-                         text-xs font-bold text-primary-700 bg-primary-50
-                         border border-primary-200 rounded-md">
+        <span className="inline-flex items-center justify-center min-w-[2rem] h-5 px-2
+                         text-xs font-bold text-blue-800 bg-blue-100
+                         border border-blue-200 rounded-md shadow-sm">
           {val}
         </span>
       </label>
@@ -173,13 +174,13 @@ function SliderField({ field, meta, error }) {
           value={val}
           onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
           className="flex-1 h-2 rounded-full appearance-none cursor-pointer
-                     bg-gray-200 accent-primary-500
+                     bg-gray-200 accent-blue-600
                      [&::-webkit-slider-thumb]:appearance-none
                      [&::-webkit-slider-thumb]:w-4
                      [&::-webkit-slider-thumb]:h-4
                      [&::-webkit-slider-thumb]:rounded-full
-                     [&::-webkit-slider-thumb]:bg-primary-500
-                     [&::-webkit-slider-thumb]:shadow-sm"
+                     [&::-webkit-slider-thumb]:bg-blue-600
+                     [&::-webkit-slider-thumb]:shadow-md"
         />
         <span className="text-xs font-mono font-semibold text-gray-700 w-6">{val}</span>
       </div>
@@ -193,6 +194,7 @@ function SliderField({ field, meta, error }) {
  * Shows a twin-bound slider alongside the number input when min/max bounds exist.
  * Both controls share the exact same field.value — moving the slider updates the
  * number box instantly, and typing in the box moves the slider instantly.
+ * When slider is visible, a live value badge is shown next to the label.
  */
 function NumberField({ field, meta, error }) {
   const min = meta.validation.minimum;
@@ -207,6 +209,16 @@ function NumberField({ field, meta, error }) {
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
+        {showSlider && (
+          <>
+            {' '}
+            <span className="inline-flex items-center justify-center min-w-[2rem] h-5 px-2
+                             text-xs font-bold text-blue-800 bg-blue-100
+                             border border-blue-200 rounded-md shadow-sm">
+              {typeof currentVal === 'number' ? currentVal.toFixed(meta.type === 'number' ? 1 : 0) : currentVal}
+            </span>
+          </>
+        )}
       </label>
       <div className="flex items-center gap-3">
         {showSlider && (
@@ -218,13 +230,13 @@ function NumberField({ field, meta, error }) {
             value={currentVal}
             onChange={(e) => field.onChange(parseFloat(e.target.value))}
             className="flex-1 h-2 rounded-full appearance-none cursor-pointer
-                       bg-gray-200 accent-primary-500
+                       bg-gray-200 accent-blue-600
                        [&::-webkit-slider-thumb]:appearance-none
                        [&::-webkit-slider-thumb]:w-4
                        [&::-webkit-slider-thumb]:h-4
                        [&::-webkit-slider-thumb]:rounded-full
-                       [&::-webkit-slider-thumb]:bg-primary-500
-                       [&::-webkit-slider-thumb]:shadow-sm"
+                       [&::-webkit-slider-thumb]:bg-blue-600
+                       [&::-webkit-slider-thumb]:shadow-md"
           />
         )}
         <input
@@ -309,7 +321,7 @@ export default function SchemaFieldFactory({ meta, control, errors }) {
   } = useController({
     name: meta.name,
     control,
-    defaultValue: meta.default ?? '',
+    defaultValue: meta.default ?? (meta.type === 'integer' || meta.type === 'number' ? 0 : ''),
     rules: {
       required: meta.validation.required ? `${meta.title} is required` : false,
       min: meta.validation.minimum,
