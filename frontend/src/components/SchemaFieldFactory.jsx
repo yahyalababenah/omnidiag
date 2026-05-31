@@ -14,6 +14,7 @@
  */
 
 import { useController } from 'react-hook-form';
+import MedicalTooltip from './MedicalTooltip';
 
 // ── Icons per component type ──
 const componentIcons = {
@@ -37,7 +38,7 @@ function ToggleField({ field, meta, error }) {
         htmlFor={meta.name}
         className="text-xs font-medium text-gray-700 cursor-pointer select-none"
       >
-        {meta.title}
+        <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
       </label>
       <button
         id={meta.name}
@@ -73,7 +74,7 @@ function SegmentedField({ field, meta, error }) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-2">
-        {meta.title}
+        <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
       </label>
       <div className="flex rounded-lg border border-gray-300 overflow-hidden" role="radiogroup">
         <button
@@ -122,7 +123,7 @@ function SelectField({ field, meta, error }) {
   return (
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
-        {meta.title}
+        <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
       </label>
       <select
         id={meta.name}
@@ -153,7 +154,7 @@ function SliderField({ field, meta, error }) {
   return (
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
-        {meta.title}
+        <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
         {' '}
         <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5
                          text-xs font-bold text-primary-700 bg-primary-50
@@ -205,7 +206,7 @@ function NumberField({ field, meta, error }) {
   return (
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
-        {meta.title}
+        <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
       </label>
       <div className="flex items-center gap-3">
         {showSlider && (
@@ -269,7 +270,7 @@ function TextField({ field, meta, error }) {
   return (
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
-        {meta.title}
+        <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
       </label>
       <input
         id={meta.name}

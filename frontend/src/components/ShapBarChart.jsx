@@ -9,6 +9,7 @@ import {
   Cell,
   CartesianGrid,
 } from 'recharts';
+import { lookupMedicalTerm } from '../utils/medicalDictionary';
 
 const COLOR_POSITIVE = '#dc2626';
 const COLOR_NEGATIVE = '#16a34a';
@@ -47,12 +48,118 @@ export default function ShapBarChart({ chartData, baseValue, maxVisible = 10 }) 
   const maxAbs = Math.max(...data.map((d) => d.absValue), 0.01);
   const domainMax = maxAbs * 1.15;
 
-  const formatTooltip = (value) => [
-    `SHAP: ${value.toFixed(4)}`,
-    value >= 0 ? '↑ Increases risk' : '↓ Decreases risk',
-  ];
-
   const chartHeight = Math.max(200, displayData.length * 36);
+
+  /**
+   * Custom Y-axis tick renderer.
+   * Uses SVG foreignObject to embed HTML with the MedicalTooltip hover effect.
+   */
+  const renderCustomYAxisTick = ({ x, y, payload }) => {
+    const featureName = payload.value;
+    const desc = lookupMedicalTerm(featureName);
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <foreignObject
+          x={-140}
+          y={-10}
+          width={140}
+          height={22}
+          style={{ overflow: 'visible' }}
+        >
+          <div
+            className="group/tooltip relative inline-flex justify-end"
+            style={{ width: '100%' }}
+          >
+            <span
+              className="text-xs font-medium truncate"
+              style={{
+                color: '#334155',
+                maxWidth: '130px',
+                display: 'inline-block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                cursor: desc ? 'help' : 'default',
+                borderBottom: desc ? '1px dashed #94a3b8' : 'none',
+              }}
+            >
+              {featureName}
+            </span>
+            {desc && (
+              <span
+                role="tooltip"
+                className="
+                  invisible group-hover/tooltip:visible
+                  opacity-0 group-hover/tooltip:opacity-100
+                  transition-all duration-200 delay-[400ms]
+                  absolute bottom-full left-1/2 -translate-x-1/2 mb-1
+                  z-50
+                  max-w-[260px] w-max
+                  px-3 py-2
+                  rounded-lg
+                  bg-gray-900 text-white
+                  text-xs leading-relaxed
+                  shadow-lg
+                  pointer-events-none
+                  text-left
+                  font-normal
+                "
+              >
+                {desc}
+                <span
+                  className="
+                    absolute top-full left-1/2 -translate-x-1/2
+                    w-0 h-0
+                    border-4 border-transparent border-t-gray-900
+                  "
+                />
+              </span>
+            )}
+          </div>
+        </foreignObject>
+      </g>
+    );
+  };
+
+  /**
+   * Custom Recharts Tooltip content with medical descriptions.
+   */
+  const CustomRechartsTooltip = ({ active, payload, label }) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const item = payload[0];
+    const desc = lookupMedicalTerm(label);
+    const val = item.value;
+    const isRiskInc = val >= 0;
+
+    return (
+      <div
+        style={{
+          fontSize: 12,
+          borderRadius: 8,
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          background: 'white',
+          padding: '8px 12px',
+          maxWidth: 280,
+        }}
+      >
+        <p style={{ fontWeight: 600, margin: '0 0 4px', color: '#1e293b' }}>
+          {label}
+        </p>
+        <p style={{ margin: '0 0 2px', color: isRiskInc ? '#dc2626' : '#16a34a' }}>
+          SHAP: {val.toFixed(4)}
+          {' '}
+          <span>{isRiskInc ? '↑ Risk-increasing' : '↓ Protective'}</span>
+        </p>
+        {desc && (
+          <p style={{ margin: '4px 0 0', color: '#64748b', lineHeight: 1.4, fontSize: 11 }}>
+            {desc}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-3">
@@ -81,19 +188,14 @@ export default function ShapBarChart({ chartData, baseValue, maxVisible = 10 }) 
           <YAxis
             type="category"
             dataKey="name"
-            tick={{ fontSize: 11, fill: '#334155', fontWeight: 500 }}
+            tick={renderCustomYAxisTick}
             tickLine={false}
             axisLine={false}
             width={150}
           />
           <Tooltip
-            formatter={formatTooltip}
-            contentStyle={{
-              fontSize: 12,
-              borderRadius: 8,
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            }}
+            content={<CustomRechartsTooltip />}
+            cursor={{ fill: '#f8fafc' }}
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
             {displayData.map((entry, i) => (
