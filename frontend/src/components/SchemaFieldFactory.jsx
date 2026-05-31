@@ -5,17 +5,19 @@
  * Maps component types to actual React input elements.
  *
  * Supported components:
- *   toggle  → Styled checkbox/switch (binary 0/1)
- *   select  → Native <select> dropdown (enum)
- *   slider  → Range slider with labeled ticks (small-range integer)
- *   number  → <input type="number"> with min/max/step
- *   text    → <input type="text"> (fallback)
+ *   segmented → Segmented radio-group (Male=1 / Female=0)
+ *   toggle    → Styled checkbox/switch (binary 0/1)
+ *   select    → Native <select> dropdown (enum)
+ *   slider    → Range slider with live value badge (small-range integer)
+ *   number    → Twin-bound slider + <input type="number"> with min/max/step
+ *   text      → <input type="text"> (fallback)
  */
 
 import { useController } from 'react-hook-form';
 
 // ── Icons per component type ──
 const componentIcons = {
+  segmented: '⊙',
   toggle: '⊡',
   select: '▼',
   slider: '═',
@@ -62,6 +64,56 @@ function ToggleField({ field, meta, error }) {
 }
 
 /**
+ * Segmented Button Group — styled radio-group for distinct binary states (e.g., Sex: Male/Female).
+ * Renders two buttons side by side; active state uses primary color.
+ */
+function SegmentedField({ field, meta, error }) {
+  const val = field.value ?? 0;
+
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-2">
+        {meta.title}
+      </label>
+      <div className="flex rounded-lg border border-gray-300 overflow-hidden" role="radiogroup">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={val === 1}
+          onClick={() => field.onChange(1)}
+          className={`
+            flex-1 px-4 py-2 text-sm font-medium transition-colors duration-150
+            ${val === 1
+              ? 'bg-primary-500 text-white shadow-sm'
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+            }
+          `}
+        >
+          Male
+        </button>
+        <div className="w-px bg-gray-300" />
+        <button
+          type="button"
+          role="radio"
+          aria-checked={val === 0}
+          onClick={() => field.onChange(0)}
+          className={`
+            flex-1 px-4 py-2 text-sm font-medium transition-colors duration-150
+            ${val === 0
+              ? 'bg-primary-500 text-white shadow-sm'
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+            }
+          `}
+        >
+          Female
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
+    </div>
+  );
+}
+
+/**
  * Dropdown — renders a native <select> for enum string/number fields.
  */
 function SelectField({ field, meta, error }) {
@@ -91,6 +143,7 @@ function SelectField({ field, meta, error }) {
 
 /**
  * Slider — range input for small-range integer fields.
+ * Renders the current value as a bold badge next to the label.
  */
 function SliderField({ field, meta, error }) {
   const min = meta.validation.minimum ?? 0;
@@ -101,6 +154,12 @@ function SliderField({ field, meta, error }) {
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
         {meta.title}
+        {' '}
+        <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5
+                         text-xs font-bold text-primary-700 bg-primary-50
+                         border border-primary-200 rounded-md">
+          {val}
+        </span>
       </label>
       <div className="flex items-center gap-3">
         <span className="text-xs text-gray-400 w-6 text-right">{min}</span>
@@ -130,7 +189,9 @@ function SliderField({ field, meta, error }) {
 
 /**
  * Number Input — for float or wide-range integer fields.
- * Shows a range slider alongside the number input when min/max bounds exist.
+ * Shows a twin-bound slider alongside the number input when min/max bounds exist.
+ * Both controls share the exact same field.value — moving the slider updates the
+ * number box instantly, and typing in the box moves the slider instantly.
  */
 function NumberField({ field, meta, error }) {
   const min = meta.validation.minimum;
@@ -171,10 +232,20 @@ function NumberField({ field, meta, error }) {
           min={min}
           max={max}
           step={step}
-          value={field.value ?? ''}
+          value={currentVal}
           onChange={(e) => {
             const raw = e.target.value;
-            field.onChange(raw === '' ? '' : Number(raw));
+            if (raw === '') {
+              field.onChange('');
+              return;
+            }
+            const parsed = Number(raw);
+            if (isNaN(parsed)) return;
+            // Clamp within bounds to match slider behaviour
+            let clamped = parsed;
+            if (min !== undefined) clamped = Math.max(min, clamped);
+            if (max !== undefined) clamped = Math.min(max, clamped);
+            field.onChange(clamped);
           }}
           className={`input-field w-24 ${error ? 'border-red-400 ring-1 ring-red-400' : ''}`}
         />
@@ -213,6 +284,7 @@ function TextField({ field, meta, error }) {
 
 // ── Component Registry ──
 const COMPONENT_MAP = {
+  segmented: SegmentedField,
   toggle: ToggleField,
   select: SelectField,
   slider: SliderField,
