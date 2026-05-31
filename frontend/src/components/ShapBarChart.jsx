@@ -66,7 +66,7 @@ export default function ShapBarChart({ chartData, baseValue, maxVisible = 10 }) 
         <BarChart
           data={displayData}
           layout="vertical"
-          margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
+          margin={{ top: 4, right: 16, left: 150, bottom: 4 }}
           barSize={20}
         >
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
@@ -76,6 +76,7 @@ export default function ShapBarChart({ chartData, baseValue, maxVisible = 10 }) 
             tick={{ fontSize: 11, fill: '#64748b' }}
             tickLine={false}
             axisLine={false}
+            tickFormatter={(tick) => tick.toFixed(2)}
           />
           <YAxis
             type="category"
@@ -83,7 +84,7 @@ export default function ShapBarChart({ chartData, baseValue, maxVisible = 10 }) 
             tick={{ fontSize: 11, fill: '#334155', fontWeight: 500 }}
             tickLine={false}
             axisLine={false}
-            width={100}
+            width={150}
           />
           <Tooltip
             formatter={formatTooltip}

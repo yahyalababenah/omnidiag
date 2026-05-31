@@ -30,6 +30,7 @@ import {
   Wind,
   ClipboardList,
   AlertCircle,
+  Shuffle,
 } from 'lucide-react';
 import { useDisease } from '../context/DiseaseContext';
 import { useDiseaseForm } from '../hooks/useDiseaseForm';
@@ -133,6 +134,28 @@ export default function DynamicClinicalForm({
 }) {
   const [hasRun, setHasRun] = useState(false);
 
+  // ── Randomize all fields with valid data ──
+  const randomizeFields = () => {
+    const randomized = {};
+    fields.forEach((f) => {
+      if (f.component === 'toggle') {
+        randomized[f.name] = Math.random() > 0.5 ? 1 : 0;
+      } else if (f.component === 'select' && f.validation.enum?.length) {
+        const opts = f.validation.enum;
+        randomized[f.name] = opts[Math.floor(Math.random() * opts.length)];
+      } else if (f.type === 'number' || f.type === 'integer') {
+        const min = f.validation.minimum ?? 0;
+        const max = f.validation.maximum ?? 100;
+        const step = f.validation.step ?? (f.type === 'number' ? 0.1 : 1);
+        const val = min + Math.random() * (max - min);
+        randomized[f.name] = step < 1 ? parseFloat(val.toFixed(1)) : Math.round(val);
+      } else {
+        randomized[f.name] = f.default ?? '';
+      }
+    });
+    form.reset(randomized);
+  };
+
   // ── Form hook ──
   const {
     form,
@@ -206,6 +229,15 @@ export default function DynamicClinicalForm({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={randomizeFields}
+            className="btn-secondary text-xs"
+            title="Fill all fields with random valid data"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            Randomize
+          </button>
           <button
             type="button"
             onClick={resetForm}

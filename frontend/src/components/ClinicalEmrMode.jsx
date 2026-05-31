@@ -22,6 +22,7 @@ import { useDisease } from '../context/DiseaseContext';
 import { useDiseaseSchema } from '../hooks/useDiseaseSchema';
 import { getPatientsForDisease } from '../mockPatients';
 import ShapBarChart from './ShapBarChart';
+import WhatIfScenarioCard from './WhatIfScenarioCard';
 
 /**
  * Clinical EMR Mode — Doctor's View
@@ -35,7 +36,8 @@ import ShapBarChart from './ShapBarChart';
  */
 export default function ClinicalEmrMode() {
   const { selectedDisease, currentDiseaseInfo } = useDisease();
-  const diseaseLabel = currentDiseaseInfo?.display_name || selectedDisease || 'Heart Disease';
+  const titleCase = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+  const diseaseLabel = titleCase(currentDiseaseInfo?.display_name || selectedDisease || 'Heart Disease');
 
   const { fields, loading: schemaLoading, error: schemaError } = useDiseaseSchema(selectedDisease);
 
@@ -482,6 +484,11 @@ export default function ClinicalEmrMode() {
                     baseValue={shapData.base_value}
                     maxVisible={10}
                   />
+
+                  {/* DiCE Counterfactuals — What-If Scenarios */}
+                  <div className="mt-6">
+                    <WhatIfScenarioCard />
+                  </div>
 
                   {/* Textual Explanation */}
                   {shapData.text_explanation && (
