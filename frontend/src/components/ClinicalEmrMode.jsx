@@ -52,6 +52,8 @@ export default function ClinicalEmrMode() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [shapData, setShapData] = useState(null);
+  const [counterfactualsData, setCounterfactualsData] = useState(null);
+  const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [showLang, setShowLang] = useState('en');
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const coldStartTimer = useRef(null);
@@ -65,6 +67,7 @@ export default function ClinicalEmrMode() {
     }
     setResult(null);
     setShapData(null);
+    setCounterfactualsData(null);
     setError(null);
   }, [selectedDisease, patients.length]);
 
@@ -90,10 +93,12 @@ export default function ClinicalEmrMode() {
     if (!selectedDisease || !patient) return;
 
     setLoading(true);
+    setCounterfactualsLoading(true);
     setColdStart(false);
     setError(null);
     setResult(null);
     setShapData(null);
+    setCounterfactualsData(null);
 
     try {
       const [pred, expl] = await Promise.all([
@@ -104,8 +109,17 @@ export default function ClinicalEmrMode() {
       setShapData(expl);
     } catch (err) {
       setError(err.message || 'Diagnosis failed. Is the backend running?');
+    }
+
+    // Counterfactuals are optional — failure renders mock data with Coming Soon badge
+    try {
+      const cfResponse = await api.counterfactuals(selectedDisease, patient.data);
+      setCounterfactualsData(cfResponse?.counterfactuals ?? null);
+    } catch {
+      setCounterfactualsData(null);
     } finally {
       setLoading(false);
+      setCounterfactualsLoading(false);
     }
   }, [selectedDisease]);
 
@@ -487,7 +501,10 @@ export default function ClinicalEmrMode() {
 
                   {/* DiCE Counterfactuals — What-If Scenarios */}
                   <div className="mt-6">
-                    <WhatIfScenarioCard />
+                    <WhatIfScenarioCard
+                      counterfactuals={counterfactualsData}
+                      loading={counterfactualsLoading}
+                    />
                   </div>
 
                   {/* Textual Explanation */}
