@@ -11,6 +11,7 @@ import { api } from '../api';
 import { useDisease } from '../context/DiseaseContext';
 import DynamicClinicalForm from './DynamicClinicalForm';
 import ShapBarChart from './ShapBarChart';
+import WhatIfScenarioCard from './WhatIfScenarioCard';
 
 export default function EngineeringMode() {
   const { selectedDisease, currentDiseaseInfo } = useDisease();
@@ -19,6 +20,8 @@ export default function EngineeringMode() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [shapData, setShapData] = useState(null);
+  const [counterfactualsData, setCounterfactualsData] = useState(null);
+  const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [lastFormData, setLastFormData] = useState(null);
   const coldStartTimer = useRef(null);
 
@@ -38,10 +41,12 @@ export default function EngineeringMode() {
     if (!selectedDisease) return;
 
     setLoading(true);
+    setCounterfactualsLoading(true);
     setColdStart(false);
     setError(null);
     setResult(null);
     setShapData(null);
+    setCounterfactualsData(null);
     setLastFormData(formData);
 
     try {
@@ -53,8 +58,17 @@ export default function EngineeringMode() {
       setShapData(expl);
     } catch (err) {
       setError(err.message || 'Inference failed. Is the backend running?');
+    }
+
+    // Counterfactuals are optional — failure renders mock data with Coming Soon badge
+    try {
+      const cfResponse = await api.counterfactuals(selectedDisease, formData);
+      setCounterfactualsData(cfResponse?.counterfactuals ?? null);
+    } catch {
+      setCounterfactualsData(null);
     } finally {
       setLoading(false);
+      setCounterfactualsLoading(false);
     }
   };
 
@@ -204,6 +218,14 @@ export default function EngineeringMode() {
                   chartData={shapData.chart_data}
                   baseValue={shapData.base_value}
                 />
+
+                {/* DiCE Counterfactuals — What-If Scenarios */}
+                <div className="mt-6">
+                  <WhatIfScenarioCard
+                    counterfactuals={counterfactualsData}
+                    loading={counterfactualsLoading}
+                  />
+                </div>
 
                 {/* Textual Explanation */}
                 {shapData.text_explanation && (

@@ -75,6 +75,14 @@ class OmniDiagApi {
       body: JSON.stringify(patientData),
     });
   }
+
+  /** POST /api/v4/{disease}/counterfactuals — DiCE what-if scenarios */
+  counterfactuals(disease, patientData) {
+    return this._fetch(`/api/v4/${disease}/counterfactuals`, {
+      method: 'POST',
+      body: JSON.stringify(patientData),
+    });
+  }
 }
 
 export const api = new OmniDiagApi();
