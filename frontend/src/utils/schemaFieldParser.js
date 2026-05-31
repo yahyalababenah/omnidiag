@@ -5,12 +5,13 @@
  * FieldMetadata objects that drive dynamic form rendering.
  *
  * Maps JSON Schema types to React component types:
- *   - integer + min=0 + max=1  →  'toggle'  (binary yes/no)
- *   - string + enum [...]      →  'select'  (dropdown)
- *   - integer + range ≤ 12     →  'slider'  (ordinal / small-range)
- *   - number (float)           →  'number'  (constrained float input)
- *   - integer + range > 12     →  'number'  (constrained int input)
- *   - string (no enum)         →  'text'    (fallback text input)
+ *   - integer + min=0 + max=1 + demographic  →  'segmented' (radio group, e.g. Sex)
+ *   - integer + min=0 + max=1                →  'toggle'    (binary yes/no switch)
+ *   - string + enum [...]                    →  'select'    (dropdown)
+ *   - integer + range ≤ 12                   →  'slider'    (ordinal / small-range)
+ *   - number (float)                         →  'number'    (constrained float input)
+ *   - integer + range > 12                   →  'number'    (constrained int input)
+ *   - string (no enum)                       →  'text'      (fallback text input)
  */
 
 /**
@@ -46,10 +47,24 @@ function deriveTitle(fieldName, description) {
 /**
  * Determine the React component type from schema field properties.
  */
+/**
+ * Fields that represent distinct demographic/clinical states (not on/off).
+ * These get a segmented radio-group control instead of a toggle switch.
+ */
+const DEMOGRAPHIC_BINARY_FIELDS = new Set([
+  'sex',
+]);
+
 function resolveComponentType(schemaField) {
   const { type, minimum, maximum, enum: enumValues } = schemaField;
+  const name = (schemaField.name || '').toLowerCase();
 
-  // Rule 1: integer with min=0, max=1 → Toggle (binary yes/no)
+  // Rule 1: integer with min=0, max=1, demographic → Segmented (radio group)
+  if (type === 'integer' && minimum === 0 && maximum === 1 && DEMOGRAPHIC_BINARY_FIELDS.has(name)) {
+    return 'segmented';
+  }
+
+  // Rule 2: integer with min=0, max=1 → Toggle (binary yes/no)
   if (type === 'integer' && minimum === 0 && maximum === 1) {
     return 'toggle';
   }
@@ -128,7 +143,7 @@ export function parseSchema(schema) {
       name,
       title: deriveTitle(name, prop.description || prop.title),
       type: fieldType,
-      component: resolveComponentType({ ...prop, type: fieldType }),
+      component: resolveComponentType({ ...prop, type: fieldType, name }),
       validation,
       description: prop.description || '',
       default: extractDefault(name, schema),

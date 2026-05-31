@@ -138,7 +138,7 @@ export default function DynamicClinicalForm({
   const randomizeFields = () => {
     const randomized = {};
     fields.forEach((f) => {
-      if (f.component === 'toggle') {
+      if (f.component === 'toggle' || f.component === 'segmented') {
         randomized[f.name] = Math.random() > 0.5 ? 1 : 0;
       } else if (f.component === 'select' && f.validation.enum?.length) {
         const opts = f.validation.enum;
@@ -148,7 +148,11 @@ export default function DynamicClinicalForm({
         const max = f.validation.maximum ?? 100;
         const step = f.validation.step ?? (f.type === 'number' ? 0.1 : 1);
         const val = min + Math.random() * (max - min);
-        randomized[f.name] = step < 1 ? parseFloat(val.toFixed(1)) : Math.round(val);
+        // Align to step increments, then round to avoid floating jitter
+        const stepped = Math.round(val / step) * step;
+        randomized[f.name] = step < 1
+          ? parseFloat(stepped.toFixed(10))
+          : Math.round(stepped);
       } else {
         randomized[f.name] = f.default ?? '';
       }
