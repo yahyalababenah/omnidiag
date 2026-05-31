@@ -59,8 +59,11 @@ ENGINEERED_FEATURES: Set[str] = {
 IMMUTABLE_FEATURES: Set[str] = {
     "Sex",           # Cannot change biological sex
     "Age",           # Cannot reverse age
-    "CholCheck",     # Already had cholesterol check — can't undo
+    "Income",        # Socioeconomic — cannot realistically change
+    "Education",     # Socioeconomic — cannot realistically change
+    "NoDocbcCost",   # Cost/access barrier — systemic, not clinical
     "AnyHealthcare", # Already has insurance — can't undo
+    "CholCheck",     # Already had cholesterol check — can't undo
     "Stroke",        # Past medical history — can't undo
     "HeartDiseaseorAttack",  # Past medical history — can't undo
 }
@@ -77,10 +80,12 @@ CLINICAL_BOUNDS: Dict[str, Tuple[float, float]] = {
 }
 
 # Features that can realistically be modified
+# NOTE: NoDocbcCost, Income, Education, AnyHealthcare are excluded
+# because they are social/access barriers — clinically inappropriate to suggest changing.
 MUTABLE_FEATURES: Set[str] = {
     "BMI", "HighBP", "HighChol", "Smoker", "PhysActivity",
     "Fruits", "Veggies", "HvyAlcoholConsump", "MentHlth",
-    "PhysHlth", "GenHlth", "NoDocbcCost", "DiffWalk",
+    "PhysHlth", "GenHlth", "DiffWalk",
 }
 
 # Perturbation scales (std as fraction of range) for each mutable feature
@@ -96,8 +101,20 @@ PERTURB_SCALES: Dict[str, float] = {
     "MentHlth": 0.2,       # 20% of 30-day range
     "PhysHlth": 0.2,       # 20% of 30-day range
     "GenHlth": 0.25,       # 25% of 4-unit range
-    "NoDocbcCost": 0.5,    # Binary
     "DiffWalk": 0.5,       # Binary
+}
+
+# Directional constraints: prevent clinically harmful perturbations.
+# Key   = feature name
+# Value = set of allowed target values (the only clinically safe values)
+# Features NOT listed here can flip bidirectionally (original behavior).
+DIRECTIONAL_CONSTRAINTS: Dict[str, Set[int]] = {
+    "HvyAlcoholConsump": {0},   # Only allow stopping/reducing alcohol, never starting
+    "Smoker": {0},              # Only allow stopping smoking, never starting
+    "Veggies": {1},             # Only allow adopting vegetable intake, never dropping
+    "Fruits": {1},              # Only allow adopting fruit intake, never dropping
+    "PhysActivity": {1},        # Only allow adopting physical activity, never dropping
+    "DiffWalk": {0},            # Never advise decreasing mobility (0→1 forbidden)
 }
 
 
@@ -255,12 +272,29 @@ class CounterfactualGenerator:
                 original = float(patient_data[feat])
                 
                 if feat in BINARY_FEATURES:
-                    # Binary feature: flip with probability based on perturn scale
-                    flip_prob = PERTURB_SCALES.get(feat, 0.5)
-                    if self.rng.random() < flip_prob:
-                        cand[feat] = 1.0 - original  # Flip 0→1 or 1→0
+                    # Check directional constraint first
+                    if feat in DIRECTIONAL_CONSTRAINTS:
+                        allowed = DIRECTIONAL_CONSTRAINTS[feat]
+                        safe_val = float(list(allowed)[0])
+                        if original == safe_val:
+                            # Already at clinically safe value — lock it
+                            cand[feat] = safe_val
+                        else:
+                            # Original is unsafe (e.g. Smoker=1, safe=0).
+                            # Use flip_prob to decide whether to switch to safe target,
+                            # but NEVER allow illegal flips (e.g. 0→1 for smoking).
+                            flip_prob = PERTURB_SCALES.get(feat, 0.5)
+                            if self.rng.random() < flip_prob:
+                                cand[feat] = safe_val
+                            else:
+                                cand[feat] = original
                     else:
-                        cand[feat] = original
+                        # Standard binary flip (original behavior)
+                        flip_prob = PERTURB_SCALES.get(feat, 0.5)
+                        if self.rng.random() < flip_prob:
+                            cand[feat] = 1.0 - original  # Flip 0→1 or 1→0
+                        else:
+                            cand[feat] = original
                 
                 elif feat in CLINICAL_BOUNDS:
                     lo, hi = CLINICAL_BOUNDS[feat]
@@ -294,6 +328,10 @@ class CounterfactualGenerator:
         for key in candidate:
             # Only report changes for raw (not engineered) features
             if key in ENGINEERED_FEATURES:
+                continue
+            # Defensive: skip immutable/systemic features — they should never
+            # appear as actionable changes, even if a perturbation slipped through
+            if key in IMMUTABLE_FEATURES:
                 continue
             
             orig_val = float(original.get(key, 0))
@@ -497,7 +535,7 @@ class CounterfactualGenerator:
             elif feat == "Veggies":
                 parts.append("increases vegetable intake" if val == 1 else "decreases vegetable intake")
             elif feat == "HvyAlcoholConsump":
-                parts.append("reduces alcohol consumption" if val == 0 else "increases alcohol consumption")
+                parts.append("limits alcohol consumption")
             elif feat == "MentHlth" and val == 0:
                 parts.append("mental health improves (0 poor days)")
             elif feat == "MentHlth":
@@ -509,9 +547,9 @@ class CounterfactualGenerator:
             elif feat == "GenHlth" and val < 3:
                 parts.append(f"general health improves to level {int(val)}")
             elif feat == "NoDocbcCost":
-                parts.append("addresses cost barrier to seeing doctor" if val == 0 else "faces cost barrier")
+                parts.append("removes cost barriers")
             elif feat == "DiffWalk":
-                parts.append("mobility improves" if val == 0 else "mobility decreases")
+                parts.append("maintains or improves mobility")
             else:
                 parts.append(f"{feat} changes to {val}")
         
