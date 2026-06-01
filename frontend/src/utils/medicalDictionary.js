@@ -168,6 +168,16 @@ const MEDICAL_DICTIONARY = {
   'Chest Pain Type':
     'Type of chest pain experienced. '
     + 'Values: Typical Angina, Atypical Angina, Non-Anginal Pain, Asymptomatic.',
+
+  // ── Engineered Features (computed server-side, appear in SHAP charts) ──
+
+  Diabetes_Clinical_Risk:
+    'Diabetes Clinical Risk — Engineered logarithmic risk index. '
+    + 'Formula: exp(BMI × 0.05 + Age × 0.03 + GenHlth × 0.2 + HighBP × 0.5). '
+    + 'HighBP contributes 50% weight — the single strongest modifiable risk factor. '
+    + 'BMI contributes 5% per unit; each unit increase raises risk exponentially. '
+    + 'Range: ~2.7 (young/healthy) to ~90+ (elderly, obese, hypertensive). '
+    + 'This feature almost always dominates the SHAP explanation for diabetes predictions.',
 };
 
 /**
