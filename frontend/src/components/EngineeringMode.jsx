@@ -187,7 +187,9 @@ export default function EngineeringMode() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Prediction</span>
-                    <span className="text-sm font-mono">{result.prediction}</span>
+                    <span className="text-sm font-mono font-semibold">
+                      {result.prediction === 1 ? 'Positive' : 'Negative'}
+                    </span>
                   </div>
 
                   {/* Raw JSON */}
@@ -224,6 +226,7 @@ export default function EngineeringMode() {
                   <WhatIfScenarioCard
                     counterfactuals={counterfactualsData}
                     loading={counterfactualsLoading}
+                    prediction={result?.prediction}
                   />
                 </div>
 

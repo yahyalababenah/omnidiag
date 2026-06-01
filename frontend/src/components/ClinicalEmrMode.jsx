@@ -495,6 +495,7 @@ export default function ClinicalEmrMode() {
                     <WhatIfScenarioCard
                       counterfactuals={counterfactualsData}
                       loading={counterfactualsLoading}
+                      prediction={result?.prediction}
                     />
                   </div>
 
