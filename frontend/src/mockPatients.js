@@ -4,6 +4,12 @@
  *
  * Each patient has realistic vitals/data matching the disease's schema fields,
  * plus clinical meta-fields (history, medications, admittingComplaint).
+ *
+ * Diabetes profiles (4 total — 2 Positive, 2 Negative):
+ *   D-001 Layla Mansour (POSITIVE)  — SHAP dominated by HIGH BMI + HighBP + GenHlth
+ *   D-002 Mohammed Al-Sayed (POSITIVE) — SHAP dominated by GenHlth(Poor) + Smoker + HeartDiseaseorAttack
+ *   D-003 Nora Al-Mutairi (NEGATIVE) — SHAP dominated by strong protective features (PhysActivity, Fruits, low BMI)
+ *   D-004 Youssef Al-Farouk (NEGATIVE) — SHAP mixed: borderline risk balanced by protective factors
  */
 const mockPatients = {
   heart_disease: [
@@ -79,13 +85,14 @@ const mockPatients = {
   ],
 
   diabetes: [
+    // ── POSITIVE 1: SHAP dominated by HIGH BMI + HighBP + GenHlth ──
     {
       id: 'D-001',
       name: 'Layla Mansour',
       age: 58,
       sex: 'F',
       avatar: 'LM',
-      history: 'Type 2 Diabetes (8 yrs), Hypertension, Hyperlipidemia',
+      history: 'Type 2 Diabetes (8 yrs), Hypertension, Hyperlipidemia, Obesity (BMI 32.4)',
       medications: 'Metformin 1000mg, Lisinopril 10mg, Atorvastatin 20mg',
       admittingComplaint: 'Follow-up visit — elevated HbA1c and fasting glucose',
       data: {
@@ -112,13 +119,14 @@ const mockPatients = {
         Income: 4,
       },
     },
+    // ── POSITIVE 2: SHAP dominated by GenHlth(Poor) + Smoker + HeartDiseaseorAttack ──
     {
       id: 'D-002',
       name: 'Mohammed Al-Sayed',
       age: 64,
       sex: 'M',
       avatar: 'MS',
-      history: 'Type 2 Diabetes (15 yrs), CAD s/p PCI, CKD Stage 3',
+      history: 'Type 2 Diabetes (15 yrs), CAD s/p PCI, CKD Stage 3, Active smoker',
       medications: 'Metformin 1000mg, Glipizide 10mg, Aspirin 81mg, Atorvastatin 40mg',
       admittingComplaint: 'Chest discomfort and shortness of breath × 3 days',
       data: {
@@ -143,6 +151,74 @@ const mockPatients = {
         Age: 11,
         Education: 2,
         Income: 3,
+      },
+    },
+    // ── NEGATIVE 1: SHAP dominated by strong protective features ──
+    {
+      id: 'D-003',
+      name: 'Nora Al-Mutairi',
+      age: 34,
+      sex: 'F',
+      avatar: 'NM',
+      history: 'No significant medical history, Non-smoker, Active lifestyle',
+      medications: 'None',
+      admittingComplaint: 'Routine annual check-up — no complaints',
+      data: {
+        HighBP: 0,
+        HighChol: 0,
+        CholCheck: 1,
+        BMI: 22.0,
+        Smoker: 0,
+        Stroke: 0,
+        HeartDiseaseorAttack: 0,
+        PhysActivity: 1,
+        Fruits: 1,
+        Veggies: 1,
+        HvyAlcoholConsump: 0,
+        AnyHealthcare: 1,
+        NoDocbcCost: 0,
+        GenHlth: 1,
+        MentHlth: 2,
+        PhysHlth: 0,
+        DiffWalk: 0,
+        Sex: 0,
+        Age: 4,
+        Education: 6,
+        Income: 8,
+      },
+    },
+    // ── NEGATIVE 2: SHAP mixed — borderline risk balanced by protective factors ──
+    {
+      id: 'D-004',
+      name: 'Youssef Al-Farouk',
+      age: 52,
+      sex: 'M',
+      avatar: 'YF',
+      history: 'Pre-hypertension, Overweight (BMI 27.0), Moderate alcohol use, Physically active',
+      medications: 'None regular',
+      admittingComplaint: 'Occasional fatigue — wants bloodwork done',
+      data: {
+        HighBP: 0,
+        HighChol: 1,
+        CholCheck: 1,
+        BMI: 27.0,
+        Smoker: 0,
+        Stroke: 0,
+        HeartDiseaseorAttack: 0,
+        PhysActivity: 1,
+        Fruits: 1,
+        Veggies: 1,
+        HvyAlcoholConsump: 1,
+        AnyHealthcare: 1,
+        NoDocbcCost: 0,
+        GenHlth: 2,
+        MentHlth: 5,
+        PhysHlth: 4,
+        DiffWalk: 0,
+        Sex: 1,
+        Age: 8,
+        Education: 5,
+        Income: 6,
       },
     },
   ],
