@@ -4,15 +4,22 @@ import MedicalTooltip from './MedicalTooltip';
 /**
  * WhatIfScenarioCard — DiCE Counterfactuals Viewer
  *
- * Three-state rendering logic:
- * 1. loading=true      → Loading spinner
- * 2. counterfactuals === null        → Mock data with "Coming Soon" badge
+ * Four-state rendering logic:
+ * 1. loading=true           → Loading spinner
+ * 2. counterfactuals === null         → Mock data with "Coming Soon" badge
  *    (API error or unsupported disease)
- * 3. counterfactuals !== null && counterfactuals.length === 0
- *    → Green "Low Risk" message (healthy patient — no interventions needed)
- * 4. counterfactuals.length > 0      → Real scenarios from backend DiCE engine
+ * 3. prediction === 0 && counterfactuals !== null && counterfactuals.length === 0
+ *    → Green "Low Risk" message (truly negative patient — no interventions needed)
+ * 4. prediction === 1 && (counterfactuals === null || counterfactuals.length === 0)
+ *    → Mock data with "Coming Soon" (positive patient, counterfactuals pending/failed)
+ * 5. counterfactuals.length > 0       → Real scenarios from backend DiCE engine
+ *
+ * The `prediction` prop (binary 0|1|undefined) decouples logic from presentation:
+ * - If the patient is truly negative (prediction=0), counterfactuals are irrelevant → show green card.
+ * - If the patient is positive (prediction=1), ALWAYS show actionable scenarios (real or mock).
+ * - Never let a missing/empty counterfactuals array suppress the What-If UI for a positive case.
  */
-export default function WhatIfScenarioCard({ counterfactuals, loading }) {
+export default function WhatIfScenarioCard({ counterfactuals, loading, prediction }) {
   /* ── Mock placeholder data (fallback when API unavailable) ── */
   const mockScenarios = [
     {
@@ -64,10 +71,15 @@ export default function WhatIfScenarioCard({ counterfactuals, loading }) {
   }
 
   /* ════════════════════════════════════════
-     State 2 — Healthy patient
-     (counterfactuals !== null && length === 0)
+     State 2 — Truly negative patient (prediction=0)
+     (prediction !== 1 && counterfactuals !== null && length === 0)
+
+     If prediction is 1 (positive), we NEVER show "Low Clinical Risk" —
+     the patient IS positive and deserves actionable scenarios even if
+     counterfactuals are empty (backend returned not_applicable).
+     Instead, fall through to mock data with "Coming Soon" badge.
      ════════════════════════════════════════ */
-  if (counterfactuals !== null && counterfactuals.length === 0) {
+  if (prediction !== 1 && counterfactuals !== null && counterfactuals.length === 0) {
     return (
       <div className="card border border-green-200 bg-green-50/40">
         <div className="card-header">
