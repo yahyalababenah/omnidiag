@@ -11,8 +11,8 @@ import {
 } from 'recharts';
 import { lookupMedicalTerm } from '../utils/medicalDictionary';
 
-const COLOR_POSITIVE = '#1a9105';
-const COLOR_NEGATIVE = '#a31616';
+const COLOR_POSITIVE = '#910505';
+const COLOR_NEGATIVE = '#24a316';
 
 /**
  * Horizontal bar chart of SHAP values.
