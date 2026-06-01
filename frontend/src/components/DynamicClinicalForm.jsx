@@ -31,6 +31,7 @@ import {
   ClipboardList,
   AlertCircle,
   Shuffle,
+  BookOpen,
 } from 'lucide-react';
 import { useDisease } from '../context/DiseaseContext';
 import { useDiseaseForm } from '../hooks/useDiseaseForm';
@@ -38,6 +39,7 @@ import { SchemaErrorBoundary } from './ErrorBoundary';
 import SchemaFieldFactory from './SchemaFieldFactory';
 import FormSkeleton from './FormSkeleton';
 import { getCategoryIcon } from '../utils/featureCategorizer';
+import VariableScalesModal from './VariableScalesModal';
 
 // ── Icon resolver for categories ──
 const CATEGORY_ICONS = {
@@ -133,6 +135,7 @@ export default function DynamicClinicalForm({
   defaultOpenCategories = ['Vitals & Signs', 'Medical History'],
 }) {
   const [hasRun, setHasRun] = useState(false);
+  const [scalesModalOpen, setScalesModalOpen] = useState(false);
 
   // ── Randomize all fields with valid data ──
   const randomizeFields = () => {
@@ -223,6 +226,7 @@ export default function DynamicClinicalForm({
 
   // ── Render form ──
   return (
+    <>
     <form onSubmit={submitForm} className="space-y-6">
       {/* Form header with controls */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -233,6 +237,15 @@ export default function DynamicClinicalForm({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setScalesModalOpen(true)}
+            className="btn-secondary text-xs"
+            title="View clinical variable definitions and scales"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            Scales
+          </button>
           <button
             type="button"
             onClick={randomizeFields}
@@ -295,5 +308,14 @@ export default function DynamicClinicalForm({
         ))}
       </div>
     </form>
+
+      <VariableScalesModal
+        isOpen={scalesModalOpen}
+        onClose={() => setScalesModalOpen(false)}
+        fields={fields}
+        diseaseName={diseaseName}
+        categorizedFields={categorizedFields}
+      />
+    </>
   );
 }
