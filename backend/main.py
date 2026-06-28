@@ -60,11 +60,36 @@ from backend.middleware.audit import AuditMiddleware
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.rate_limit import limiter, LIMIT_CLINICAL, LIMIT_ADMIN
 from backend.monitoring.routes import router as monitoring_router
-from backend.llm.report_generator import generate_report
-from backend.nlp.notes_parser import parse_clinical_note
-from backend.active_learning.routes import router as review_router
-from backend.active_learning.sampler import should_queue_for_review, prediction_entropy
 from backend.monitoring.metrics import record_prediction, record_batch
+
+# Feature modules — imported lazily inside endpoints; safe stubs defined here
+# so the rest of the file doesn't need try/except everywhere.
+try:
+    from backend.llm.report_generator import generate_report as _generate_report
+    _HAS_LLM = True
+except Exception as _e:
+    log.warning("LLM module unavailable (%s) — /generate-report will return rule-based output only", _e)
+    _generate_report = None
+    _HAS_LLM = False
+
+try:
+    from backend.nlp.notes_parser import parse_clinical_note as _parse_clinical_note
+    _HAS_NLP = True
+except Exception as _e:
+    log.warning("NLP module unavailable (%s) — /parse-notes will return empty results", _e)
+    _parse_clinical_note = None
+    _HAS_NLP = False
+
+try:
+    from backend.active_learning.routes import router as review_router
+    from backend.active_learning.sampler import should_queue_for_review, prediction_entropy
+    _HAS_AL = True
+except Exception as _e:
+    log.warning("Active learning module unavailable (%s) — review queue disabled", _e)
+    review_router = None
+    _HAS_AL = False
+    def should_queue_for_review(_p): return False
+    def prediction_entropy(_p): return 0.0
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
 log.info("Initializing OmniDiagRouter...")
@@ -172,7 +197,8 @@ app.include_router(patients_router, prefix="/api/v4/patients", tags=["Patients"]
 
 # Monitoring: drift detection endpoints under admin prefix
 app.include_router(monitoring_router, prefix="/api/v4/admin", tags=["Monitoring"])
-app.include_router(review_router, prefix="/api/v4/review", tags=["Active Learning"])
+if review_router is not None:
+    app.include_router(review_router, prefix="/api/v4/review", tags=["Active Learning"])
 
 # Audit middleware — logs every /api/* and /auth/* request to audit_logs table.
 # Must be added AFTER CORSMiddleware so preflight OPTIONS are excluded.
@@ -208,14 +234,15 @@ def health_check():
 @app.get("/api/v4/diseases", tags=["System"])
 def list_diseases():
     """عرض قائمة الأمراض المتاحة في المنصة."""
+    all_diseases = []
+    for name in router.get_available_diseases():
+        info = router.get_disease_info(name)
+        all_diseases.append({"name": name, "info": info})
+    # Only return diseases that have a trained model on disk
+    available = [d for d in all_diseases if d["info"] and d["info"].get("available", True)]
     return {
-        "diseases": [
-            {
-                "name": name,
-                "info": router.get_disease_info(name)
-            }
-            for name in router.get_available_diseases()
-        ]
+        "diseases": available,
+        "all_registered": [d["name"] for d in all_diseases],
     }
 
 
@@ -558,7 +585,15 @@ async def generate_clinical_report(
     disease_info = router.get_disease_info(body.disease)
     disease_display = (disease_info or {}).get("display_name", body.disease)
 
-    result = await generate_report(
+    if _generate_report is None:
+        # Fallback when anthropic package is not installed
+        from backend.llm.report_generator import _rule_based_report
+        report_text = _rule_based_report(
+            disease_display, body.probability, body.label, body.shap_values, body.features
+        )
+        return {"disease": body.disease, "report": report_text, "source": "rule_based"}
+
+    result = await _generate_report(
         disease_display=disease_display,
         probability=body.probability,
         label=body.label,
@@ -589,7 +624,9 @@ async def parse_notes(
     body: NotesParseRequest,
     _user: User = Depends(require_role(*CLINICAL_ROLES)),
 ) -> Dict[str, Any]:
-    extracted = parse_clinical_note(body.note, use_bert=body.use_bert)
+    if _parse_clinical_note is None:
+        return {"extracted_features": {}, "field_count": 0, "note": "NLP module unavailable."}
+    extracted = _parse_clinical_note(body.note, use_bert=body.use_bert)
     return {
         "extracted_features": extracted,
         "field_count": len(extracted),
