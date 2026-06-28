@@ -9,8 +9,10 @@ import {
   UserPlus, UserCheck, UserX, Edit2, X, Check,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { API_BASE } from '../api'
 
-const BASE = '/api/v4'
+const BASE = API_BASE
+const API_V4 = `${API_BASE}/api/v4`
 
 const DISEASE_COLORS = [
   '#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed', '#0891b2',
@@ -316,7 +318,7 @@ function AnnotationQueueTable({ token }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${BASE}/review/queue?page=${p}&limit=10`, {
+      const res = await fetch(`${API_V4}/review/queue?page=${p}&limit=10`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -335,7 +337,7 @@ function AnnotationQueueTable({ token }) {
     setAnnotating(a => ({ ...a, [itemId]: label }))
     try {
       const isSkip = label === 'skip'
-      await fetch(`${BASE}/review/${itemId}/${isSkip ? 'skip' : 'annotate'}`, {
+      await fetch(`${API_V4}/review/${itemId}/${isSkip ? 'skip' : 'annotate'}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         ...(isSkip ? {} : { body: JSON.stringify({ label }) }),

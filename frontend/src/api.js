@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.space';
+export const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.space';
 
 /** Default timeout for API requests (ms). HF Spaces cold starts can take 60-120s. */
 const REQUEST_TIMEOUT_MS = 120_000;

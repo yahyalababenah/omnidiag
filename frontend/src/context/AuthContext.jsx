@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { api } from '../api'
+import { api, API_BASE } from '../api'
 
 const AuthContext = createContext(null)
 
@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
   // Verify stored token is still valid on mount
   useEffect(() => {
     if (!token) return
-    fetch('/api/v4/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(u => { setUser(u); localStorage.setItem(USER_KEY, JSON.stringify(u)) })
       .catch(() => { setToken(null); setUser(null); localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY) })
@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
     setLoginError(null)
     setLoginLoading(true)
     try {
-      const res = await fetch('/api/v4/auth/login', {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem(TOKEN_KEY, accessToken)
 
       // Fetch user profile
-      const meRes = await fetch('/api/v4/auth/me', { headers: { Authorization: `Bearer ${accessToken}` } })
+      const meRes = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${accessToken}` } })
       const me = await meRes.json()
       setUser(me)
       localStorage.setItem(USER_KEY, JSON.stringify(me))
@@ -60,7 +60,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const logout = useCallback(() => {
-    fetch('/api/v4/auth/logout', {
+    fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     }).catch(() => {})
