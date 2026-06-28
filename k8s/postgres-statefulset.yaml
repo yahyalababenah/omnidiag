@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: omnidiag-postgres
+  namespace: omnidiag
+spec:
+  serviceName: omnidiag-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: omnidiag-postgres
+  template:
+    metadata:
+      labels:
+        app: omnidiag-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: omnidiag-secrets
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: omnidiag-secrets
+                  key: postgres-password
+            - name: POSTGRES_DB
+              value: omnidiag_db
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "omnidiag"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omnidiag-postgres
+  namespace: omnidiag
+spec:
+  selector:
+    app: omnidiag-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
