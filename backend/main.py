@@ -53,9 +53,10 @@ from backend.patients.routes import router as patients_router
 from backend.auth.rbac import require_role, CLINICAL_ROLES
 from backend.auth.dependencies import get_current_active_user, get_optional_user
 from backend.cache import init_cache, cache_get, cache_set, predict_cache_key, schema_cache_key
-from backend.database import get_db
+from backend.database import get_db, engine, AsyncSessionLocal, Base
 from backend.db_models.prediction import Prediction
 from backend.db_models.user import User
+from backend.db_models.role import Role
 from backend.middleware.audit import AuditMiddleware
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.rate_limit import limiter, LIMIT_CLINICAL, LIMIT_ADMIN
@@ -101,9 +102,69 @@ except Exception as e:
     raise
 
 
-# 2. Lifespan — initialise cache on startup
+# 2. Lifespan — initialise DB + cache on startup
+async def init_db() -> None:
+    """Create all tables and seed default roles/users if the DB is empty."""
+    import uuid as _uuid
+    from sqlalchemy import select as _select
+    from backend.auth.hashing import hash_password as _hash
+
+    async with engine.begin() as conn:
+        # Import all models so Base.metadata is fully populated before create_all
+        import backend.db_models  # noqa: F401 — side-effect: registers all ORM models
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with AsyncSessionLocal() as db:
+        # Seed roles
+        for role_name in ("super_admin", "admin", "doctor", "nurse", "viewer"):
+            existing = (await db.execute(_select(Role).where(Role.name == role_name))).scalar_one_or_none()
+            if not existing:
+                db.add(Role(name=role_name, description=role_name.replace("_", " ").title()))
+
+        await db.commit()
+
+        # Seed admin user
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@omnidiag.com")
+        admin_pw    = os.getenv("ADMIN_PASSWORD", "Admin@123")
+        if not (await db.execute(_select(User).where(User.email == admin_email))).scalar_one_or_none():
+            admin_role = (await db.execute(_select(Role).where(Role.name == "super_admin"))).scalar_one_or_none()
+            admin_user = User(
+                id=str(_uuid.uuid4()),
+                email=admin_email,
+                full_name="Admin User",
+                hashed_password=_hash(admin_pw),
+                is_active=True,
+            )
+            if admin_role:
+                admin_user.roles.append(admin_role)
+            db.add(admin_user)
+
+        # Seed doctor user
+        doctor_email = os.getenv("DOCTOR_EMAIL", "doctor@omnidiag.com")
+        doctor_pw    = os.getenv("DOCTOR_PASSWORD", "Doctor@123")
+        if not (await db.execute(_select(User).where(User.email == doctor_email))).scalar_one_or_none():
+            doctor_role = (await db.execute(_select(Role).where(Role.name == "doctor"))).scalar_one_or_none()
+            doctor_user = User(
+                id=str(_uuid.uuid4()),
+                email=doctor_email,
+                full_name="Dr. Sarah Al-Khalid",
+                hashed_password=_hash(doctor_pw),
+                is_active=True,
+            )
+            if doctor_role:
+                doctor_user.roles.append(doctor_role)
+            db.add(doctor_user)
+
+        await db.commit()
+        log.info("DB initialised — tables created + default users seeded")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        await init_db()
+    except Exception as _e:
+        log.error("init_db failed: %s", _e, exc_info=True)
     await init_cache()
     yield
 
