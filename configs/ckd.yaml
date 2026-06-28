@@ -1,0 +1,127 @@
+# =============================================================================
+# OmniDiag Configuration — Chronic Kidney Disease (CKD)
+# =============================================================================
+# CKD classification using XGBoost on the UCI CKD dataset.
+# 24 clinical features + engineered renal function markers.
+# =============================================================================
+
+disease:
+  name: "ckd"
+  display_name: "Chronic Kidney Disease Classification"
+  description: "CKD vs non-CKD classification using XGBoost with SHAP — 24 clinical lab markers + engineered renal function indices"
+  target_column: "classification"
+  version: "1.0.0"
+
+# ---------------------------------------------------------------------------
+# Data paths
+# ---------------------------------------------------------------------------
+data:
+  raw_path: "data/ckd/raw/"
+  processed_path: "data/ckd/processed/"
+  interim_path: "data/ckd/interim/"
+  raw_files:
+    - "kidney_disease.csv"
+  merged_file: "ckd_data.csv"
+  final_clean_file: "ckd_final.csv"
+
+# ---------------------------------------------------------------------------
+# Feature engineering
+# ---------------------------------------------------------------------------
+features:
+  module: "features.ckd_features"
+  class: "CKDFeatureEngineer"
+  categorical_columns:
+    - "rbc"
+    - "pc"
+    - "pcc"
+    - "ba"
+    - "htn"
+    - "dm"
+    - "cad"
+    - "appet"
+    - "pe"
+    - "ane"
+  numerical_columns:
+    - "age"
+    - "bp"
+    - "sg"
+    - "al"
+    - "su"
+    - "bgr"
+    - "bu"
+    - "sc"
+    - "sod"
+    - "pot"
+    - "hemo"
+    - "pcv"
+    - "wc"
+    - "rc"
+  imputation_features:
+    - "age"
+    - "bp"
+    - "bgr"
+    - "bu"
+    - "sc"
+    - "sod"
+    - "hemo"
+    - "pcv"
+  heuristic_features:
+    - name: "BUN_Creatinine_Ratio"
+      formula: "bu / sc"
+      description: "Blood urea nitrogen to serum creatinine ratio — key marker for pre-renal vs intrinsic renal failure"
+    - name: "Anemia_Index"
+      formula: "hemo * rc"
+      description: "Interaction of hemoglobin and RBC count — detects CKD-associated normocytic anemia"
+    - name: "Electrolyte_Balance"
+      formula: "sod - pot"
+      description: "Sodium–potassium differential — CKD disrupts electrolyte homeostasis"
+    - name: "Protein_Sugar_Load"
+      formula: "al + su"
+      description: "Combined proteinuria and glucosuria burden — hallmarks of glomerular damage"
+  clinical_features:
+    - name: "CKD_Clinical_Risk"
+      formula: "exp(sc * 0.3 + bu * 0.01 + bp * 0.015 + al * 0.2 - hemo * 0.05)"
+      description: "Composite renal risk score based on serum creatinine, BUN, blood pressure, albuminuria, and hemoglobin"
+
+# ---------------------------------------------------------------------------
+# Model
+# ---------------------------------------------------------------------------
+model:
+  type: "xgboost"
+  explainer_type: "tree"
+  weights_path: "models/ckd/ckd_xgb.pkl"
+  fallback_weights_path: "models/ckd/ckd_xgb.pkl"
+  preprocessors_path: "models/ckd/preprocessors/"
+  best_params:
+    n_estimators: 300
+    max_depth: 4
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    eval_metric: "logloss"
+    random_state: 42
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+training:
+  test_size: 0.2
+  random_state: 42
+  optimization_trials: 100
+  optimization_direction: "maximize"
+  optimization_metric: "accuracy"
+
+# ---------------------------------------------------------------------------
+# Explainability
+# ---------------------------------------------------------------------------
+explainer:
+  enabled: true
+  type: "shap"
+  plots_output_dir: "reports/figures/ckd/"
+
+# ---------------------------------------------------------------------------
+# API
+# ---------------------------------------------------------------------------
+api:
+  endpoint_prefix: "/api/v4"
+  version: "1.0.0"
