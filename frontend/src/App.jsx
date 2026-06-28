@@ -36,6 +36,7 @@ function AppContent() {
   const [activeView, setActiveView]   = useState('engineering');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLogin, setShowLogin]     = useState(false);
+  const [pendingView, setPendingView] = useState(null);
   const { user, isAdmin, logout }     = useAuth();
   const { dark, toggle: toggleTheme } = useTheme();
 
@@ -49,7 +50,15 @@ function AppContent() {
       setActiveView('admin');
       setSidebarOpen(false);
     } else {
+      setPendingView('admin');
       setShowLogin(true);
+    }
+  }
+
+  function handleLoginSuccess() {
+    if (pendingView) {
+      setActiveView(pendingView);
+      setPendingView(null);
     }
   }
 
@@ -198,7 +207,7 @@ function AppContent() {
         </main>
       </div>
 
-      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={handleLoginSuccess} />}
     </div>
   );
 }
