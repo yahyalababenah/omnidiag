@@ -51,7 +51,7 @@ from backend.auth.routes import router as auth_router
 from backend.admin.routes import router as admin_router
 from backend.patients.routes import router as patients_router
 from backend.auth.rbac import require_role, CLINICAL_ROLES
-from backend.auth.dependencies import get_current_active_user
+from backend.auth.dependencies import get_current_active_user, get_optional_user
 from backend.cache import init_cache, cache_get, cache_set, predict_cache_key, schema_cache_key
 from backend.database import get_db
 from backend.db_models.prediction import Prediction
@@ -284,11 +284,11 @@ async def predict_disease(
     patient: dict,
     response: Response,
     patient_id: str = Query(None, description="Optional patient UUID to link this prediction"),
-    current_user: User = Depends(require_role(*CLINICAL_ROLES)),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    تشخيص مريض لمرض معين.
+    تشخيص مريض لمرض معين. يعمل بدون تسجيل دخول — النتائج تُحفظ فقط للمستخدمين المسجلين.
 
     يتطلب دور: doctor | nurse | super_admin
 
@@ -322,35 +322,36 @@ async def predict_disease(
     except Exception:
         pass
 
-    # Persist to predictions table (best-effort — never fail the response)
-    try:
-        confidence = float(result.get("confidence", 0.0))
-        record = Prediction(
-            id=str(_uuid.uuid4()),
-            patient_id=patient_id,
-            disease=disease,
-            input_features=patient_data,
-            prediction=int(result.get("prediction", 0)),
-            confidence=confidence,
-            diagnosis=result.get("diagnosis"),
-            created_by=current_user.id,
-        )
-        db.add(record)
-        await db.flush()
-
-        # Auto-queue uncertain predictions for human review (Feature 1.3)
-        if should_queue_for_review(confidence):
-            from backend.db_models.review_queue import ReviewQueue
-            rq = ReviewQueue(
+    # Persist to predictions table only for authenticated users
+    if current_user:
+        try:
+            confidence = float(result.get("confidence", 0.0))
+            record = Prediction(
                 id=str(_uuid.uuid4()),
-                prediction_id=record.id,
-                uncertainty_score=prediction_entropy(confidence),
+                patient_id=patient_id,
+                disease=disease,
+                input_features=patient_data,
+                prediction=int(result.get("prediction", 0)),
+                confidence=confidence,
+                diagnosis=result.get("diagnosis"),
+                created_by=current_user.id,
             )
-            db.add(rq)
+            db.add(record)
+            await db.flush()
 
-        await db.commit()
-    except Exception as _exc:
-        log.warning("predict: failed to persist prediction record — %s", _exc)
+            # Auto-queue uncertain predictions for human review (Feature 1.3)
+            if should_queue_for_review(confidence):
+                from backend.db_models.review_queue import ReviewQueue
+                rq = ReviewQueue(
+                    id=str(_uuid.uuid4()),
+                    prediction_id=record.id,
+                    uncertainty_score=prediction_entropy(confidence),
+                )
+                db.add(rq)
+
+            await db.commit()
+        except Exception as _exc:
+            log.warning("predict: failed to persist prediction record — %s", _exc)
 
     return result
 
@@ -362,13 +363,11 @@ async def explain_disease(
     disease: str,
     patient: dict,
     patient_id: str = Query(None, description="Optional patient UUID to link SHAP data"),
-    current_user: User = Depends(require_role(*CLINICAL_ROLES)),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    تفسير قرار التشخيص باستخدام SHAP.
-
-    يتطلب دور: doctor | nurse | super_admin
+    تفسير قرار التشخيص باستخدام SHAP. يعمل بدون تسجيل دخول.
     """
     try:
         patient_data = _validate_patient_input(disease, patient)
@@ -377,23 +376,24 @@ async def explain_disease(
         result = router.explain(disease, patient_data)
         _explain_log.debug("Explain completed successfully")
 
-        # Persist prediction + SHAP data (best-effort)
-        try:
-            record = Prediction(
-                id=str(_uuid.uuid4()),
-                patient_id=patient_id,
-                disease=disease,
-                input_features=patient_data,
-                prediction=int(result.get("prediction", 0)),
-                confidence=float(result.get("confidence", 0.0)),
-                diagnosis=result.get("diagnosis"),
-                shap_chart_data=result.get("chart_data"),
-                created_by=current_user.id,
-            )
-            db.add(record)
-            await db.commit()
-        except Exception as _exc:
-            log.warning("explain: failed to persist prediction record — %s", _exc)
+        # Persist prediction + SHAP data only for authenticated users
+        if current_user:
+            try:
+                record = Prediction(
+                    id=str(_uuid.uuid4()),
+                    patient_id=patient_id,
+                    disease=disease,
+                    input_features=patient_data,
+                    prediction=int(result.get("prediction", 0)),
+                    confidence=float(result.get("confidence", 0.0)),
+                    diagnosis=result.get("diagnosis"),
+                    shap_chart_data=result.get("chart_data"),
+                    created_by=current_user.id,
+                )
+                db.add(record)
+                await db.commit()
+            except Exception as _exc:
+                log.warning("explain: failed to persist prediction record — %s", _exc)
 
         return result
     except HTTPException:
@@ -416,12 +416,10 @@ async def counterfactuals_disease(
     request: Request,
     disease: str,
     patient: dict,
-    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+    _user: Optional[User] = Depends(get_optional_user),
 ):
     """
-    توليد سيناريوهات "ماذا لو" لتقليل المخاطر.
-
-    يتطلب دور: doctor | nurse | super_admin
+    توليد سيناريوهات "ماذا لو" لتقليل المخاطر. يعمل بدون تسجيل دخول.
     """
     try:
         patient_data = _validate_patient_input(disease, patient)
