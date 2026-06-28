@@ -30,12 +30,16 @@ _PATTERNS: Dict[str, list] = {
     "age": [
         r"\b(\d{1,3})[- ]?(?:year[s]?[- ]?old|y/?o|yr[s]?)\b",
         r"\bage[:\s]+(\d{1,3})\b",
+        # "45 male" / "45-year-old female" / "Patient: 45, female"
+        r"\b(\d{2,3})\s*[-,]?\s*(?:year[s]?[-\s]?old\s+)?(?:male|female|man|woman)\b",
     ],
     "sex_male": [r"\b(male|man|he|his|gentleman|boy)\b"],
     "sex_female": [r"\b(female|woman|she|her|lady|girl)\b"],
     "bp_systolic": [
         r"(?:bp|blood pressure)[:\s]*(\d{2,3})\s*/\s*\d{2,3}",
         r"(?:systolic|sbp)[:\s]*(\d{2,3})",
+        # Standalone: "BP 140" or "BP: 140" without diastolic
+        r"(?:bp|blood pressure)[:\s]+(\d{2,3})\b",
     ],
     "bp_diastolic": [
         r"(?:bp|blood pressure)[:\s]*\d{2,3}\s*/\s*(\d{2,3})",
