@@ -448,3 +448,133 @@ async def get_stats(
         predictions_last_7_days=predictions_last_7_days,
         top_endpoints=top_endpoints,
     )
+
+
+# ── POST /admin/users ─────────────────────────────────────────────────────────
+
+class CreateUserBody(BaseModel):
+    email: str = Field(..., description="User email address")
+    full_name: str = Field(..., description="Full name")
+    password: str = Field(..., min_length=8, description="Initial password (min 8 chars)")
+    roles: List[str] = Field(default=["doctor"], description="List of role names")
+
+
+@router.post(
+    "/users",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new user (super_admin only)",
+)
+async def create_user(
+    body: CreateUserBody,
+    _: object = Depends(require_role(*ADMIN_ROLES)),
+    db: AsyncSession = Depends(get_db),
+) -> UserOut:
+    from sqlalchemy.orm import selectinload
+    from backend.db_models.role import Role as RoleModel
+    from backend.auth.hashing import hash_password
+    import uuid
+
+    existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    role_rows = (await db.execute(select(RoleModel).where(RoleModel.name.in_(body.roles)))).scalars().all()
+    if not role_rows:
+        raise HTTPException(status_code=400, detail=f"None of the requested roles exist: {body.roles}")
+
+    user = User(
+        id=str(uuid.uuid4()),
+        email=body.email,
+        full_name=body.full_name,
+        hashed_password=hash_password(body.password),
+        is_active=True,
+    )
+    user.roles = list(role_rows)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    result = await db.execute(select(User).options(selectinload(User.roles)).where(User.id == user.id))
+    u = result.scalar_one()
+    return UserOut(
+        id=u.id, email=u.email, full_name=u.full_name, is_active=u.is_active,
+        created_at=u.created_at, roles=[r.name for r in u.roles], has_api_key=bool(u.api_key_hash),
+    )
+
+
+# ── PATCH /admin/users/{user_id}/role ────────────────────────────────────────
+
+class UpdateRoleBody(BaseModel):
+    roles: List[str] = Field(..., description="New list of role names to assign")
+
+
+@router.patch(
+    "/users/{user_id}/role",
+    response_model=UserOut,
+    summary="Update a user's roles (super_admin only)",
+)
+async def update_user_role(
+    user_id: str,
+    body: UpdateRoleBody,
+    _: object = Depends(require_role(*ADMIN_ROLES)),
+    db: AsyncSession = Depends(get_db),
+) -> UserOut:
+    from sqlalchemy.orm import selectinload
+    from backend.db_models.role import Role as RoleModel
+
+    result = await db.execute(select(User).options(selectinload(User.roles)).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    role_rows = (await db.execute(select(RoleModel).where(RoleModel.name.in_(body.roles)))).scalars().all()
+    if not role_rows:
+        raise HTTPException(status_code=400, detail=f"None of the requested roles exist: {body.roles}")
+
+    user.roles = list(role_rows)
+    await db.commit()
+    await db.refresh(user)
+
+    result2 = await db.execute(select(User).options(selectinload(User.roles)).where(User.id == user_id))
+    u = result2.scalar_one()
+    return UserOut(
+        id=u.id, email=u.email, full_name=u.full_name, is_active=u.is_active,
+        created_at=u.created_at, roles=[r.name for r in u.roles], has_api_key=bool(u.api_key_hash),
+    )
+
+
+# ── PATCH /admin/users/{user_id}/active ──────────────────────────────────────
+
+class SetActiveBody(BaseModel):
+    is_active: bool
+
+
+@router.patch(
+    "/users/{user_id}/active",
+    response_model=UserOut,
+    summary="Activate or deactivate a user account (super_admin only)",
+)
+async def set_user_active(
+    user_id: str,
+    body: SetActiveBody,
+    _: object = Depends(require_role(*ADMIN_ROLES)),
+    db: AsyncSession = Depends(get_db),
+) -> UserOut:
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(select(User).options(selectinload(User.roles)).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.is_active = body.is_active
+    await db.commit()
+    await db.refresh(user)
+
+    result2 = await db.execute(select(User).options(selectinload(User.roles)).where(User.id == user_id))
+    u = result2.scalar_one()
+    return UserOut(
+        id=u.id, email=u.email, full_name=u.full_name, is_active=u.is_active,
+        created_at=u.created_at, roles=[r.name for r in u.roles], has_api_key=bool(u.api_key_hash),
+    )

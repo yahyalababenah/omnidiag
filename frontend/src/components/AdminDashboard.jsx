@@ -6,6 +6,7 @@ import {
 import {
   Users, Activity, Database, Zap, TrendingUp, AlertCircle,
   RefreshCw, Trash2, Key, ChevronLeft, ChevronRight, Search, Shield,
+  UserPlus, UserCheck, UserX, Edit2, X, Check,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -50,29 +51,135 @@ function StatCard({ icon: Icon, label, value, sub, color = 'text-primary-600' })
 
 // ── Users table ───────────────────────────────────────────────────────────────
 
-function UsersTable({ token, onIssueKey, onRevokeKey }) {
+// ── Create User modal ─────────────────────────────────────────────────────────
+
+const ALL_ROLES = ['doctor', 'nurse', 'admin', 'super_admin']
+
+function CreateUserModal({ token, onClose, onCreated }) {
+  const [form, setForm] = useState({ email: '', full_name: '', password: '', roles: ['doctor'] })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  function toggleRole(role) {
+    setForm(f => ({
+      ...f,
+      roles: f.roles.includes(role) ? f.roles.filter(r => r !== role) : [...f.roles, role],
+    }))
+  }
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!form.roles.length) return setError('Select at least one role')
+    setLoading(true); setError(null)
+    try {
+      await apiFetch('/admin/users', token, { method: 'POST', body: JSON.stringify(form) })
+      onCreated()
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-primary-600" /> Create User
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+            <input required className="input-field text-sm" value={form.full_name}
+              onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+            <input required type="email" className="input-field text-sm" value={form.email}
+              onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Password (min 8 chars)</label>
+            <input required type="password" minLength={8} className="input-field text-sm" value={form.password}
+              onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-2">Roles</label>
+            <div className="flex flex-wrap gap-2">
+              {ALL_ROLES.map(r => (
+                <button type="button" key={r} onClick={() => toggleRole(r)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    form.roles.includes(r)
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}>{r}</button>
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{error}</p>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="btn-secondary text-sm">Cancel</button>
+            <button type="submit" disabled={loading} className="btn-primary text-sm flex items-center gap-2">
+              {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Create
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Users table ───────────────────────────────────────────────────────────────
+
+function UsersTable({ token, onIssueKey, onRevokeKey, onRefresh }) {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [editRoleId, setEditRoleId] = useState(null)
+  const [editRoles, setEditRoles] = useState([])
+  const [actionLoading, setActionLoading] = useState(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const qs = new URLSearchParams({ page, limit: 10, ...(query ? { search: query } : {}) })
-      const d = await apiFetch(`/admin/users?${qs}`, token)
-      setData(d)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
+      setData(await apiFetch(`/admin/users?${qs}`, token))
+    } catch (e) { setError(e.message) }
+    finally { setLoading(false) }
   }, [page, query, token])
 
   useEffect(() => { load() }, [load])
+
+  async function toggleActive(userId, current) {
+    setActionLoading(userId)
+    try {
+      await apiFetch(`/admin/users/${userId}/active`, token, {
+        method: 'PATCH', body: JSON.stringify({ is_active: !current }),
+      })
+      load()
+    } catch (e) { alert(e.message) }
+    finally { setActionLoading(null) }
+  }
+
+  async function saveRoles(userId) {
+    setActionLoading(userId)
+    try {
+      await apiFetch(`/admin/users/${userId}/role`, token, {
+        method: 'PATCH', body: JSON.stringify({ roles: editRoles }),
+      })
+      setEditRoleId(null)
+      load()
+    } catch (e) { alert(e.message) }
+    finally { setActionLoading(null) }
+  }
 
   return (
     <div className="card">
@@ -83,21 +190,15 @@ function UsersTable({ token, onIssueKey, onRevokeKey }) {
         <div className="flex items-center gap-2 flex-1 max-w-xs">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <input
-              className="input-field pl-8 text-xs py-1.5"
-              placeholder="Search email or name…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { setQuery(search); setPage(1) } }}
-            />
+            <input className="input-field pl-8 text-xs py-1.5" placeholder="Search email or name…"
+              value={search} onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { setQuery(search); setPage(1) } }} />
           </div>
-          <button
-            onClick={() => { setQuery(search); setPage(1) }}
-            className="btn-secondary text-xs py-1.5 px-3"
-          >
-            Go
-          </button>
+          <button onClick={() => { setQuery(search); setPage(1) }} className="btn-secondary text-xs py-1.5 px-3">Go</button>
         </div>
+        <button onClick={onRefresh} className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5">
+          <UserPlus className="w-3.5 h-3.5" /> New User
+        </button>
       </div>
       <div className="overflow-x-auto">
         {error && <p className="text-xs text-red-600 p-4">{error}</p>}
@@ -106,23 +207,34 @@ function UsersTable({ token, onIssueKey, onRevokeKey }) {
           <table className="w-full text-xs">
             <thead className="bg-slate-50">
               <tr>
-                {['Name', 'Email', 'Roles', 'Status', 'Joined', 'API Key'].map(h => (
+                {['Name', 'Email', 'Roles', 'Status', 'Joined', 'API Key', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-2.5 text-gray-500 font-medium uppercase tracking-wide text-[10px]">{h}</th>
                 ))}
-                <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-clinical-border">
               {data.items.map(u => (
-                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={u.id} className={`transition-colors ${u.is_active ? 'hover:bg-slate-50' : 'bg-red-50/30 hover:bg-red-50/50'}`}>
                   <td className="px-4 py-2.5 font-medium text-gray-900">{u.full_name}</td>
                   <td className="px-4 py-2.5 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex flex-wrap gap-1">
-                      {u.roles.map(r => (
-                        <span key={r} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">{r}</span>
-                      ))}
-                    </div>
+                  <td className="px-4 py-2.5 min-w-[140px]">
+                    {editRoleId === u.id ? (
+                      <div className="flex flex-wrap gap-1">
+                        {ALL_ROLES.map(r => (
+                          <button key={r} type="button"
+                            onClick={() => setEditRoles(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${editRoles.includes(r) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-300'}`}>
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {u.roles.map(r => (
+                          <span key={r} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">{r}</span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2.5">
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -136,20 +248,37 @@ function UsersTable({ token, onIssueKey, onRevokeKey }) {
                       : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        title="Issue API key"
-                        onClick={() => onIssueKey(u.id)}
-                        className="p-1 rounded hover:bg-blue-50 text-blue-600 transition-colors"
-                      >
+                    <div className="flex items-center gap-1">
+                      {editRoleId === u.id ? (
+                        <>
+                          <button title="Save roles" onClick={() => saveRoles(u.id)} disabled={actionLoading === u.id}
+                            className="p-1 rounded hover:bg-green-50 text-green-600">
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button title="Cancel" onClick={() => setEditRoleId(null)}
+                            className="p-1 rounded hover:bg-gray-100 text-gray-500">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button title="Edit roles" onClick={() => { setEditRoleId(u.id); setEditRoles(u.roles) }}
+                          className="p-1 rounded hover:bg-blue-50 text-blue-500">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button title={u.is_active ? 'Deactivate' : 'Activate'}
+                        onClick={() => toggleActive(u.id, u.is_active)}
+                        disabled={actionLoading === u.id}
+                        className={`p-1 rounded transition-colors ${u.is_active ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600'}`}>
+                        {u.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                      </button>
+                      <button title="Issue API key" onClick={() => onIssueKey(u.id)}
+                        className="p-1 rounded hover:bg-amber-50 text-amber-600">
                         <Key className="w-3.5 h-3.5" />
                       </button>
                       {u.has_api_key && (
-                        <button
-                          title="Revoke API key"
-                          onClick={() => onRevokeKey(u.id)}
-                          className="p-1 rounded hover:bg-red-50 text-red-500 transition-colors"
-                        >
+                        <button title="Revoke API key" onClick={() => onRevokeKey(u.id)}
+                          className="p-1 rounded hover:bg-red-50 text-red-500">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -165,12 +294,8 @@ function UsersTable({ token, onIssueKey, onRevokeKey }) {
         <div className="px-4 py-3 border-t border-clinical-border flex items-center justify-between">
           <span className="text-xs text-gray-500">{data.total} users · page {data.page}/{data.pages}</span>
           <div className="flex gap-1">
-            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="btn-secondary py-1 px-2 disabled:opacity-40">
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="btn-secondary py-1 px-2 disabled:opacity-40">
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="btn-secondary py-1 px-2 disabled:opacity-40"><ChevronLeft className="w-3.5 h-3.5" /></button>
+            <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="btn-secondary py-1 px-2 disabled:opacity-40"><ChevronRight className="w-3.5 h-3.5" /></button>
           </div>
         </div>
       )}
@@ -344,6 +469,7 @@ export default function AdminDashboard() {
   const [cacheLoading, setCacheLoading] = useState(false)
   const [issueKeyUserId, setIssueKeyUserId] = useState(null)
   const [usersRefresh, setUsersRefresh] = useState(0)
+  const [showCreateUser, setShowCreateUser] = useState(false)
 
   const loadStats = useCallback(async () => {
     setStatsLoading(true)
@@ -571,10 +697,20 @@ export default function AdminDashboard() {
         token={token}
         onIssueKey={userId => setIssueKeyUserId(userId)}
         onRevokeKey={revokeKey}
+        onRefresh={() => setShowCreateUser(true)}
       />
 
       {/* Audit log */}
       <AuditLogTable token={token} />
+
+      {/* Create user modal */}
+      {showCreateUser && (
+        <CreateUserModal
+          token={token}
+          onClose={() => setShowCreateUser(false)}
+          onCreated={() => setUsersRefresh(r => r + 1)}
+        />
+      )}
 
       {/* Issue key modal */}
       {issueKeyUserId && (
