@@ -22,18 +22,20 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # Copy the entire project code
-# Note: *.pkl files are in .gitignore, so model weights won't be in git.
-# Preprocessors (standard_scaler.pkl, label_encoders.pkl) are already committed
-# to the Space and will be copied here. The main model file is downloaded
-# at startup from Hugging Face Hub (see startup.sh).
 COPY . .
+
+# Download model weights at BUILD time so they're baked into the image.
+# This means zero download delay at startup — port 7860 responds instantly.
+RUN mkdir -p models/heart_disease && \
+    curl -fsSL "https://huggingface.co/yahyoha/omnidiag-models/resolve/main/omni_diag_xgb_optimized.pkl" \
+         -o models/heart_disease/omni_diag_xgb_optimized.pkl && \
+    echo "Model baked in: $(wc -c < models/heart_disease/omni_diag_xgb_optimized.pkl) bytes"
 
 # Create non-root user for security
 RUN useradd -m -u 1000 omnidiag && chown -R omnidiag:omnidiag /app
 USER omnidiag
 
-# Minimal startup script — just launch uvicorn immediately
-# Model download is handled inside FastAPI lifespan so HF Spaces sees port 7860 instantly
+# Simple startup — model is already present, just launch uvicorn
 RUN printf '#!/bin/bash\n\
 echo "===== Application Startup at $(date -u +%%Y-%%m-%%d\\ %%H:%%M:%%S) ====="\n\
 exec uvicorn backend.main:app --host 0.0.0.0 --port 7860\n\

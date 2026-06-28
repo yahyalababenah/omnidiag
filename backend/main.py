@@ -101,32 +101,10 @@ except Exception as e:
     raise
 
 
-# 2. Lifespan — download model weights + initialise cache on startup
-async def _download_model_if_missing():
-    """Download XGBoost weights from HF Hub in the background at startup."""
-    import asyncio, urllib.request
-    model_file = "models/heart_disease/omni_diag_xgb_optimized.pkl"
-    model_url  = "https://huggingface.co/yahyoha/omnidiag-models/resolve/main/omni_diag_xgb_optimized.pkl"
-    if os.path.isfile(model_file):
-        log.info("Model weights already present — skipping download")
-        return
-    log.info("Downloading model weights in background...")
-    os.makedirs(os.path.dirname(model_file), exist_ok=True)
-    try:
-        await asyncio.get_event_loop().run_in_executor(
-            None, lambda: urllib.request.urlretrieve(model_url, model_file)
-        )
-        size = os.path.getsize(model_file)
-        log.info("Model weights downloaded (%d bytes)", size)
-    except Exception as exc:
-        log.warning("Model download failed: %s — predictions may fail until reloaded", exc)
-
-
+# 2. Lifespan — initialise cache on startup
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    import asyncio
     await init_cache()
-    asyncio.create_task(_download_model_if_missing())
     yield
 
 
