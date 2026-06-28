@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(USER_KEY)
   }, [token])
 
-  const isAdmin = user?.roles?.some(r => ['admin', 'super_admin'].includes(r)) ?? false
+  const isAdmin = user?.roles?.some(r => ['admin', 'super_admin'].includes(typeof r === 'string' ? r : r?.name)) ?? false
 
   return (
     <AuthContext.Provider value={{ token, user, isAdmin, login, logout, loginError, loginLoading }}>
