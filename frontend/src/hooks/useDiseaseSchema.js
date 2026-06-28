@@ -126,11 +126,3 @@ export function useDiseaseSchema(diseaseName, options = {}) {
   };
 }
 
-/**
- * Clear all cached schemas — useful for hard refresh.
- */
-export function clearSchemaCache() {
-  schemaCache.clear();
-  fieldsCache.clear();
-  categorizedCache.clear();
-}

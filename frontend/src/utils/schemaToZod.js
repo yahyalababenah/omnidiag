@@ -142,26 +142,3 @@ export function buildZodSchema(fields) {
   return z.object(shape);
 }
 
-/**
- * Helper: extracts default form values and runs a partial validation,
- * returning { success, data, errors }.
- */
-export function validateFormData(fields, formData) {
-  const schema = buildZodSchema(fields);
-  const result = schema.safeParse(formData);
-
-  if (result.success) {
-    return { success: true, data: result.data, errors: {} };
-  }
-
-  // Flatten Zod errors into a { fieldName: message } map
-  const errors = {};
-  for (const issue of result.error.issues) {
-    const path = issue.path.join('.');
-    if (!errors[path]) {
-      errors[path] = issue.message;
-    }
-  }
-
-  return { success: false, data: formData, errors };
-}

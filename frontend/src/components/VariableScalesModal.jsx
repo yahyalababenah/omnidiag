@@ -332,16 +332,6 @@ export default function VariableScalesModal({
         </div>
       </div>
 
-      {/* ── Slide-in animation via keyframes injected once ── */}
-      <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to   { transform: translateX(0); }
-        }
-        .animate-slide-in-right {
-          animation: slideInRight 0.25s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
