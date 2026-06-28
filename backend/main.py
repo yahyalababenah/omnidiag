@@ -57,7 +57,10 @@ from backend.database import get_db
 from backend.db_models.prediction import Prediction
 from backend.db_models.user import User
 from backend.middleware.audit import AuditMiddleware
+from backend.middleware.security import SecurityHeadersMiddleware
 from backend.rate_limit import limiter, LIMIT_CLINICAL, LIMIT_ADMIN
+from backend.monitoring.routes import router as monitoring_router
+from backend.monitoring.metrics import record_prediction, record_batch
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
 log.info("Initializing OmniDiagRouter...")
@@ -163,13 +166,30 @@ app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 # Patient CRUD routes (/api/v4/patients/*)
 app.include_router(patients_router, prefix="/api/v4/patients", tags=["Patients"])
 
+# Monitoring: drift detection endpoints under admin prefix
+app.include_router(monitoring_router, prefix="/api/v4/admin", tags=["Monitoring"])
+
 # Audit middleware — logs every /api/* and /auth/* request to audit_logs table.
 # Must be added AFTER CORSMiddleware so preflight OPTIONS are excluded.
 app.add_middleware(AuditMiddleware)
 
+# Security headers middleware — OWASP-recommended headers (HIPAA alignment)
+# enforce_https=False in development; set via env var in production
+_enforce_https = os.getenv("ENFORCE_HTTPS", "true").lower() == "true"
+app.add_middleware(SecurityHeadersMiddleware, enforce_https=_enforce_https)
+
 # =========================================================================
 # المسارات العامة (System)
 # =========================================================================
+
+@app.get("/metrics", include_in_schema=False)
+async def prometheus_metrics():
+    """Prometheus metrics endpoint for scraping."""
+    from backend.monitoring.metrics import get_metrics_response
+    from fastapi.responses import Response as _Response
+    body, content_type = get_metrics_response()
+    return _Response(content=body, media_type=content_type)
+
 
 @app.get("/", tags=["System"])
 def health_check():
@@ -259,6 +279,16 @@ async def predict_disease(
     if not patient_id:
         await cache_set(cache_key, result, ttl=300)
     response.headers["Cache-Hit"] = "false"
+
+    # Record Prometheus metrics
+    try:
+        record_prediction(
+            disease=disease,
+            prediction=int(result.get("prediction", 0)),
+            confidence=float(result.get("confidence", 0.0)),
+        )
+    except Exception:
+        pass
 
     # Persist to predictions table (best-effort — never fail the response)
     try:
@@ -467,6 +497,12 @@ async def batch_predict(
         except Exception as exc:
             results.append(BatchRowResult(row=i, status="error", error=str(exc)))
             failed += 1
+
+    # Record Prometheus batch metrics
+    try:
+        record_batch(disease=disease, succeeded=succeeded, failed=failed)
+    except Exception:
+        pass
 
     return BatchResponse(
         disease=disease,
