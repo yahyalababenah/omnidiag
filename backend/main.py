@@ -32,10 +32,15 @@ log.info("=" * 60)
 import uuid as _uuid
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+import csv
+import io
+from typing import Any, Dict, List
+
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -371,3 +376,102 @@ async def counterfactuals_disease(
 def predict_legacy(patient: dict):
     """نقطة نهاية قديمة - تعيد التوجيه إلى heart_disease."""
     return router.predict("heart_disease", patient)
+
+
+# ── Batch prediction ──────────────────────────────────────────────────────────
+
+class BatchRowResult(BaseModel):
+    row: int
+    status: str          # "ok" | "error"
+    prediction: int | None = None
+    confidence: float | None = None
+    diagnosis: str | None = None
+    error: str | None = None
+
+
+class BatchResponse(BaseModel):
+    disease: str
+    total: int
+    succeeded: int
+    failed: int
+    results: List[BatchRowResult]
+
+
+@app.post(
+    "/api/v4/{disease}/batch",
+    response_model=BatchResponse,
+    tags=["Clinical Diagnosis"],
+    summary="Batch predict from CSV upload",
+    description=(
+        "Upload a CSV file where each row is a patient record. "
+        "Returns predictions for all rows. "
+        "Rows that fail validation are returned with status='error' and an error message. "
+        "Maximum 500 rows per request."
+    ),
+)
+@limiter.limit(LIMIT_CLINICAL)
+async def batch_predict(
+    request: Request,
+    disease: str,
+    file: UploadFile = File(..., description="CSV file with header row matching the disease schema"),
+    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+) -> BatchResponse:
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail={"error": "File must be a .csv", "code": "INVALID_FILE_TYPE"})
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")   # strip UTF-8 BOM if present
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail={"error": "CSV must be UTF-8 encoded", "code": "ENCODING_ERROR"})
+
+    reader = csv.DictReader(io.StringIO(text))
+    rows: List[Dict[str, Any]] = list(reader)
+
+    if len(rows) == 0:
+        raise HTTPException(status_code=400, detail={"error": "CSV is empty or has no data rows", "code": "EMPTY_CSV"})
+    if len(rows) > 500:
+        raise HTTPException(status_code=400, detail={"error": "Maximum 500 rows per batch request", "code": "TOO_MANY_ROWS"})
+
+    results: List[BatchRowResult] = []
+    succeeded = 0
+    failed = 0
+
+    for i, raw_row in enumerate(rows, start=1):
+        # Convert numeric strings to appropriate types
+        coerced: Dict[str, Any] = {}
+        for k, v in raw_row.items():
+            if v is None or v == "":
+                coerced[k] = v
+                continue
+            try:
+                # Try int first, then float
+                if "." in str(v):
+                    coerced[k] = float(v)
+                else:
+                    coerced[k] = int(v)
+            except (ValueError, TypeError):
+                coerced[k] = v
+
+        try:
+            validated = _validate_patient_input(disease, coerced)
+            pred = router.predict(disease, validated)
+            results.append(BatchRowResult(
+                row=i,
+                status="ok",
+                prediction=pred.get("prediction"),
+                confidence=pred.get("confidence"),
+                diagnosis=pred.get("diagnosis"),
+            ))
+            succeeded += 1
+        except Exception as exc:
+            results.append(BatchRowResult(row=i, status="error", error=str(exc)))
+            failed += 1
+
+    return BatchResponse(
+        disease=disease,
+        total=len(rows),
+        succeeded=succeeded,
+        failed=failed,
+        results=results,
+    )
