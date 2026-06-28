@@ -62,6 +62,8 @@ from backend.rate_limit import limiter, LIMIT_CLINICAL, LIMIT_ADMIN
 from backend.monitoring.routes import router as monitoring_router
 from backend.llm.report_generator import generate_report
 from backend.nlp.notes_parser import parse_clinical_note
+from backend.active_learning.routes import router as review_router
+from backend.active_learning.sampler import should_queue_for_review, prediction_entropy
 from backend.monitoring.metrics import record_prediction, record_batch
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
@@ -170,6 +172,7 @@ app.include_router(patients_router, prefix="/api/v4/patients", tags=["Patients"]
 
 # Monitoring: drift detection endpoints under admin prefix
 app.include_router(monitoring_router, prefix="/api/v4/admin", tags=["Monitoring"])
+app.include_router(review_router, prefix="/api/v4/review", tags=["Active Learning"])
 
 # Audit middleware — logs every /api/* and /auth/* request to audit_logs table.
 # Must be added AFTER CORSMiddleware so preflight OPTIONS are excluded.
@@ -294,17 +297,30 @@ async def predict_disease(
 
     # Persist to predictions table (best-effort — never fail the response)
     try:
+        confidence = float(result.get("confidence", 0.0))
         record = Prediction(
             id=str(_uuid.uuid4()),
             patient_id=patient_id,
             disease=disease,
             input_features=patient_data,
             prediction=int(result.get("prediction", 0)),
-            confidence=float(result.get("confidence", 0.0)),
+            confidence=confidence,
             diagnosis=result.get("diagnosis"),
             created_by=current_user.id,
         )
         db.add(record)
+        await db.flush()
+
+        # Auto-queue uncertain predictions for human review (Feature 1.3)
+        if should_queue_for_review(confidence):
+            from backend.db_models.review_queue import ReviewQueue
+            rq = ReviewQueue(
+                id=str(_uuid.uuid4()),
+                prediction_id=record.id,
+                uncertainty_score=prediction_entropy(confidence),
+            )
+            db.add(rq)
+
         await db.commit()
     except Exception as _exc:
         log.warning("predict: failed to persist prediction record — %s", _exc)
