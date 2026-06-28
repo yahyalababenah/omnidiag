@@ -1,0 +1,66 @@
+replicaCount: 2
+
+image:
+  repository: omnidiag/backend
+  tag: "2.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 7860
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.omnidiag.ai
+  tls:
+    enabled: true
+    secretName: omnidiag-tls
+    clusterIssuer: letsencrypt-prod
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+postgres:
+  enabled: true
+  image: postgres:15-alpine
+  storage: 10Gi
+  database: omnidiag_db
+  existingSecret: omnidiag-secrets
+  userKey: postgres-user
+  passwordKey: postgres-password
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+modelCache:
+  storage: 5Gi
+  accessMode: ReadWriteMany
+
+env:
+  logLevel: INFO
+  workers: 2
+
+secrets:
+  existingSecret: omnidiag-secrets
