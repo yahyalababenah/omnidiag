@@ -8,10 +8,13 @@ import {
   ArrowLeftRight,
   LogIn,
   LogOut,
+  Moon,
+  Sun,
   Menu,
 } from 'lucide-react';
 import { DiseaseProvider } from './context/DiseaseContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import DiseaseSelector from './components/DiseaseSelector';
 import EngineeringMode from './components/EngineeringMode';
 import ClinicalEmrMode from './components/ClinicalEmrMode';
@@ -34,6 +37,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLogin, setShowLogin]     = useState(false);
   const { user, isAdmin, logout }     = useAuth();
+  const { dark, toggle: toggleTheme } = useTheme();
 
   const isAdminView = activeView === 'admin';
 
@@ -50,7 +54,10 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-clinical-bg flex">
+    <div className="min-h-screen bg-clinical-bg flex dark:bg-slate-950">
+      {/* Skip to main content — WCAG 2.1 SC 2.4.1 */}
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+
       <OfflineBanner />
 
       {/* Mobile sidebar overlay */}
@@ -63,8 +70,10 @@ function AppContent() {
 
       {/* ── Sidebar ── */}
       <aside
+        aria-label="Navigation"
         className={`
           fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-clinical-border
+          dark:bg-slate-900 dark:border-slate-700
           transform transition-transform duration-200 ease-in-out flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0 lg:flex
@@ -138,8 +147,17 @@ function AppContent() {
               <LogIn className="w-4 h-4" /> Sign In
             </button>
           )}
+          {/* Dark mode toggle */}
+          <button
+            onClick={toggleTheme}
+            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="btn-secondary w-full text-xs flex items-center gap-2"
+          >
+            {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {dark ? 'Light Mode' : 'Dark Mode'}
+          </button>
           <InstallPrompt />
-          <p className="text-[10px] text-gray-400 text-center">
+          <p className="text-[10px] text-gray-400 text-center dark:text-slate-600">
             OmniDiag v4.0.0 &middot; Powered by XGBoost + SHAP
           </p>
         </div>
@@ -148,7 +166,7 @@ function AppContent() {
       {/* ── Main Content ── */}
       <div className="flex-1 min-w-0">
         {/* Mobile top bar */}
-        <header className="h-16 bg-white border-b border-clinical-border flex items-center justify-between px-4 lg:hidden">
+        <header className="h-16 bg-white border-b border-clinical-border flex items-center justify-between px-4 lg:hidden dark:bg-slate-900 dark:border-slate-700">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -165,7 +183,7 @@ function AppContent() {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-8 max-w-7xl mx-auto">
+        <main id="main-content" className="p-4 lg:p-8 max-w-7xl mx-auto" role="main">
           {isAdminView && !isAdmin ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Shield className="w-12 h-12 text-gray-300 mb-4" />
@@ -187,10 +205,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <DiseaseProvider>
-        <AppContent />
-      </DiseaseProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <DiseaseProvider>
+          <AppContent />
+        </DiseaseProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
