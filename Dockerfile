@@ -32,29 +32,10 @@ COPY . .
 RUN useradd -m -u 1000 omnidiag && chown -R omnidiag:omnidiag /app
 USER omnidiag
 
-# Create startup script that downloads model weights if missing
+# Minimal startup script — just launch uvicorn immediately
+# Model download is handled inside FastAPI lifespan so HF Spaces sees port 7860 instantly
 RUN printf '#!/bin/bash\n\
-\n\
-# Download model weights from Hugging Face Hub if not present\n\
-MODEL_FILE="models/heart_disease/omni_diag_xgb_optimized.pkl"\n\
-MODEL_URL="https://huggingface.co/yahyoha/omnidiag-models/resolve/main/omni_diag_xgb_optimized.pkl"\n\
-\n\
-if [ ! -f "$MODEL_FILE" ]; then\n\
-    echo "⬇️  Downloading model weights from Hugging Face Hub..."\n\
-    mkdir -p "$(dirname "$MODEL_FILE")"\n\
-    if curl -fsSL "$MODEL_URL" -o "$MODEL_FILE"; then\n\
-        SIZE=$(wc -c < "$MODEL_FILE" 2>/dev/null || echo "unknown")\n\
-        echo "✅ Model weights downloaded (${SIZE} bytes)"\n\
-    else\n\
-        echo "⚠️  Model download failed — app will start without model weights"\n\
-        rm -f "$MODEL_FILE"\n\
-    fi\n\
-else\n\
-    SIZE=$(wc -c < "$MODEL_FILE" 2>/dev/null || echo "unknown")\n\
-    echo "✅ Model weights already present (${SIZE} bytes)"\n\
-fi\n\
-\n\
-# Start the FastAPI application on port 7860 (HF Spaces requirement)\n\
+echo "===== Application Startup at $(date -u +%%Y-%%m-%%d\\ %%H:%%M:%%S) ====="\n\
 exec uvicorn backend.main:app --host 0.0.0.0 --port 7860\n\
 ' > /app/startup.sh && chmod +x /app/startup.sh
 
