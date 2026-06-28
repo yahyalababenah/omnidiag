@@ -3,30 +3,51 @@ import {
   Heart,
   FlaskConical,
   Stethoscope,
+  Shield,
+  LogIn,
+  LogOut,
   Menu,
 } from 'lucide-react';
 import { DiseaseProvider } from './context/DiseaseContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import DiseaseSelector from './components/DiseaseSelector';
 import EngineeringMode from './components/EngineeringMode';
 import ClinicalEmrMode from './components/ClinicalEmrMode';
+import AdminDashboard from './components/AdminDashboard';
 import OfflineBanner from './components/OfflineBanner';
 import InstallPrompt from './components/InstallPrompt';
+import LoginModal from './components/LoginModal';
 
-const VIEWS = [
+const CLINICAL_VIEWS = [
   { id: 'engineering', label: 'Engineering Mode', icon: FlaskConical, component: EngineeringMode },
-  { id: 'clinical', label: 'Clinical EMR Mode', icon: Stethoscope, component: ClinicalEmrMode },
+  { id: 'clinical',    label: 'Clinical EMR Mode', icon: Stethoscope,  component: ClinicalEmrMode },
 ];
 
 function AppContent() {
-  const [activeView, setActiveView] = useState('engineering');
+  const [activeView, setActiveView]   = useState('engineering');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogin, setShowLogin]     = useState(false);
+  const { user, isAdmin, logout }     = useAuth();
 
-  const ActiveComponent = VIEWS.find((v) => v.id === activeView)?.component || EngineeringMode;
+  const isAdminView = activeView === 'admin';
+
+  let ActiveComponent = CLINICAL_VIEWS.find((v) => v.id === activeView)?.component || EngineeringMode;
+  if (isAdminView) ActiveComponent = AdminDashboard;
+
+  function handleAdminClick() {
+    if (user) {
+      setActiveView('admin');
+      setSidebarOpen(false);
+    } else {
+      setShowLogin(true);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-clinical-bg flex">
       <OfflineBanner />
-      {/* ── Mobile sidebar overlay ── */}
+
+      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/30 z-30 lg:hidden"
@@ -38,13 +59,13 @@ function AppContent() {
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-clinical-border
-          transform transition-transform duration-200 ease-in-out
+          transform transition-transform duration-200 ease-in-out flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 lg:block
+          lg:translate-x-0 lg:flex
         `}
       >
-        {/* Logo + Disease Selector */}
-        <div className="h-16 flex items-center gap-3 px-6 border-b border-clinical-border">
+        {/* Logo */}
+        <div className="h-16 flex items-center gap-3 px-6 border-b border-clinical-border flex-shrink-0">
           <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center">
             <Heart className="w-5 h-5 text-white" />
           </div>
@@ -54,32 +75,63 @@ function AppContent() {
           </div>
         </div>
 
-        {/* Disease Selector */}
-        <DiseaseSelector />
+        {/* Disease selector — only relevant for clinical views */}
+        {!isAdminView && <DiseaseSelector />}
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1">
-          {VIEWS.map((view) => {
+        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
+          {CLINICAL_VIEWS.map((view) => {
             const Icon = view.icon;
             const isActive = activeView === view.id;
             return (
               <button
                 key={view.id}
-                onClick={() => {
-                  setActiveView(view.id);
-                  setSidebarOpen(false);
-                }}
-                className={isActive ? 'sidebar-link-active' : 'sidebar-link-inactive'}
+                onClick={() => { setActiveView(view.id); setSidebarOpen(false); }}
+                className={isActive ? 'sidebar-link-active w-full text-left' : 'sidebar-link-inactive w-full text-left'}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
                 {view.label}
               </button>
             );
           })}
+
+          {/* Admin section divider */}
+          <div className="pt-2 mt-2 border-t border-clinical-border">
+            <button
+              onClick={handleAdminClick}
+              className={activeView === 'admin' ? 'sidebar-link-active w-full text-left' : 'sidebar-link-inactive w-full text-left'}
+            >
+              <Shield className={`w-5 h-5 ${activeView === 'admin' ? 'text-primary-600' : 'text-gray-400'}`} />
+              Admin Dashboard
+              {!user && <span className="ml-auto text-[10px] text-gray-400">Sign in</span>}
+            </button>
+          </div>
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-clinical-border space-y-2">
+        <div className="p-4 border-t border-clinical-border space-y-2 flex-shrink-0">
+          {user ? (
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-900 truncate">{user.full_name}</p>
+                <p className="text-[10px] text-gray-500 truncate">{user.email}</p>
+              </div>
+              <button
+                onClick={logout}
+                title="Sign out"
+                className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLogin(true)}
+              className="btn-secondary w-full text-xs flex items-center gap-2"
+            >
+              <LogIn className="w-4 h-4" /> Sign In
+            </button>
+          )}
           <InstallPrompt />
           <p className="text-[10px] text-gray-400 text-center">
             OmniDiag v4.0.0 &middot; Powered by XGBoost + SHAP
@@ -89,7 +141,7 @@ function AppContent() {
 
       {/* ── Main Content ── */}
       <div className="flex-1 min-w-0">
-        {/* Top bar (mobile) */}
+        {/* Mobile top bar */}
         <header className="h-16 bg-white border-b border-clinical-border flex items-center justify-between px-4 lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -108,17 +160,31 @@ function AppContent() {
 
         {/* Page content */}
         <main className="p-4 lg:p-8 max-w-7xl mx-auto">
-          <ActiveComponent />
+          {isAdminView && !isAdmin ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <Shield className="w-12 h-12 text-gray-300 mb-4" />
+              <p className="text-gray-500 text-sm">Admin access required.</p>
+              <button onClick={() => setShowLogin(true)} className="btn-primary mt-4 text-sm">
+                Sign In as Admin
+              </button>
+            </div>
+          ) : (
+            <ActiveComponent />
+          )}
         </main>
       </div>
+
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </div>
   );
 }
 
 export default function App() {
   return (
-    <DiseaseProvider>
-      <AppContent />
-    </DiseaseProvider>
+    <AuthProvider>
+      <DiseaseProvider>
+        <AppContent />
+      </DiseaseProvider>
+    </AuthProvider>
   );
 }
