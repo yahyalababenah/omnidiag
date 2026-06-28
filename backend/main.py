@@ -60,6 +60,7 @@ from backend.middleware.audit import AuditMiddleware
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.rate_limit import limiter, LIMIT_CLINICAL, LIMIT_ADMIN
 from backend.monitoring.routes import router as monitoring_router
+from backend.llm.report_generator import generate_report
 from backend.monitoring.metrics import record_prediction, record_batch
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
@@ -511,3 +512,41 @@ async def batch_predict(
         failed=failed,
         results=results,
     )
+
+
+# ---------------------------------------------------------------------------
+# Feature 1.5 — LLM Clinical Report Generation
+# ---------------------------------------------------------------------------
+
+class ReportRequest(BaseModel):
+    disease: str
+    probability: float
+    label: str
+    confidence_band: str
+    shap_values: List[Dict[str, Any]]
+    features: Dict[str, Any]
+
+
+@app.post(
+    "/api/v4/generate-report",
+    tags=["Clinical Diagnosis"],
+    summary="Generate AI clinical report from prediction results",
+)
+@limiter.limit("10/minute")
+async def generate_clinical_report(
+    request: Request,
+    body: ReportRequest,
+    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+) -> Dict[str, Any]:
+    disease_info = router.get_disease_info(body.disease)
+    disease_display = (disease_info or {}).get("display_name", body.disease)
+
+    result = await generate_report(
+        disease_display=disease_display,
+        probability=body.probability,
+        label=body.label,
+        confidence_band=body.confidence_band,
+        shap_values=body.shap_values,
+        features=body.features,
+    )
+    return {"disease": body.disease, **result}
