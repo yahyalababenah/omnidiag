@@ -1,0 +1,120 @@
+{
+  "title": "OmniDiag — Clinical AI Platform",
+  "uid": "omnidiag-v1",
+  "version": 1,
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Predictions (Rate)",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(omnidiag_predictions_total[5m])",
+          "legendFormat": "{{disease}} {{prediction}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Active Requests",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "omnidiag_active_requests",
+          "legendFormat": "Active"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "gauge",
+      "title": "Drift Share by Disease",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.3},
+              {"color": "red", "value": 0.5}
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "omnidiag_drift_share",
+          "legendFormat": "{{disease}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Prediction Rate per Disease",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(omnidiag_predictions_total[1m])",
+          "legendFormat": "{{disease}} ({{prediction}})"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Request Latency p95 (seconds)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "histogram_quantile(0.95, rate(omnidiag_request_duration_seconds_bucket[5m]))",
+          "legendFormat": "p95 {{endpoint}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "histogram",
+      "title": "Prediction Confidence Distribution",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(omnidiag_prediction_confidence_bucket[5m])",
+          "legendFormat": "{{disease}} {{le}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Cache Hit / Miss Rate",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(omnidiag_cache_hits_total[1m])",
+          "legendFormat": "hits {{disease}}"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(omnidiag_cache_misses_total[1m])",
+          "legendFormat": "misses {{disease}}"
+        }
+      ]
+    }
+  ],
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {}
+}
