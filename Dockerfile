@@ -34,7 +34,6 @@ USER omnidiag
 
 # Create startup script that downloads model weights if missing
 RUN printf '#!/bin/bash\n\
-set -e\n\
 \n\
 # Download model weights from Hugging Face Hub if not present\n\
 MODEL_FILE="models/heart_disease/omni_diag_xgb_optimized.pkl"\n\
@@ -43,22 +42,28 @@ MODEL_URL="https://huggingface.co/yahyoha/omnidiag-models/resolve/main/omni_diag
 if [ ! -f "$MODEL_FILE" ]; then\n\
     echo "⬇️  Downloading model weights from Hugging Face Hub..."\n\
     mkdir -p "$(dirname "$MODEL_FILE")"\n\
-    curl -sL "$MODEL_URL" -o "$MODEL_FILE"\n\
-    echo "✅ Model weights downloaded ($(stat -c%s "$MODEL_FILE") bytes)"\n\
+    if curl -fsSL "$MODEL_URL" -o "$MODEL_FILE"; then\n\
+        SIZE=$(wc -c < "$MODEL_FILE" 2>/dev/null || echo "unknown")\n\
+        echo "✅ Model weights downloaded (${SIZE} bytes)"\n\
+    else\n\
+        echo "⚠️  Model download failed — app will start without model weights"\n\
+        rm -f "$MODEL_FILE"\n\
+    fi\n\
 else\n\
-    echo "✅ Model weights already present ($(stat -c%s "$MODEL_FILE") bytes)"\n\
+    SIZE=$(wc -c < "$MODEL_FILE" 2>/dev/null || echo "unknown")\n\
+    echo "✅ Model weights already present (${SIZE} bytes)"\n\
 fi\n\
 \n\
-# Start the FastAPI application\n\
-exec uvicorn backend.main:app --host 0.0.0.0 --port 8000\n\
+# Start the FastAPI application on port 7860 (HF Spaces requirement)\n\
+exec uvicorn backend.main:app --host 0.0.0.0 --port 7860\n\
 ' > /app/startup.sh && chmod +x /app/startup.sh
 
-# Expose the FastAPI port
-EXPOSE 8000
+# HF Spaces requires port 7860
+EXPOSE 7860
 
-# Health check for container orchestration (Hugging Face Spaces, Kubernetes)
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/')" || exit 1
 
 # Run startup script (downloads model if needed, then starts uvicorn)
 CMD ["/app/startup.sh"]
