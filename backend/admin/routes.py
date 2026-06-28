@@ -8,10 +8,12 @@ Endpoints:
     POST /admin/cache/flush       — Invalidate all cached responses after a model update
     POST /admin/api-keys          — Issue a new API key for a user
     DELETE /admin/api-keys/{user_id} — Revoke a user's API key
+    GET  /admin/stats             — Aggregate platform statistics
+    GET  /admin/users             — Paginated user list
 """
 
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -22,6 +24,7 @@ from backend.auth.rbac import require_role, ADMIN_ROLES
 from backend.database import get_db
 from backend.db_models.audit_log import AuditLog
 from backend.db_models.user import User
+from backend.db_models.prediction import Prediction
 
 router = APIRouter()
 
@@ -237,4 +240,211 @@ async def revoke_api_key(
     return RevokeResponse(
         message="API key revoked. The user can no longer authenticate via X-API-Key.",
         user_id=user_id,
+    )
+
+
+# ── GET /admin/users ─────────────────────────────────────────────────────────
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    is_active: bool
+    created_at: datetime
+    roles: List[str]
+    has_api_key: bool
+
+    model_config = {"from_attributes": True}
+
+
+class UserPage(BaseModel):
+    total: int
+    page: int
+    limit: int
+    pages: int
+    items: List[UserOut]
+
+
+@router.get(
+    "/users",
+    response_model=UserPage,
+    summary="Paginated user list (super_admin only)",
+)
+async def list_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=200),
+    search: Optional[str] = Query(None, description="Filter by email or name"),
+    _: object = Depends(require_role(*ADMIN_ROLES)),
+    db: AsyncSession = Depends(get_db),
+) -> UserPage:
+    from sqlalchemy.orm import selectinload
+    from backend.db_models.role import Role as RoleModel
+
+    filters = []
+    if search:
+        like = f"%{search}%"
+        filters.append((User.email.ilike(like)) | (User.full_name.ilike(like)))
+
+    where_clause = and_(*filters) if filters else True
+
+    total = (await db.execute(select(func.count()).select_from(User).where(where_clause))).scalar_one()
+
+    offset = (page - 1) * limit
+    rows = (
+        await db.execute(
+            select(User)
+            .options(selectinload(User.roles))
+            .where(where_clause)
+            .order_by(User.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).scalars().all()
+
+    items = [
+        UserOut(
+            id=u.id,
+            email=u.email,
+            full_name=u.full_name,
+            is_active=u.is_active,
+            created_at=u.created_at,
+            roles=[r.name for r in u.roles],
+            has_api_key=bool(u.api_key_hash),
+        )
+        for u in rows
+    ]
+
+    return UserPage(
+        total=total,
+        page=page,
+        limit=limit,
+        pages=max(1, -(-total // limit)),
+        items=items,
+    )
+
+
+# ── GET /admin/stats ──────────────────────────────────────────────────────────
+
+class DiseaseCount(BaseModel):
+    disease: str
+    total: int
+    positive: int
+
+
+class DailyCount(BaseModel):
+    date: str      # "YYYY-MM-DD"
+    count: int
+
+
+class AdminStats(BaseModel):
+    total_predictions: int
+    total_users: int
+    total_patients: int
+    avg_confidence: float
+    positive_rate: float
+    avg_latency_ms: float
+    predictions_by_disease: List[DiseaseCount]
+    predictions_last_7_days: List[DailyCount]
+    top_endpoints: List[Dict[str, Any]]
+
+
+@router.get(
+    "/stats",
+    response_model=AdminStats,
+    summary="Aggregate platform statistics (super_admin only)",
+)
+async def get_stats(
+    _: object = Depends(require_role(*ADMIN_ROLES)),
+    db: AsyncSession = Depends(get_db),
+) -> AdminStats:
+    from backend.db_models.patient import Patient
+
+    # Total predictions
+    total_preds = (await db.execute(select(func.count()).select_from(Prediction))).scalar_one()
+
+    # Total users
+    total_users = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+
+    # Total patients
+    total_patients = (await db.execute(select(func.count()).select_from(Patient))).scalar_one()
+
+    # Avg confidence
+    avg_conf_row = (await db.execute(select(func.avg(Prediction.confidence)))).scalar_one()
+    avg_conf = float(avg_conf_row or 0.0)
+
+    # Positive rate
+    pos_count = (
+        await db.execute(select(func.count()).select_from(Prediction).where(Prediction.prediction == 1))
+    ).scalar_one()
+    positive_rate = (pos_count / total_preds) if total_preds else 0.0
+
+    # Avg latency from audit logs
+    avg_latency_row = (await db.execute(select(func.avg(AuditLog.duration_ms)))).scalar_one()
+    avg_latency = float(avg_latency_row or 0.0)
+
+    # Predictions by disease
+    disease_rows = (
+        await db.execute(
+            select(
+                Prediction.disease,
+                func.count().label("total"),
+                func.sum(Prediction.prediction).label("positive"),
+            ).group_by(Prediction.disease)
+        )
+    ).all()
+    predictions_by_disease = [
+        DiseaseCount(disease=r.disease, total=r.total, positive=int(r.positive or 0))
+        for r in disease_rows
+    ]
+
+    # Last 7 days — daily prediction counts
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    daily_rows = (
+        await db.execute(
+            select(
+                func.strftime("%Y-%m-%d", Prediction.created_at).label("day"),
+                func.count().label("count"),
+            )
+            .where(Prediction.created_at >= cutoff)
+            .group_by(func.strftime("%Y-%m-%d", Prediction.created_at))
+            .order_by(func.strftime("%Y-%m-%d", Prediction.created_at))
+        )
+    ).all()
+
+    # Build complete 7-day series (fill missing days with 0)
+    day_map: Dict[str, int] = {r.day: r.count for r in daily_rows}
+    predictions_last_7_days = []
+    for i in range(6, -1, -1):
+        day_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        predictions_last_7_days.append(DailyCount(date=day_str, count=day_map.get(day_str, 0)))
+
+    # Top endpoints by call count
+    top_ep_rows = (
+        await db.execute(
+            select(
+                AuditLog.endpoint,
+                AuditLog.method,
+                func.count().label("count"),
+                func.avg(AuditLog.duration_ms).label("avg_ms"),
+            )
+            .group_by(AuditLog.endpoint, AuditLog.method)
+            .order_by(func.count().desc())
+            .limit(10)
+        )
+    ).all()
+    top_endpoints = [
+        {"endpoint": r.endpoint, "method": r.method, "count": r.count, "avg_ms": round(float(r.avg_ms or 0), 1)}
+        for r in top_ep_rows
+    ]
+
+    return AdminStats(
+        total_predictions=total_preds,
+        total_users=total_users,
+        total_patients=total_patients,
+        avg_confidence=round(avg_conf, 4),
+        positive_rate=round(positive_rate, 4),
+        avg_latency_ms=round(avg_latency, 1),
+        predictions_by_disease=predictions_by_disease,
+        predictions_last_7_days=predictions_last_7_days,
+        top_endpoints=top_endpoints,
     )
