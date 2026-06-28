@@ -131,23 +131,21 @@ class Counterfactual(BaseModel):
 
 
 class ExplainResponse(BaseModel):
-    """
-    Response model for the SHAP explanation endpoint.
-    
-    Attributes:
-        chart_data: List of feature impacts sorted by absolute SHAP value
-                    descending, ready for direct consumption by the React
-                    ShapBarChart component.
-        text_explanation: Human-readable summary of the top 3 most impactful
-                          features with direction labels.
-        base_value: The base (expected) value from the SHAP explainer, useful
-                    for advanced charting.
-        ensemble_variance: Standard deviation across base model probabilities
-                           (0 = perfect agreement, higher = more disagreement).
-        model_agreement: Qualitative label for ensemble agreement.
-        counterfactuals: List of diverse counterfactual scenarios showing
-                         actionable changes to reduce risk (DiCE-inspired).
-    """
+    """Response model for the SHAP explanation endpoint."""
+    prediction: Optional[int] = Field(
+        None,
+        description="Binary prediction (1 = Positive / disease, 0 = Negative)"
+    )
+    confidence: Optional[float] = Field(
+        None,
+        description="Model confidence in the positive class (0.0–1.0)",
+        ge=0.0,
+        le=1.0
+    )
+    diagnosis: Optional[str] = Field(
+        None,
+        description="Human-readable diagnosis label ('Positive' or 'Negative')"
+    )
     chart_data: List[FeatureImpact] = Field(
         ...,
         description="Sorted list of feature SHAP impacts for chart rendering"

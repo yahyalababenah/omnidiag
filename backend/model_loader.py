@@ -352,6 +352,15 @@ class ModelLoader:
             feature_names = list(df.columns)
             
             result = generate_shap_explanation(shap_values, feature_names)
+
+            # Attach prediction + confidence (same inversion fix as predict())
+            raw_pred = int(self.model.predict(df)[0])
+            raw_proba = self.model.predict_proba(df)[0]
+            has_disease = (raw_pred == 0)
+            result["prediction"] = 1 if has_disease else 0
+            result["confidence"] = float(raw_proba[0])
+            result["diagnosis"] = "Positive" if has_disease else "Negative"
+
             log.debug("SHAP explanation generated successfully")
             return result
         except Exception as e:

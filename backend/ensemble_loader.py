@@ -651,6 +651,12 @@ class EnsembleModelLoader:
 
             result = generate_shap_explanation(shap_container, feature_names)
 
+            # Attach prediction + confidence so /explain mirrors /predict output
+            pred_result = self.predict(patient_data)
+            result["prediction"] = pred_result["prediction"]
+            result["confidence"] = pred_result["confidence"]
+            result["diagnosis"] = pred_result["diagnosis"]
+
             # Add ensemble-specific metadata
             result["per_model_shap"] = per_model_shap
             result["shap_weights"] = shap_weights
