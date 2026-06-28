@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { api } from '../api'
 
 const AuthContext = createContext(null)
 
@@ -6,7 +7,11 @@ const TOKEN_KEY = 'omnidiag_token'
 const USER_KEY  = 'omnidiag_user'
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY))
+  const [token, setToken] = useState(() => {
+    const stored = localStorage.getItem(TOKEN_KEY)
+    if (stored) api.setToken(stored)   // sync api client on page reload
+    return stored
+  })
   const [user, setUser]   = useState(() => {
     try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null') }
     catch { return null }
@@ -37,6 +42,7 @@ export function AuthProvider({ children }) {
 
       const accessToken = data.access_token
       setToken(accessToken)
+      api.setToken(accessToken)           // wire token into api client
       localStorage.setItem(TOKEN_KEY, accessToken)
 
       // Fetch user profile
@@ -60,6 +66,7 @@ export function AuthProvider({ children }) {
     }).catch(() => {})
     setToken(null)
     setUser(null)
+    api.setToken(null)
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
   }, [token])
