@@ -83,6 +83,15 @@ class OmniDiagApi {
       body: JSON.stringify(patientData),
     });
   }
+
+  /** POST /api/v4/generate-report — LLM clinical narrative report */
+  generateReport(payload, token) {
+    return this._fetch('/api/v4/generate-report', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 export const api = new OmniDiagApi();
