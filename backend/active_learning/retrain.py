@@ -46,39 +46,37 @@ async def get_annotated_samples(
     Returns (features_list, labels_list) where each features_list[i] is a
     dict of the original prediction inputs and labels_list[i] is the expert label.
     """
-    from sqlalchemy import and_, select
-    from backend.db_models.review_queue import ReviewQueue
-    from backend.db_models.prediction import Prediction
+    from sqlalchemy import text as _text
 
-    result = await db.execute(
-        select(ReviewQueue, Prediction)
-        .join(Prediction, ReviewQueue.prediction_id == Prediction.id)
-        .where(
-            and_(
-                ReviewQueue.status == "annotated",
-                Prediction.disease == disease,
-                ReviewQueue.expert_label.isnot(None),
-            )
-        )
-        .limit(1000)
-    )
-    rows = result.all()
+    rows = (await db.execute(
+        _text("""
+            SELECT rq.label, p.input_features
+            FROM review_queue rq
+            JOIN predictions p ON p.id = rq.prediction_id
+            WHERE rq.status = 'reviewed'
+              AND rq.label IS NOT NULL
+              AND p.disease = :disease
+            LIMIT 1000
+        """),
+        {"disease": disease},
+    )).fetchall()
 
     if len(rows) < min_samples:
         return [], []
 
+    import json as _json
     features_list: List[Dict[str, Any]] = []
     labels: List[int] = []
 
-    for queue_item, prediction in rows:
-        if prediction.input_data:
-            import json as _json
-            try:
-                feats = _json.loads(prediction.input_data) if isinstance(prediction.input_data, str) else prediction.input_data
+    for row in rows:
+        expert_label, raw_features = row[0], row[1]
+        try:
+            feats = _json.loads(raw_features) if isinstance(raw_features, str) else dict(raw_features or {})
+            if feats:
                 features_list.append(feats)
-                labels.append(int(queue_item.expert_label))
-            except Exception:
-                continue
+                labels.append(int(expert_label))
+        except Exception:
+            continue
 
     return features_list, labels
 

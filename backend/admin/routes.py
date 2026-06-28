@@ -605,7 +605,17 @@ async def trigger_retrain(
     _: object = Depends(require_role(*ADMIN_ROLES)),
     db: AsyncSession = Depends(get_db),
 ) -> RetrainResponse:
+    import traceback as _tb
     from backend.active_learning.retrain import run_retrain_pipeline
 
-    result = await run_retrain_pipeline(db, body.disease, body.min_samples)
+    try:
+        result = await run_retrain_pipeline(db, body.disease, body.min_samples)
+    except Exception as exc:
+        import logging as _log
+        _log.getLogger("omnidiag.retrain").error("Retrain failed: %s\n%s", exc, _tb.format_exc())
+        return RetrainResponse(
+            status="error",
+            disease=body.disease,
+            reason=f"{type(exc).__name__}: {exc}",
+        )
     return RetrainResponse(**result)
