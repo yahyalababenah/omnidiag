@@ -1,20 +1,25 @@
 # =============================================================================
-# OmniDiag — Docker Compose
+# OmniDiag — Docker Compose (v2.0 — Full MLOps Stack)
 # =============================================================================
 # Services:
-#   postgres  — PostgreSQL 15 database (primary datastore)
-#   backend   — FastAPI application (depends on postgres)
+#   postgres    — PostgreSQL 15 database (primary datastore)
+#   redis       — Redis 7 cache
+#   backend     — FastAPI application (port 7860)
+#   mlflow      — MLflow tracking server (port 5000)
+#   prometheus  — Prometheus metrics scraper (port 9090)
+#   grafana     — Grafana dashboard (port 3001)
+#   retrain     — One-shot retrain container (runs on demand)
 #
 # Usage:
-#   docker-compose up postgres          # Start only the database
-#   docker-compose up --build           # Start everything
-#   docker-compose down -v             # Stop and remove volumes (clears DB)
+#   docker compose up -d postgres redis                     # infra only
+#   docker compose up -d                                    # full stack
+#   docker compose run --rm retrain --disease heart_disease # manual retrain
+#   docker compose down -v                                  # wipe volumes
 # =============================================================================
 
-version: "3.9"
-
 services:
-  # ── PostgreSQL Database ──────────────────────────────────────────────────
+
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: omnidiag-postgres
@@ -34,7 +39,7 @@ services:
       retries: 5
       start_period: 10s
 
-  # ── Redis Cache ─────────────────────────────────────────────────────────
+  # ── Redis Cache ──────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: omnidiag-redis
@@ -47,17 +52,19 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── FastAPI Backend ──────────────────────────────────────────────────────
+  # ── FastAPI Backend ──────────────────────────────────────────────────────────
   backend:
     build: .
     container_name: omnidiag-backend
     restart: unless-stopped
     ports:
-      - "8000:7860"
+      - "7860:7860"
     environment:
       - DATABASE_URL=postgresql+asyncpg://omnidiag:omnidiag_pass@postgres:5432/omnidiag_db
       - REDIS_URL=redis://redis:6379
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
       - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,10 +72,99 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-    # Override CMD to use port 7860 for Hugging Face Spaces compatibility
+      - model_cache:/app/models
     command: uvicorn backend.main:app --host 0.0.0.0 --port 7860
 
-# ── Named Volumes ──────────────────────────────────────────────────────────
+  # ── MLflow Tracking Server ───────────────────────────────────────────────────
+  mlflow:
+    image: python:3.11-slim
+    container_name: omnidiag-mlflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlruns
+    command: >
+      sh -c "pip install mlflow psycopg2-binary -q &&
+             mlflow server
+               --host 0.0.0.0
+               --port 5000
+               --backend-store-uri sqlite:///mlruns/mlruns.db
+               --default-artifact-root /mlruns/artifacts"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Prometheus ───────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: omnidiag-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    depends_on:
+      - backend
+
+  # ── Grafana ──────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: omnidiag-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-omnidiag_grafana}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/omnidiag.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./deploy/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deploy/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  # ── Auto-Retrain (on-demand / cron) ─────────────────────────────────────────
+  retrain:
+    build: .
+    container_name: omnidiag-retrain
+    profiles:
+      - retrain
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://omnidiag:omnidiag_pass@postgres:5432/omnidiag_db
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - model_cache:/app/models
+    entrypoint: ["python", "scripts/retrain.py"]
+    command: ["--disease", "heart_disease"]
+
+# ── Named Volumes ─────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
+    driver: local
+  mlflow_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  model_cache:
     driver: local
