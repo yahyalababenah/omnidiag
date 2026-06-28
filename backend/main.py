@@ -623,25 +623,32 @@ async def generate_clinical_report(
 
 class NotesParseRequest(BaseModel):
     note: str
-    use_bert: bool = True
+    disease: Optional[str] = None
+    use_bert: bool = False
 
 
 @app.post(
     "/api/v4/parse-notes",
     tags=["Clinical Diagnosis"],
-    summary="Extract structured features from free-text clinical notes",
+    summary="Extract structured features from free-text clinical notes (no auth required)",
 )
 @limiter.limit("20/minute")
 async def parse_notes(
     request: Request,
     body: NotesParseRequest,
-    _user: User = Depends(require_role(*CLINICAL_ROLES)),
 ) -> Dict[str, Any]:
     if _parse_clinical_note is None:
-        return {"extracted_features": {}, "field_count": 0, "note": "NLP module unavailable."}
+        return {"extracted_features": {}, "mapped_features": {}, "field_count": 0}
     extracted = _parse_clinical_note(body.note, use_bert=body.use_bert)
+    mapped: Dict[str, Any] = {}
+    if body.disease and _HAS_NLP:
+        try:
+            from backend.nlp.notes_parser import map_to_disease_schema
+            mapped = map_to_disease_schema(extracted, body.disease)
+        except Exception:
+            pass
     return {
         "extracted_features": extracted,
-        "field_count": len(extracted),
-        "note": "Fields not present in the note are omitted. Supply missing values manually.",
+        "mapped_features": mapped,
+        "field_count": len(mapped) or len(extracted),
     }

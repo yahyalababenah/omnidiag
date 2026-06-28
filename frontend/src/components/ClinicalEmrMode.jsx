@@ -30,6 +30,7 @@ import WhatIfScenarioCard from './WhatIfScenarioCard';
 import PDFReport from './PDFReport';
 import { useShapSnapshot } from '../hooks/useShapSnapshot';
 import PatientTimeline from './PatientTimeline';
+import ClinicalNotesInput from './ClinicalNotesInput';
 
 /**
  * Clinical EMR Mode — Doctor's View
@@ -64,6 +65,7 @@ export default function ClinicalEmrMode() {
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const coldStartTimer = useRef(null);
   const shapChartRef = useRef(null);
   const { snapshot: shapSnapshot, capture: captureShap } = useShapSnapshot();
@@ -365,6 +367,34 @@ export default function ClinicalEmrMode() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Clinical Notes Parser — collapsible NLP section */}
+            <div className="card">
+              <button
+                onClick={() => setNotesOpen(o => !o)}
+                className="card-header w-full flex items-center justify-between"
+              >
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-purple-600" />
+                  Clinical Notes Parser
+                  <span className="text-xs font-normal text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">NLP</span>
+                </h2>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {notesOpen && (
+                <div className="card-body">
+                  <ClinicalNotesInput
+                    disease={selectedDisease}
+                    onExtracted={(mapped) => {
+                      setSelectedPatient(prev => ({
+                        ...prev,
+                        data: { ...prev.data, ...mapped },
+                      }));
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Patient Data Grid — schema-driven vital cards */}

@@ -8,11 +8,13 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.s
  * Textarea that parses free-text clinical notes and pre-fills the parent form.
  *
  * Props:
- *   onExtracted — (extractedFields: object) => void
- *                 Called with the dict of extracted features so the parent
- *                 form can pre-populate its inputs.
+ *   onExtracted — (mappedFields: object) => void
+ *                 Called with disease-mapped feature names so the parent
+ *                 can merge them directly into patient.data.
+ *   disease     — string (e.g. "heart_disease", "diabetes") passed to backend
+ *                 so it returns schema-keyed mapped_features.
  */
-export default function ClinicalNotesInput({ onExtracted }) {
+export default function ClinicalNotesInput({ onExtracted, disease }) {
   const { token } = useAuth();
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,7 @@ export default function ClinicalNotesInput({ onExtracted }) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ note, use_bert: false }),
+        body: JSON.stringify({ note, disease: disease || null, use_bert: false }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -39,8 +41,11 @@ export default function ClinicalNotesInput({ onExtracted }) {
       }
       const data = await res.json();
       setResult(data);
-      if (onExtracted && data.extracted_features) {
-        onExtracted(data.extracted_features);
+      if (onExtracted) {
+        const fields = Object.keys(data.mapped_features || {}).length > 0
+          ? data.mapped_features
+          : data.extracted_features;
+        onExtracted(fields);
       }
     } catch (err) {
       setError(err.message || 'Failed to parse note');
@@ -91,10 +96,14 @@ export default function ClinicalNotesInput({ onExtracted }) {
       {result && (
         <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-3">
           <p className="text-xs font-semibold text-purple-800 dark:text-purple-300 mb-2">
-            {result.field_count} field{result.field_count !== 1 ? 's' : ''} extracted — form pre-filled
+            {result.field_count} field{result.field_count !== 1 ? 's' : ''} extracted — patient data updated
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {Object.entries(result.extracted_features).map(([k, v]) => (
+            {Object.entries(
+              Object.keys(result.mapped_features || {}).length > 0
+                ? result.mapped_features
+                : result.extracted_features
+            ).map(([k, v]) => (
               <span
                 key={k}
                 className="inline-flex items-center gap-1 text-xs bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-700 rounded px-2 py-0.5 text-purple-700 dark:text-purple-300"

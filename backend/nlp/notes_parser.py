@@ -12,7 +12,7 @@ The output is a dict suitable for passing directly to the prediction API,
 pre-filled with whatever values could be extracted from the note.
 Missing values are omitted so the frontend can prompt the user to fill them in.
 
-Supported diseases: heart_disease, diabetes, stroke, ckd
+Supported diseases: heart_disease, diabetes
 """
 
 import re
@@ -198,6 +198,49 @@ def _bert_extract(text: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Disease-specific field mappers
+# Maps generic extracted keys → schema field names for each disease
+# ---------------------------------------------------------------------------
+
+_HEART_DISEASE_MAP = {
+    "age":             ("Age",            lambda v: int(v)),
+    "sex":             ("Sex",            lambda v: "M" if str(v).lower().startswith("m") else "F"),
+    "bp_systolic":     ("RestingBP",      lambda v: int(v)),
+    "cholesterol":     ("Cholesterol",    lambda v: int(v)),
+    "heart_rate":      ("MaxHR",          lambda v: int(v)),
+    "oldpeak":         ("Oldpeak",        lambda v: float(v)),
+    "hypertension":    ("FastingBS",      lambda v: 1),
+    "chest_pain_flag": ("ChestPainType",  lambda v: "ASY"),
+    "exercise_angina": ("ExerciseAngina", lambda v: "Y"),
+}
+
+_DIABETES_MAP = {
+    "age":                   ("Age",                 lambda v: max(1, min(13, round(int(v) / 7)))),
+    "bmi":                   ("BMI",                 lambda v: float(v)),
+    "bp_systolic":           ("HighBP",              lambda v: 1 if int(v) >= 130 else 0),
+    "cholesterol":           ("HighChol",            lambda v: 1 if int(v) >= 200 else 0),
+    "sex":                   ("Sex",                 lambda v: 1 if str(v).lower().startswith("m") else 0),
+    "hypertension":          ("HighBP",              lambda v: 1),
+    "heart_disease_flag":    ("HeartDiseaseorAttack",lambda v: 1),
+    "stroke_flag":           ("Stroke",              lambda v: 1),
+    "smoking_flag":          ("Smoker",              lambda v: 1),
+}
+
+
+def map_to_disease_schema(extracted: Dict[str, Any], disease: str) -> Dict[str, Any]:
+    """Map generic NLP-extracted fields to disease-specific schema field names."""
+    mapping = {"heart_disease": _HEART_DISEASE_MAP, "diabetes": _DIABETES_MAP}.get(disease, {})
+    result: Dict[str, Any] = {}
+    for generic_key, (schema_key, transform) in mapping.items():
+        if generic_key in extracted:
+            try:
+                result[schema_key] = transform(extracted[generic_key])
+            except Exception:
+                pass
+    return result
+
 
 def parse_clinical_note(note: str, use_bert: bool = True) -> Dict[str, Any]:
     """
