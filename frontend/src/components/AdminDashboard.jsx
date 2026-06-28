@@ -695,6 +695,14 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Loading */}
+      {statsLoading && !stats && (
+        <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          Loading dashboard data…
+        </div>
+      )}
+
       {/* Stat cards */}
       {stats && (
         <>

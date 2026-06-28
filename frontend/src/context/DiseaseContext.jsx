@@ -42,7 +42,9 @@ export function DiseaseProvider({ children }) {
       try {
         setLoading(true);
         const res = await api.listDiseases();
-        const diseases = res.diseases || [];
+        // Flatten { name, info: {...} } → { name, ...info } so consumers can
+        // access currentDiseaseInfo.display_name / .supports_counterfactuals directly.
+        const diseases = (res.diseases || []).map(d => ({ name: d.name, ...d.info }));
 
         if (cancelled) return;
 
@@ -82,7 +84,7 @@ export function DiseaseProvider({ children }) {
     setLoading(true);
     try {
       const res = await api.listDiseases();
-      const diseases = res.diseases || [];
+      const diseases = (res.diseases || []).map(d => ({ name: d.name, ...d.info }));
       setAvailableDiseases(diseases);
 
       if (!selectedDisease && diseases.length > 0) {
