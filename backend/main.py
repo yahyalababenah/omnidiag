@@ -61,6 +61,7 @@ from backend.middleware.security import SecurityHeadersMiddleware
 from backend.rate_limit import limiter, LIMIT_CLINICAL, LIMIT_ADMIN
 from backend.monitoring.routes import router as monitoring_router
 from backend.llm.report_generator import generate_report
+from backend.nlp.notes_parser import parse_clinical_note
 from backend.monitoring.metrics import record_prediction, record_batch
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
@@ -550,3 +551,31 @@ async def generate_clinical_report(
         features=body.features,
     )
     return {"disease": body.disease, **result}
+
+
+# ---------------------------------------------------------------------------
+# Feature 1.1 — NLP Clinical Notes Parser
+# ---------------------------------------------------------------------------
+
+class NotesParseRequest(BaseModel):
+    note: str
+    use_bert: bool = True
+
+
+@app.post(
+    "/api/v4/parse-notes",
+    tags=["Clinical Diagnosis"],
+    summary="Extract structured features from free-text clinical notes",
+)
+@limiter.limit("20/minute")
+async def parse_notes(
+    request: Request,
+    body: NotesParseRequest,
+    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+) -> Dict[str, Any]:
+    extracted = parse_clinical_note(body.note, use_bert=body.use_bert)
+    return {
+        "extracted_features": extracted,
+        "field_count": len(extracted),
+        "note": "Fields not present in the note are omitted. Supply missing values manually.",
+    }
