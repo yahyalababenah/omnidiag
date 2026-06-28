@@ -34,7 +34,7 @@ from contextlib import asynccontextmanager
 
 import csv
 import io
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
