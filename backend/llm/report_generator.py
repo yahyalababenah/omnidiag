@@ -12,8 +12,12 @@ from typing import Any, Dict, List, Optional
 
 log = logging.getLogger("omnidiag.llm")
 
-_DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+
+def _get_api_key() -> str:
+    """Read key lazily so HF Space secrets (injected after startup) are picked up."""
+    return os.getenv("DEEPSEEK_API_KEY", "")
 
 _SYSTEM_PROMPT = """You are a senior clinical decision support AI embedded in OmniDiag,
 a multi-disease risk assessment platform used by healthcare professionals.
@@ -101,26 +105,34 @@ async def generate_report(
     shap_values: List[Dict[str, Any]],
     features: Dict[str, Any],
     model: str = "deepseek-chat",
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
     Generate a structured clinical report.
 
     Returns a dict with keys:
-        - report: The generated markdown report text
-        - source: 'llm' | 'rule_based'
+        - report:        The generated markdown report text
+        - source:        'llm' | 'rule_based'
+        - llm_model:     Model name used (only when source='llm')
+        - latency_ms:    Round-trip time in milliseconds (only when source='llm')
+        - fallback_reason: Why rule-based was used (only when source='rule_based')
     """
-    if not _DEEPSEEK_API_KEY:
-        log.info("DEEPSEEK_API_KEY not set — using rule-based report fallback")
+    import time
+
+    api_key = _get_api_key()
+
+    if not api_key:
+        log.warning("DEEPSEEK_API_KEY not set — falling back to rule-based report")
         return {
             "report": _rule_based_report(disease_display, probability, label, shap_values, features),
             "source": "rule_based",
+            "fallback_reason": "DEEPSEEK_API_KEY environment variable is not set",
         }
 
     try:
         from openai import AsyncOpenAI  # lazy import — only needed when API key present
 
         client = AsyncOpenAI(
-            api_key=_DEEPSEEK_API_KEY,
+            api_key=api_key,
             base_url=_DEEPSEEK_BASE_URL,
         )
 
@@ -133,6 +145,9 @@ async def generate_report(
             features_summary=_format_features(features),
         )
 
+        log.info(f"Calling DeepSeek API (model={model}) for {disease_display} report...")
+        t0 = time.perf_counter()
+
         response = await client.chat.completions.create(
             model=model,
             max_tokens=600,
@@ -142,12 +157,21 @@ async def generate_report(
             ],
         )
 
+        latency_ms = int((time.perf_counter() - t0) * 1000)
         report_text = response.choices[0].message.content
-        return {"report": report_text, "source": "llm"}
+        log.info(f"DeepSeek report generated in {latency_ms}ms ({len(report_text)} chars)")
+
+        return {
+            "report": report_text,
+            "source": "llm",
+            "llm_model": model,
+            "latency_ms": latency_ms,
+        }
 
     except Exception as exc:
-        log.warning(f"LLM report generation failed ({exc!r}), falling back to rule-based")
+        log.error(f"DeepSeek API call failed: {exc!r}")
         return {
             "report": _rule_based_report(disease_display, probability, label, shap_values, features),
             "source": "rule_based",
+            "fallback_reason": str(exc),
         }
