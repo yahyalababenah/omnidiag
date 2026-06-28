@@ -657,7 +657,7 @@ class ReportRequest(BaseModel):
 async def generate_clinical_report(
     request: Request,
     body: ReportRequest,
-    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+    _user: Optional[User] = Depends(get_optional_user),
 ) -> Dict[str, Any]:
     disease_info = router.get_disease_info(body.disease)
     disease_display = (disease_info or {}).get("display_name", body.disease)
