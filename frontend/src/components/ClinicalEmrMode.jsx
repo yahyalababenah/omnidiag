@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Download,
   Printer,
+  History,
 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import MedicalTooltip from './MedicalTooltip';
@@ -28,6 +29,7 @@ import ShapBarChart from './ShapBarChart';
 import WhatIfScenarioCard from './WhatIfScenarioCard';
 import PDFReport from './PDFReport';
 import { useShapSnapshot } from '../hooks/useShapSnapshot';
+import PatientTimeline from './PatientTimeline';
 
 /**
  * Clinical EMR Mode — Doctor's View
@@ -60,6 +62,7 @@ export default function ClinicalEmrMode() {
   const [counterfactualsData, setCounterfactualsData] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const coldStartTimer = useRef(null);
   const shapChartRef = useRef(null);
@@ -271,11 +274,19 @@ export default function ClinicalEmrMode() {
           <div className="md:col-span-1 xl:col-span-1 space-y-6">
             {/* Patient Selector */}
             <div className="card">
-              <div className="card-header">
+              <div className="card-header flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <User className="w-5 h-5 text-primary-600" />
                   Patient
                 </h2>
+                <button
+                  onClick={() => setShowTimeline(t => !t)}
+                  title="View prediction history"
+                  className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  History
+                </button>
               </div>
               <div className="card-body">
                 {/* Dropdown selector */}
@@ -691,6 +702,25 @@ export default function ClinicalEmrMode() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── Patient History Timeline slide-over ── */}
+      {showTimeline && selectedPatient && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-40"
+            onClick={() => setShowTimeline(false)}
+          />
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-white shadow-2xl overflow-y-auto animate-slide-in-right">
+            <div className="p-6">
+              <PatientTimeline
+                patientId={selectedPatient?.patientId ?? selectedPatient?.id}
+                patientName={selectedPatient?.name}
+                onClose={() => setShowTimeline(false)}
+              />
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
