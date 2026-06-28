@@ -46,6 +46,7 @@ class Patient(Base):
     # ── Relationships ──────────────────────────────────────────────────────
     created_by_user = relationship("User", back_populates="patients_created", foreign_keys=[created_by])
     predictions = relationship("Prediction", back_populates="patient", foreign_keys="Prediction.patient_id")
+    visits = relationship("PatientVisit", back_populates="patient", order_by="PatientVisit.visit_date")
 
     def __repr__(self) -> str:
         return f"<Patient(id={self.id}, mrn='{self.mrn}', name='{self.full_name}')>"
