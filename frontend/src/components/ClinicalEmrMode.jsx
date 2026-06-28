@@ -15,7 +15,10 @@ import {
   RefreshCw,
   Loader2,
   ChevronDown,
+  Download,
+  Printer,
 } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
 import MedicalTooltip from './MedicalTooltip';
 import { api } from '../api';
 import { useDisease } from '../context/DiseaseContext';
@@ -23,6 +26,8 @@ import { useDiseaseSchema } from '../hooks/useDiseaseSchema';
 import { getPatientsForDisease } from '../mockPatients';
 import ShapBarChart from './ShapBarChart';
 import WhatIfScenarioCard from './WhatIfScenarioCard';
+import PDFReport from './PDFReport';
+import { useShapSnapshot } from '../hooks/useShapSnapshot';
 
 /**
  * Clinical EMR Mode — Doctor's View
@@ -55,7 +60,10 @@ export default function ClinicalEmrMode() {
   const [counterfactualsData, setCounterfactualsData] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
   const coldStartTimer = useRef(null);
+  const shapChartRef = useRef(null);
+  const { snapshot: shapSnapshot, capture: captureShap } = useShapSnapshot();
 
   // Reset patient and clear results when disease changes
   useEffect(() => {
@@ -172,6 +180,48 @@ export default function ClinicalEmrMode() {
     }
     return String(value ?? '—');
   };
+
+  // ── PDF export ─────────────────────────────────────────────────────────────
+  const handleExportPDF = async () => {
+    setPdfGenerating(true);
+    try {
+      const imgUrl = await captureShap(shapChartRef.current);
+      const patientName = selectedPatient?.name?.replace(/\s+/g, '_') ?? 'Patient';
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `OmniDiag_${patientName}_${dateStr}.pdf`;
+
+      const blob = await pdf(
+        <PDFReport
+          patient={{
+            full_name: selectedPatient?.name,
+            mrn: selectedPatient?.mrn ?? '—',
+            date_of_birth: selectedPatient?.age ? `Age ${selectedPatient.age}` : '—',
+            gender: selectedPatient?.gender ?? '—',
+          }}
+          disease={selectedDisease}
+          result={result}
+          shapText={shapData?.text_explanation}
+          counterfactuals={counterfactualsData?.counterfactuals}
+          shapImageUrl={imgUrl}
+          reportDate={new Date().toLocaleDateString('en-GB')}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF generation failed', err);
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
+  // ── Print ───────────────────────────────────────────────────────────────────
+  const handlePrint = () => window.print();
 
   // ── Pick an icon for a field based on its name ──
   const getFieldIcon = (fieldName) => {
@@ -463,23 +513,46 @@ export default function ClinicalEmrMode() {
                     <Activity className="w-5 h-5 text-primary-600" />
                     Clinical Insights
                   </h2>
-                  <button
-                    onClick={() => runDiagnosis(selectedPatient)}
-                    disabled={loading}
-                    className="btn-secondary text-xs"
-                    title="Refresh diagnosis"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handlePrint}
+                      className="btn-secondary text-xs"
+                      title="Print report"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Print
+                    </button>
+                    <button
+                      onClick={handleExportPDF}
+                      disabled={pdfGenerating}
+                      className="btn-primary text-xs"
+                      title="Download PDF report"
+                    >
+                      {pdfGenerating
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Download className="w-3.5 h-3.5" />}
+                      {pdfGenerating ? 'Generating…' : 'Export PDF'}
+                    </button>
+                    <button
+                      onClick={() => runDiagnosis(selectedPatient)}
+                      disabled={loading}
+                      className="btn-secondary text-xs"
+                      title="Refresh diagnosis"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </button>
+                  </div>
                 </div>
                 <div className="card-body">
-                  {/* SHAP Bar Chart — maxVisible=10 by default, with "Show All" toggle for large feature sets */}
+                  {/* SHAP Bar Chart — ref used for html2canvas snapshot in PDF export */}
+                  <div ref={shapChartRef}>
                   <ShapBarChart
                     chartData={shapData.chart_data}
                     baseValue={shapData.base_value}
                     maxVisible={10}
                   />
+                  </div>
 
                   {/* DiCE Counterfactuals — What-If Scenarios (same layout as Engineering Mode) */}
                   <div className="mt-6">
