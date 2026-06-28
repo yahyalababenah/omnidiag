@@ -1,0 +1,74 @@
+# =============================================================================
+# OmniDiag — Docker Compose
+# =============================================================================
+# Services:
+#   postgres  — PostgreSQL 15 database (primary datastore)
+#   backend   — FastAPI application (depends on postgres)
+#
+# Usage:
+#   docker-compose up postgres          # Start only the database
+#   docker-compose up --build           # Start everything
+#   docker-compose down -v             # Stop and remove volumes (clears DB)
+# =============================================================================
+
+version: "3.9"
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: omnidiag-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: omnidiag
+      POSTGRES_PASSWORD: omnidiag_pass
+      POSTGRES_DB: omnidiag_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omnidiag"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis Cache ─────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: omnidiag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────
+  backend:
+    build: .
+    container_name: omnidiag-backend
+    restart: unless-stopped
+    ports:
+      - "8000:7860"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://omnidiag:omnidiag_pass@postgres:5432/omnidiag_db
+      - REDIS_URL=redis://redis:6379
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    # Override CMD to use port 7860 for Hugging Face Spaces compatibility
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 7860
+
+# ── Named Volumes ──────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
