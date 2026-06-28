@@ -29,6 +29,8 @@ from backend.model_loader import ModelLoader
 
 log = logging.getLogger("omnidiag.router")
 
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 class OmniDiagRouter:
     """
@@ -79,6 +81,11 @@ class OmniDiagRouter:
         config = self.disease_configs.get(disease)
         if config is None:
             return None
+        weights_path = os.path.join(
+            _PROJECT_ROOT if hasattr(self, '_project_root') else ".",
+            config.get("model", {}).get("weights_path", "")
+        )
+        has_model = os.path.isfile(weights_path)
         return {
             "name": config.get("disease", {}).get("name"),
             "display_name": config.get("disease", {}).get("display_name"),
@@ -86,6 +93,7 @@ class OmniDiagRouter:
             "version": config.get("disease", {}).get("version"),
             "model_type": config.get("model", {}).get("type"),
             "explainer_type": config.get("model", {}).get("explainer_type"),
+            "available": has_model,
         }
     
     def predict(self, disease: str, patient_data: Dict[str, Any]) -> Dict[str, Any]:
