@@ -12,13 +12,22 @@ core.*
 mlruns.db
 *.pkl
 
-# استثناء: ملفات النموذج والمعالجات المطلوبة للتشغيل
-!models/heart_disease/omni_diag_xgb_optimized.pkl
-!models/heart_disease/preprocessors/*.pkl
+# ============== CLEANUP: Large binary model files ==============
+# .pkl files are now fully ignored (removed force-tracking exceptions)
+# Model files should be stored via a model registry, not in Git
 
-# Diabetes module model artifacts (must be tracked for Docker builds)
-!models/diabetes/*.pkl
-!models/diabetes/preprocessors/*.pkl
+# ============== CLEANUP: Generated plots/images ==============
+models/heart_disease/shap_plots/
+models/heart_disease/threshold_plots/
+
+# ============== CLEANUP: Duplicate artifacts ==============
+omnidiag_diabetes_artifacts/
+
+# ============== CLEANUP: Experimental scripts ==============
+experiment_files/
+
+# ============== CLEANUP: Data files ==============
+*.csv
 
 # ولكن استبعاد النسخ الاحتياطية القديمة للمعالجات
 /models/heart_disease/preprocessors/*.bak.v4.pkl
