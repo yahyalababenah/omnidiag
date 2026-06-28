@@ -143,6 +143,7 @@ class CounterfactualGenerator:
         n_samples: int = 500,
         n_counterfactuals: int = 3,
         random_state: int = 42,
+        inference_threshold: float = 0.5,
     ):
         self.predict_fn = predict_fn
         self.pipeline_fn = pipeline_fn
@@ -152,6 +153,7 @@ class CounterfactualGenerator:
         self.n_counterfactuals = n_counterfactuals
         self.rng = random.Random(random_state)
         self.np_rng = np.random.default_rng(random_state)
+        self.inference_threshold = inference_threshold
     
     def generate(
         self,
@@ -183,8 +185,8 @@ class CounterfactualGenerator:
         )
         
         # If patient is already Negative (low risk), no counterfactuals needed
-        if (desired_class == 0 and baseline_proba < 0.5) or \
-           (desired_class == 1 and baseline_proba >= 0.5):
+        if (desired_class == 0 and baseline_proba < self.inference_threshold) or \
+           (desired_class == 1 and baseline_proba >= self.inference_threshold):
             log.debug("Patient already in desired class — no counterfactuals generated")
             return []
         
@@ -199,8 +201,8 @@ class CounterfactualGenerator:
                 cand_proba = self._get_proba(cand_df)
                 
                 # Check if prediction flips to desired class
-                if (desired_class == 0 and cand_proba < 0.5) or \
-                   (desired_class == 1 and cand_proba >= 0.5):
+                if (desired_class == 0 and cand_proba < self.inference_threshold) or \
+                   (desired_class == 1 and cand_proba >= self.inference_threshold):
                     
                     # Calculate changes relative to baseline
                     changes = self._compute_changes(patient_data, cand_raw)

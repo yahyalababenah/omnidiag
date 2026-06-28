@@ -401,6 +401,7 @@ class EnsembleModelLoader:
             n_samples=500,
             n_counterfactuals=3,
             random_state=42,
+            inference_threshold=self._inference_threshold,
         )
         
         counterfactuals = generator.generate(
