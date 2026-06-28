@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "omnidiag.fullname" . }}-backend
+  namespace: omnidiag
+  labels:
+    app: {{ include "omnidiag.fullname" . }}-backend
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ include "omnidiag.fullname" . }}-backend
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
