@@ -21,10 +21,13 @@ Usage:
 """
 
 import os
+import logging
 import yaml
 from typing import Dict, List, Optional, Any
 from fastapi import HTTPException
 from backend.model_loader import ModelLoader
+
+log = logging.getLogger("omnidiag.router")
 
 
 class OmniDiagRouter:
@@ -171,33 +174,33 @@ class OmniDiagRouter:
     def _load_all_configs(self):
         """Scan configs/ directory and load all YAML config files."""
         if not os.path.isdir(self.configs_dir):
-            print(f"⚠️  Configs directory '{self.configs_dir}' not found. No diseases registered.")
+            log.warning("Configs directory '%s' not found. No diseases registered.", self.configs_dir)
             return
-        
+
         for filename in sorted(os.listdir(self.configs_dir)):
             if filename.endswith((".yaml", ".yml")):
                 config_path = os.path.join(self.configs_dir, filename)
                 try:
                     with open(config_path, "r") as f:
                         config = yaml.safe_load(f)
-                    
+
                     disease_name = config.get("disease", {}).get("name")
                     if not disease_name:
-                        print(f"⚠️  Skipping {filename}: missing 'disease.name' field.")
+                        log.warning("Skipping %s: missing 'disease.name' field.", filename)
                         continue
-                    
+
                     self.disease_configs[disease_name] = config
                     self.model_loaders[disease_name] = self._create_loader(config)
                     display = config.get("disease", {}).get("display_name", disease_name)
-                    print(f"✅ Registered disease: {display} ({disease_name})")
-                    
+                    log.info("Registered disease: %s (%s)", display, disease_name)
+
                 except yaml.YAMLError as e:
-                    print(f"❌ Error parsing {filename}: {e}")
+                    log.error("Error parsing %s: %s", filename, e)
                 except Exception as e:
-                    print(f"❌ Error loading {filename}: {e}")
-        
+                    log.error("Error loading %s: %s", filename, e)
+
         if not self.disease_configs:
-            print("⚠️  No disease configs loaded. The API will return 404 for all diseases.")
+            log.warning("No disease configs loaded. The API will return 404 for all diseases.")
     
     def _create_loader(self, config: dict) -> object:
         """
@@ -218,7 +221,7 @@ class OmniDiagRouter:
         if ensemble_config is not None:
             from backend.ensemble_loader import EnsembleModelLoader
             loader = EnsembleModelLoader(config)
-            print(f"  └─ Using EnsembleModelLoader (type={ensemble_config.get('type', 'unknown')})")
+            log.info("Using EnsembleModelLoader (type=%s)", ensemble_config.get('type', 'unknown'))
             return loader
         
         # Default: single model loader

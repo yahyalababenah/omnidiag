@@ -17,12 +17,11 @@ Usage:
 """
 
 import os
-import sys
 import json
 import logging
 import traceback
 import importlib
-from typing import Dict, Any, List, Optional, Tuple, Callable
+from typing import Dict, Any, List, Optional
 
 import joblib
 import numpy as np
@@ -490,8 +489,7 @@ class EnsembleModelLoader:
                 try:
                     # Freshly reload model for SHAP (avoids cached-object issues
                     # with sklearn 1.8.0 + SHAP TreeExplainer)
-                    import joblib as _joblib
-                    fresh_model = _joblib.load(shap_model_paths[name])
+                    fresh_model = joblib.load(shap_model_paths[name])
 
                     # XGBoost 3.x compatibility: base_score may be stored as a
                     # bracket-wrapped string (e.g. '[5.000088E-1]') in UBJSON.

@@ -10,7 +10,6 @@ so they are only loaded once (on first request).
 """
 
 import os
-import sys
 import json
 import logging
 import traceback

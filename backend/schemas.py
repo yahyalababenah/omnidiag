@@ -14,7 +14,7 @@ Currently supports:
 
 from typing import Dict, Type, List, Optional, Literal
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # =============================================================================
@@ -54,22 +54,21 @@ class HeartDiseaseInput(BaseModel):
     Oldpeak: float = Field(..., description="ST depression induced by exercise relative to rest")
     ST_Slope: Literal['Up', 'Flat', 'Down'] = Field(..., description="ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "Age": 54,
-                "Sex": "M",
-                "ChestPainType": "ATA",
-                "RestingBP": 140,
-                "Cholesterol": 289,
-                "FastingBS": 0,
-                "RestingECG": "Normal",
-                "MaxHR": 122,
-                "ExerciseAngina": "N",
-                "Oldpeak": 0.0,
-                "ST_Slope": "Flat"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "Age": 54,
+            "Sex": "M",
+            "ChestPainType": "ATA",
+            "RestingBP": 140,
+            "Cholesterol": 289,
+            "FastingBS": 0,
+            "RestingECG": "Normal",
+            "MaxHR": 122,
+            "ExerciseAngina": "N",
+            "Oldpeak": 0.0,
+            "ST_Slope": "Flat",
         }
+    })
 
 
 # =============================================================================
@@ -220,32 +219,31 @@ class DiabetesInput(BaseModel):
     Education: int = Field(..., description="Education level: 1=None to 6=College graduate", ge=1, le=6)
     Income: int = Field(..., description="Income scale: 1=<$10K to 8=>$75K", ge=1, le=8)
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "HighBP": 1,
-                "HighChol": 1,
-                "CholCheck": 1,
-                "BMI": 30.0,
-                "Smoker": 1,
-                "Stroke": 0,
-                "HeartDiseaseorAttack": 0,
-                "PhysActivity": 0,
-                "Fruits": 0,
-                "Veggies": 0,
-                "HvyAlcoholConsump": 0,
-                "AnyHealthcare": 1,
-                "NoDocbcCost": 0,
-                "GenHlth": 3,
-                "MentHlth": 10,
-                "PhysHlth": 5,
-                "DiffWalk": 0,
-                "Sex": 1,
-                "Age": 7,
-                "Education": 4,
-                "Income": 4
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "HighBP": 1,
+            "HighChol": 1,
+            "CholCheck": 1,
+            "BMI": 30.0,
+            "Smoker": 1,
+            "Stroke": 0,
+            "HeartDiseaseorAttack": 0,
+            "PhysActivity": 0,
+            "Fruits": 0,
+            "Veggies": 0,
+            "HvyAlcoholConsump": 0,
+            "AnyHealthcare": 1,
+            "NoDocbcCost": 0,
+            "GenHlth": 3,
+            "MentHlth": 10,
+            "PhysHlth": 5,
+            "DiffWalk": 0,
+            "Sex": 1,
+            "Age": 7,
+            "Education": 4,
+            "Income": 4,
         }
+    })
 
 
 # =============================================================================
