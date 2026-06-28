@@ -1,21 +1,28 @@
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.space';
 
 /** Default timeout for API requests (ms). HF Spaces cold starts can take 60-120s. */
-const REQUEST_TIMEOUT_MS = 120_000; // 2 minutes
+const REQUEST_TIMEOUT_MS = 120_000;
 
 /**
  * OmniDiag API client.
- * All endpoints return parsed JSON or throw on error.
+ * Call api.setToken(token) after login so all subsequent requests are authenticated.
  */
 class OmniDiagApi {
   constructor(baseUrl = API_BASE) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this._token = null;
   }
 
-  /**
-   * Fetch with AbortController timeout.
-   * Throws a descriptive error if the request times out (e.g., HF Spaces cold start).
-   */
+  /** Set the JWT token — called by AuthContext after login */
+  setToken(token) {
+    this._token = token;
+  }
+
+  /** Build auth header if a token is available */
+  _authHeader() {
+    return this._token ? { Authorization: `Bearer ${this._token}` } : {};
+  }
+
   async _fetch(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -23,7 +30,11 @@ class OmniDiagApi {
     const url = `${this.baseUrl}${path}`;
     try {
       const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this._authHeader(),
+          ...options.headers,
+        },
         signal: controller.signal,
         ...options,
       });
@@ -45,22 +56,22 @@ class OmniDiagApi {
     }
   }
 
-  /** GET / — health check + available diseases */
+  /** GET / — health check */
   health() {
     return this._fetch('/');
   }
 
-  /** GET /api/v4/diseases — list all registered diseases */
+  /** GET /api/v4/diseases — list registered diseases */
   listDiseases() {
     return this._fetch('/api/v4/diseases');
   }
 
-  /** GET /api/v4/{disease}/schema — get JSON Schema for a disease's patient input fields */
+  /** GET /api/v4/{disease}/schema */
   getSchema(disease) {
     return this._fetch(`/api/v4/${disease}/schema`);
   }
 
-  /** POST /api/v4/{disease}/predict — run inference */
+  /** POST /api/v4/{disease}/predict */
   predict(disease, patientData) {
     return this._fetch(`/api/v4/${disease}/predict`, {
       method: 'POST',
@@ -68,7 +79,7 @@ class OmniDiagApi {
     });
   }
 
-  /** POST /api/v4/{disease}/explain — SHAP explanation */
+  /** POST /api/v4/{disease}/explain */
   explain(disease, patientData) {
     return this._fetch(`/api/v4/${disease}/explain`, {
       method: 'POST',
@@ -76,7 +87,7 @@ class OmniDiagApi {
     });
   }
 
-  /** POST /api/v4/{disease}/counterfactuals — DiCE what-if scenarios */
+  /** POST /api/v4/{disease}/counterfactuals */
   counterfactuals(disease, patientData) {
     return this._fetch(`/api/v4/${disease}/counterfactuals`, {
       method: 'POST',
@@ -84,12 +95,19 @@ class OmniDiagApi {
     });
   }
 
-  /** POST /api/v4/generate-report — LLM clinical narrative report */
-  generateReport(payload, token) {
+  /** POST /api/v4/generate-report */
+  generateReport(payload) {
     return this._fetch('/api/v4/generate-report', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
+    });
+  }
+
+  /** POST /api/v4/parse-notes */
+  parseNotes(note, useBert = false) {
+    return this._fetch('/api/v4/parse-notes', {
+      method: 'POST',
+      body: JSON.stringify({ note, use_bert: useBert }),
     });
   }
 }
