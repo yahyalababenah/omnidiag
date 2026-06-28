@@ -1,3 +1,13 @@
+---
+title: OmniDiag
+emoji: 🏥
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_file: backend/main.py
+pinned: false
+---
+
 # OmniDiag: Dynamic Multi-Disease Clinical Decision Support System (CDSS)
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python)](requirements.txt)
