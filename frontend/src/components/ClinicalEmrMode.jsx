@@ -57,23 +57,14 @@ export default function ClinicalEmrMode() {
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const coldStartTimer = useRef(null);
 
-  // Reset patient when disease changes or patients list changes
+  // Reset patient and clear results when disease changes
   useEffect(() => {
-    if (patients.length > 0) {
-      setSelectedPatient(patients[0]);
-    } else {
-      setSelectedPatient(null);
-    }
+    const newPatients = getPatientsForDisease(selectedDisease);
+    setSelectedPatient(newPatients.length > 0 ? newPatients[0] : null);
     setResult(null);
     setShapData(null);
     setCounterfactualsData(null);
     setError(null);
-  }, [selectedDisease, patients.length]);
-
-  // Reset selected patient to first patient of the new disease when switching diseases
-  useEffect(() => {
-    const newPatients = getPatientsForDisease(selectedDisease);
-    setSelectedPatient(newPatients.length > 0 ? newPatients[0] : null);
   }, [selectedDisease]);
 
   // Show "Waking up..." message if request takes > 8s (HF Spaces cold start)
@@ -225,9 +216,9 @@ export default function ClinicalEmrMode() {
       {noPatientsMsg}
 
       {selectedDisease && patients.length > 0 && selectedPatient && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {/* ── Left Column: Patient Info + Data Grid ── */}
-          <div className="xl:col-span-1 space-y-6">
+          <div className="md:col-span-1 xl:col-span-1 space-y-6">
             {/* Patient Selector */}
             <div className="card">
               <div className="card-header">
@@ -373,7 +364,7 @@ export default function ClinicalEmrMode() {
           </div>
 
           {/* ── Right Column: AI Diagnosis + SHAP ── */}
-          <div className="xl:col-span-2 space-y-6">
+          <div className="md:col-span-1 xl:col-span-2 space-y-6">
             {/* AI Diagnostic Panel */}
             <div className="card">
               <div className="card-header flex items-center justify-between">
