@@ -1,7 +1,7 @@
 # =============================================================================
 # OmniDiag — Multi-Disease Diagnostic Platform
 # Production Dockerfile for Hugging Face Spaces deployment
-# Build v3 — includes engineer_medical fix + retrained 16-feature model
+# Build v4 — bakes model + preprocessors into image at build time
 # =============================================================================
 
 FROM python:3.10-slim
@@ -24,12 +24,26 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy the entire project code
 COPY . .
 
-# Download model weights at BUILD time so they're baked into the image.
-# This means zero download delay at startup — port 7860 responds instantly.
-RUN mkdir -p models/heart_disease && \
-    curl -fsSL "https://huggingface.co/yahyoha/omnidiag-models/resolve/main/omni_diag_xgb_optimized.pkl" \
+# Download model weights + preprocessors at BUILD time so they're baked into
+# the image. Zero download delay at startup — port 7860 responds instantly.
+#
+# Why preprocessors are separate:
+#   *.pkl files are gitignored (too large for git history), so COPY . . doesn't
+#   include them. label_encoders.pkl and standard_scaler.pkl are required by
+#   ModelLoader._apply_preprocessors() to encode categorical fields (Sex, ChestPainType,
+#   RestingECG, ExerciseAngina, ST_Slope) and scale numerical features before inference.
+#   Without them, any predict/explain call raises a KeyError / ValueError → HTTP 500.
+RUN mkdir -p models/heart_disease/preprocessors && \
+    HF_MODEL="https://huggingface.co/yahyoha/omnidiag-models/resolve/main" && \
+    curl -fsSL "${HF_MODEL}/omni_diag_xgb_optimized.pkl" \
          -o models/heart_disease/omni_diag_xgb_optimized.pkl && \
-    echo "Model baked in: $(wc -c < models/heart_disease/omni_diag_xgb_optimized.pkl) bytes"
+    curl -fsSL "${HF_MODEL}/label_encoders.pkl" \
+         -o models/heart_disease/preprocessors/label_encoders.pkl && \
+    curl -fsSL "${HF_MODEL}/standard_scaler.pkl" \
+         -o models/heart_disease/preprocessors/standard_scaler.pkl && \
+    echo "Model   : $(wc -c < models/heart_disease/omni_diag_xgb_optimized.pkl) bytes" && \
+    echo "Encoders: $(wc -c < models/heart_disease/preprocessors/label_encoders.pkl) bytes" && \
+    echo "Scaler  : $(wc -c < models/heart_disease/preprocessors/standard_scaler.pkl) bytes"
 
 # Create non-root user for security
 RUN useradd -m -u 1000 omnidiag && chown -R omnidiag:omnidiag /app

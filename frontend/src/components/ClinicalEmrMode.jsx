@@ -112,16 +112,21 @@ export default function ClinicalEmrMode() {
       setError(err.message || 'Diagnosis failed. Is the backend running?');
     }
 
-    // Counterfactuals are optional — failure renders mock data with Coming Soon badge
-    try {
-      const cfResponse = await api.counterfactuals(selectedDisease, patient.data);
-      setCounterfactualsData(cfResponse?.counterfactuals ?? null);
-    } catch {
+    // Counterfactuals: only supported by ensemble diseases (e.g. diabetes).
+    // Skip entirely for single-model diseases (e.g. heart_disease) to avoid a
+    // noisy 501 error in the browser console.
+    if (currentDiseaseInfo?.supports_counterfactuals) {
+      try {
+        const cfResponse = await api.counterfactuals(selectedDisease, patient.data);
+        setCounterfactualsData(cfResponse?.counterfactuals ?? null);
+      } catch {
+        setCounterfactualsData(null);
+      }
+    } else {
       setCounterfactualsData(null);
-    } finally {
-      setLoading(false);
-      setCounterfactualsLoading(false);
     }
+    setLoading(false);
+    setCounterfactualsLoading(false);
   }, [selectedDisease]);
 
   // Auto-run diagnosis when patient changes

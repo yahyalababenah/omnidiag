@@ -94,6 +94,8 @@ class OmniDiagRouter:
             "model_type": config.get("model", {}).get("type"),
             "explainer_type": config.get("model", {}).get("explainer_type"),
             "available": has_model,
+            # True only for ensemble diseases (EnsembleModelLoader has generate_counterfactuals)
+            "supports_counterfactuals": config.get("model", {}).get("ensemble") is not None,
         }
     
     def predict(self, disease: str, patient_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -155,9 +157,13 @@ class OmniDiagRouter:
         # Check if loader has generate_counterfactuals method
         if not hasattr(loader, "generate_counterfactuals"):
             raise HTTPException(
-                status_code=400,
-                detail=f"Counterfactual generation is not supported for disease '{disease}'. "
-                       f"This feature is only available for ensemble models."
+                status_code=501,
+                detail={
+                    "error": f"Counterfactual generation is not implemented for disease '{disease}'.",
+                    "code": "COUNTERFACTUALS_NOT_SUPPORTED",
+                    "hint": "This feature is only available for ensemble models (e.g. diabetes). "
+                            "Heart disease uses a single XGBoost model without a counterfactual generator.",
+                }
             )
         
         return loader.generate_counterfactuals(patient_data)

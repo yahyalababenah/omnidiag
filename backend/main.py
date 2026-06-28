@@ -295,65 +295,80 @@ async def predict_disease(
     النتائج مؤقتة في الكاش لـ 5 دقائق للمدخلات المتكررة.
     يمكن ربط النتيجة بمريض موجود عبر ?patient_id=<uuid>
     """
-    patient_data = _validate_patient_input(disease, patient)
-
-    # Cache check (skip when linking to a specific patient for accurate audit)
-    cache_key = predict_cache_key(disease, patient_data)
-    if not patient_id:
-        cached = await cache_get(cache_key)
-        if cached is not None:
-            response.headers["Cache-Hit"] = "true"
-            return cached
-
-    result = router.predict(disease, patient_data)
-
-    # Store in cache
-    if not patient_id:
-        await cache_set(cache_key, result, ttl=300)
-    response.headers["Cache-Hit"] = "false"
-
-    # Record Prometheus metrics
+    _predict_log = logging.getLogger("omnidiag.predict")
     try:
-        record_prediction(
-            disease=disease,
-            prediction=int(result.get("prediction", 0)),
-            confidence=float(result.get("confidence", 0.0)),
-        )
-    except Exception:
-        pass
+        patient_data = _validate_patient_input(disease, patient)
 
-    # Persist to predictions table only for authenticated users
-    if current_user:
+        # Cache check (skip when linking to a specific patient for accurate audit)
+        cache_key = predict_cache_key(disease, patient_data)
+        if not patient_id:
+            cached = await cache_get(cache_key)
+            if cached is not None:
+                response.headers["Cache-Hit"] = "true"
+                return cached
+
+        result = router.predict(disease, patient_data)
+
+        # Store in cache
+        if not patient_id:
+            await cache_set(cache_key, result, ttl=300)
+        response.headers["Cache-Hit"] = "false"
+
+        # Record Prometheus metrics
         try:
-            confidence = float(result.get("confidence", 0.0))
-            record = Prediction(
-                id=str(_uuid.uuid4()),
-                patient_id=patient_id,
+            record_prediction(
                 disease=disease,
-                input_features=patient_data,
                 prediction=int(result.get("prediction", 0)),
-                confidence=confidence,
-                diagnosis=result.get("diagnosis"),
-                created_by=current_user.id,
+                confidence=float(result.get("confidence", 0.0)),
             )
-            db.add(record)
-            await db.flush()
+        except Exception:
+            pass
 
-            # Auto-queue uncertain predictions for human review (Feature 1.3)
-            if should_queue_for_review(confidence):
-                from backend.db_models.review_queue import ReviewQueue
-                rq = ReviewQueue(
+        # Persist to predictions table only for authenticated users
+        if current_user:
+            try:
+                confidence = float(result.get("confidence", 0.0))
+                record = Prediction(
                     id=str(_uuid.uuid4()),
-                    prediction_id=record.id,
-                    uncertainty_score=prediction_entropy(confidence),
+                    patient_id=patient_id,
+                    disease=disease,
+                    input_features=patient_data,
+                    prediction=int(result.get("prediction", 0)),
+                    confidence=confidence,
+                    diagnosis=result.get("diagnosis"),
+                    created_by=current_user.id,
                 )
-                db.add(rq)
+                db.add(record)
+                await db.flush()
 
-            await db.commit()
-        except Exception as _exc:
-            log.warning("predict: failed to persist prediction record — %s", _exc)
+                # Auto-queue uncertain predictions for human review (Feature 1.3)
+                if should_queue_for_review(confidence):
+                    from backend.db_models.review_queue import ReviewQueue
+                    rq = ReviewQueue(
+                        id=str(_uuid.uuid4()),
+                        prediction_id=record.id,
+                        uncertainty_score=prediction_entropy(confidence),
+                    )
+                    db.add(rq)
 
-    return result
+                await db.commit()
+            except Exception as _exc:
+                log.warning("predict: failed to persist prediction record — %s", _exc)
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        _predict_log.error("Predict failed for disease=%s: %s: %s", disease, type(e).__name__, e)
+        _predict_log.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"Prediction failed: {type(e).__name__}: {str(e)}",
+                "hint": "Check that all model artifacts (weights + preprocessors) are present on the server.",
+            },
+        )
 
 
 @app.post("/api/v4/{disease}/explain", response_model=ExplainResponse, tags=["Clinical Diagnosis"])
