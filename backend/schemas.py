@@ -247,6 +247,102 @@ class DiabetesInput(BaseModel):
 
 
 # =============================================================================
+# Stroke Schema
+# =============================================================================
+
+class StrokeInput(BaseModel):
+    """
+    Patient input schema for Stroke Risk Assessment.
+
+    Based on the Kaggle Stroke Prediction Dataset (11 clinical features).
+
+    **Auto-computed features (no input needed):**
+        - Age_Glucose_Interaction, BMI_Age_Risk, Vascular_Burden
+        - Stroke_Clinical_Risk
+    """
+    gender: Literal["Male", "Female", "Other"] = Field(..., description="Patient gender")
+    age: float = Field(..., description="Patient age in years", ge=0, le=120)
+    hypertension: int = Field(..., description="Hypertension: 1=Yes, 0=No", ge=0, le=1)
+    heart_disease: int = Field(..., description="Heart disease history: 1=Yes, 0=No", ge=0, le=1)
+    ever_married: Literal["Yes", "No"] = Field(..., description="Marital status")
+    work_type: Literal["Private", "Self-employed", "Govt_job", "children", "Never_worked"] = Field(
+        ..., description="Employment type"
+    )
+    Residence_type: Literal["Urban", "Rural"] = Field(..., description="Residence type")
+    avg_glucose_level: float = Field(..., description="Average blood glucose level (mg/dL)", ge=50, le=300)
+    bmi: float = Field(..., description="Body mass index", ge=10, le=70)
+    smoking_status: Literal["formerly smoked", "never smoked", "smokes", "Unknown"] = Field(
+        ..., description="Smoking status"
+    )
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "gender": "Male",
+            "age": 67,
+            "hypertension": 0,
+            "heart_disease": 1,
+            "ever_married": "Yes",
+            "work_type": "Private",
+            "Residence_type": "Urban",
+            "avg_glucose_level": 228.69,
+            "bmi": 36.6,
+            "smoking_status": "formerly smoked",
+        }
+    })
+
+
+# =============================================================================
+# CKD Schema
+# =============================================================================
+
+class CKDInput(BaseModel):
+    """
+    Patient input schema for Chronic Kidney Disease classification.
+
+    Based on the UCI CKD Dataset (24 clinical + lab features).
+
+    **Auto-computed features (no input needed):**
+        - BUN_Creatinine_Ratio, Anemia_Index, Electrolyte_Balance,
+          Protein_Sugar_Load, CKD_Clinical_Risk
+    """
+    age: float = Field(..., description="Patient age in years", ge=0, le=120)
+    bp: float = Field(..., description="Blood pressure (mm/Hg)", ge=50, le=200)
+    sg: float = Field(..., description="Specific gravity of urine", ge=1.005, le=1.025)
+    al: float = Field(..., description="Albumin in urine (0–5 scale)", ge=0, le=5)
+    su: float = Field(..., description="Sugar in urine (0–5 scale)", ge=0, le=5)
+    rbc: Literal["normal", "abnormal"] = Field(..., description="Red blood cells in urine")
+    pc: Literal["normal", "abnormal"] = Field(..., description="Pus cell in urine")
+    pcc: Literal["present", "notpresent"] = Field(..., description="Pus cell clumps")
+    ba: Literal["present", "notpresent"] = Field(..., description="Bacteria in urine")
+    bgr: float = Field(..., description="Blood glucose random (mg/dL)", ge=50, le=500)
+    bu: float = Field(..., description="Blood urea (mg/dL)", ge=1, le=400)
+    sc: float = Field(..., description="Serum creatinine (mg/dL)", ge=0.4, le=80)
+    sod: float = Field(..., description="Sodium (mEq/L)", ge=100, le=175)
+    pot: float = Field(..., description="Potassium (mEq/L)", ge=2, le=50)
+    hemo: float = Field(..., description="Hemoglobin (gms)", ge=3, le=20)
+    pcv: float = Field(..., description="Packed cell volume (%)", ge=9, le=54)
+    wc: float = Field(..., description="White blood cell count (cells/cumm)", ge=2200, le=26400)
+    rc: float = Field(..., description="Red blood cell count (millions/cmm)", ge=2, le=8)
+    htn: Literal["yes", "no"] = Field(..., description="Hypertension")
+    dm: Literal["yes", "no"] = Field(..., description="Diabetes mellitus")
+    cad: Literal["yes", "no"] = Field(..., description="Coronary artery disease")
+    appet: Literal["good", "poor"] = Field(..., description="Appetite")
+    pe: Literal["yes", "no"] = Field(..., description="Pedal edema")
+    ane: Literal["yes", "no"] = Field(..., description="Anemia")
+
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "age": 48, "bp": 80, "sg": 1.020, "al": 1, "su": 0,
+            "rbc": "normal", "pc": "normal", "pcc": "notpresent", "ba": "notpresent",
+            "bgr": 121, "bu": 36, "sc": 1.2, "sod": 137, "pot": 4.5,
+            "hemo": 15.4, "pcv": 44, "wc": 7800, "rc": 5.2,
+            "htn": "yes", "dm": "no", "cad": "no", "appet": "good",
+            "pe": "no", "ane": "no",
+        }
+    })
+
+
+# =============================================================================
 # Schema Registry
 # =============================================================================
 # Maps disease names (from config) to their Pydantic input schemas.
@@ -255,6 +351,8 @@ class DiabetesInput(BaseModel):
 DISEASE_SCHEMA_REGISTRY: Dict[str, Type[BaseModel]] = {
     "heart_disease": HeartDiseaseInput,
     "diabetes": DiabetesInput,
+    "stroke": StrokeInput,
+    "ckd": CKDInput,
 }
 
 
