@@ -9,6 +9,8 @@ import { DiseaseProvider } from './context/DiseaseContext';
 import DiseaseSelector from './components/DiseaseSelector';
 import EngineeringMode from './components/EngineeringMode';
 import ClinicalEmrMode from './components/ClinicalEmrMode';
+import OfflineBanner from './components/OfflineBanner';
+import InstallPrompt from './components/InstallPrompt';
 
 const VIEWS = [
   { id: 'engineering', label: 'Engineering Mode', icon: FlaskConical, component: EngineeringMode },
@@ -23,6 +25,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-clinical-bg flex">
+      <OfflineBanner />
       {/* ── Mobile sidebar overlay ── */}
       {sidebarOpen && (
         <div
@@ -76,7 +79,8 @@ function AppContent() {
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-clinical-border">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-clinical-border space-y-2">
+          <InstallPrompt />
           <p className="text-[10px] text-gray-400 text-center">
             OmniDiag v4.0.0 &middot; Powered by XGBoost + SHAP
           </p>
@@ -97,7 +101,9 @@ function AppContent() {
             <Heart className="w-5 h-5 text-primary-600" />
             <span className="text-sm font-bold text-gray-900">OmniDiag</span>
           </div>
-          <div className="w-9" /> {/* spacer */}
+          <div className="flex items-center gap-2">
+            <InstallPrompt />
+          </div>
         </header>
 
         {/* Page content */}
