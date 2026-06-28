@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omnidiag-backend
+  namespace: omnidiag
+  labels:
+    app: omnidiag-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: omnidiag-backend
+  template:
+    metadata:
+      labels:
+        app: omnidiag-backend
+    spec:
+      containers:
+        - name: backend
+          image: yahyoha/omnidiag:latest
+          ports:
+            - containerPort: 7860
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: omnidiag-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: omnidiag-secrets
+                  key: redis-url
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: omnidiag-secrets
+                  key: jwt-secret
+            - name: ENFORCE_HTTPS
+              value: "true"
+            - name: MLFLOW_TRACKING_URI
+              value: "http://omnidiag-mlflow:5000"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 7860
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 7860
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          volumeMounts:
+            - name: model-cache
+              mountPath: /app/models
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: omnidiag-model-cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omnidiag-backend
+  namespace: omnidiag
+spec:
+  selector:
+    app: omnidiag-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 7860
+  type: ClusterIP
