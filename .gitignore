@@ -5,6 +5,7 @@
 # Binary / document files — not suitable for HF Spaces git
 *.docx
 *.db
+mlruns.db
 
 # Kaggle backup files (too large for HF Spaces)
 *.kaggle_backup
