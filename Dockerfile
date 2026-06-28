@@ -33,17 +33,19 @@ COPY . .
 #   ModelLoader._apply_preprocessors() to encode categorical fields (Sex, ChestPainType,
 #   RestingECG, ExerciseAngina, ST_Slope) and scale numerical features before inference.
 #   Without them, any predict/explain call raises a KeyError / ValueError → HTTP 500.
-RUN mkdir -p models/heart_disease/preprocessors && \
-    HF_MODEL="https://huggingface.co/yahyoha/omnidiag-models/resolve/main" && \
-    curl -fsSL "${HF_MODEL}/omni_diag_xgb_optimized.pkl" \
-         -o models/heart_disease/omni_diag_xgb_optimized.pkl && \
-    curl -fsSL "${HF_MODEL}/label_encoders.pkl" \
-         -o models/heart_disease/preprocessors/label_encoders.pkl && \
-    curl -fsSL "${HF_MODEL}/standard_scaler.pkl" \
-         -o models/heart_disease/preprocessors/standard_scaler.pkl && \
-    echo "Model   : $(wc -c < models/heart_disease/omni_diag_xgb_optimized.pkl) bytes" && \
-    echo "Encoders: $(wc -c < models/heart_disease/preprocessors/label_encoders.pkl) bytes" && \
-    echo "Scaler  : $(wc -c < models/heart_disease/preprocessors/standard_scaler.pkl) bytes"
+RUN mkdir -p models/heart_disease/preprocessors models/diabetes/preprocessors && \
+    HF="https://huggingface.co/yahyoha/omnidiag-models/resolve/main" && \
+    echo "=== heart_disease ===" && \
+    curl -fsSL "${HF}/omni_diag_xgb_optimized.pkl"   -o models/heart_disease/omni_diag_xgb_optimized.pkl && \
+    curl -fsSL "${HF}/label_encoders.pkl"             -o models/heart_disease/preprocessors/label_encoders.pkl && \
+    curl -fsSL "${HF}/standard_scaler.pkl"            -o models/heart_disease/preprocessors/standard_scaler.pkl && \
+    echo "=== diabetes ===" && \
+    curl -fsSL "${HF}/diabetes/xgb_model.pkl"                     -o models/diabetes/xgb_model.pkl && \
+    curl -fsSL "${HF}/diabetes/lgb_model.pkl"                     -o models/diabetes/lgb_model.pkl && \
+    curl -fsSL "${HF}/diabetes/rf_model.pkl"                      -o models/diabetes/rf_model.pkl && \
+    curl -fsSL "${HF}/diabetes/meta_learner.pkl"                  -o models/diabetes/meta_learner.pkl && \
+    curl -fsSL "${HF}/diabetes/preprocessors/standard_scaler.pkl" -o models/diabetes/preprocessors/standard_scaler.pkl && \
+    echo "=== all models downloaded ==="
 
 # Create non-root user for security
 RUN useradd -m -u 1000 omnidiag && chown -R omnidiag:omnidiag /app
