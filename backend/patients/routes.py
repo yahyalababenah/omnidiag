@@ -25,8 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.auth.rbac import CLINICAL_ROLES, ADMIN_ROLES, require_role
 from backend.database import get_db
 from backend.db_models.patient import Patient
+from backend.db_models.patient_visit import PatientVisit
 from backend.db_models.prediction import Prediction
 from backend.db_models.user import User
+from pydantic import BaseModel as _BaseModel
+from datetime import date as _date
+from typing import List as _List
 from backend.patients.schemas import (
     PatientCreate,
     PatientExportBundle,
@@ -288,3 +292,69 @@ async def export_patient(
         predictions=predictions,
         total_predictions=len(predictions),
     )
+
+
+# ── Feature 1.2: Patient Visit / Time-Series Risk Tracking ───────────────────
+
+class VisitCreate(_BaseModel):
+    disease: str
+    visit_date: Optional[str] = None
+    features: dict
+    risk_score: float
+    prediction: int
+    notes: Optional[str] = None
+
+
+@router.post(
+    "/{patient_id}/visits",
+    tags=["Patients"],
+    summary="Record a patient visit with risk snapshot",
+    status_code=201,
+)
+async def create_visit(
+    patient_id: str,
+    body: VisitCreate,
+    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    patient = await _get_active_patient(patient_id, db)
+    visit_dt = datetime.now(timezone.utc)
+    if body.visit_date:
+        try:
+            visit_dt = datetime.fromisoformat(body.visit_date).replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+    visit = PatientVisit(
+        patient_id=patient.id,
+        disease=body.disease,
+        visit_date=visit_dt,
+        features=body.features,
+        risk_score=body.risk_score,
+        prediction=body.prediction,
+        notes=body.notes,
+    )
+    db.add(visit)
+    await db.commit()
+    await db.refresh(visit)
+    return visit.to_dict()
+
+
+@router.get(
+    "/{patient_id}/visits",
+    tags=["Patients"],
+    summary="Get visit history (risk timeline) for a patient",
+)
+async def list_visits(
+    patient_id: str,
+    disease: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    patient = await _get_active_patient(patient_id, db)
+    q = select(PatientVisit).where(PatientVisit.patient_id == patient.id)
+    if disease:
+        q = q.where(PatientVisit.disease == disease)
+    q = q.order_by(PatientVisit.visit_date.asc()).limit(limit)
+    visits = (await db.execute(q)).scalars().all()
+    return {"patient_id": patient_id, "visits": [v.to_dict() for v in visits]}
