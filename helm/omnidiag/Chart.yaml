@@ -1,0 +1,13 @@
+apiVersion: v2
+name: omnidiag
+description: OmniDiag — Config-driven multi-disease Clinical Decision Support System
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+keywords:
+  - healthcare
+  - machine-learning
+  - fastapi
+home: https://github.com/yahyalababenah/omnidiag
+maintainers:
+  - name: OmniDiag Team
