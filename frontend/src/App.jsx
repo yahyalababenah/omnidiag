@@ -4,6 +4,7 @@ import {
   FlaskConical,
   Stethoscope,
   Shield,
+  Table2,
   LogIn,
   LogOut,
   Menu,
@@ -14,6 +15,7 @@ import DiseaseSelector from './components/DiseaseSelector';
 import EngineeringMode from './components/EngineeringMode';
 import ClinicalEmrMode from './components/ClinicalEmrMode';
 import AdminDashboard from './components/AdminDashboard';
+import BatchUpload from './components/BatchUpload';
 import OfflineBanner from './components/OfflineBanner';
 import InstallPrompt from './components/InstallPrompt';
 import LoginModal from './components/LoginModal';
@@ -21,6 +23,7 @@ import LoginModal from './components/LoginModal';
 const CLINICAL_VIEWS = [
   { id: 'engineering', label: 'Engineering Mode', icon: FlaskConical, component: EngineeringMode },
   { id: 'clinical',    label: 'Clinical EMR Mode', icon: Stethoscope,  component: ClinicalEmrMode },
+  { id: 'batch',       label: 'Batch Prediction',  icon: Table2,       component: BatchUpload },
 ];
 
 function AppContent() {
