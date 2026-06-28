@@ -232,11 +232,4 @@ export function getPatientsForDisease(diseaseName) {
   return mockPatients[diseaseName] || [];
 }
 
-/**
- * Get all available disease keys that have mock patients.
- */
-export function getAvailablePatientDiseases() {
-  return Object.keys(mockPatients);
-}
-
 export default mockPatients;

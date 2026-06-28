@@ -200,25 +200,4 @@ export function lookupMedicalTerm(text) {
   return undefined;
 }
 
-/**
- * Check if a text string matches a known medical term.
- *
- * @param {string} text
- * @returns {boolean}
- */
-export function isKnownMedicalTerm(text) {
-  return lookupMedicalTerm(text) !== undefined;
-}
-
-/**
- * Return the full structured dictionary for use in reference components
- * (e.g., VariableScalesModal). Keys are feature names; values are strings
- * with embedded definition + scale/range.
- *
- * @returns {Record<string, string>} The complete MEDICAL_DICTIONARY map.
- */
-export function getFullDictionary() {
-  return { ...MEDICAL_DICTIONARY };
-}
-
 export default MEDICAL_DICTIONARY;

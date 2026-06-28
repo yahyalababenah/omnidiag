@@ -4,10 +4,9 @@
  * React Error Boundary component that catches render-phase errors
  * and displays a fallback UI instead of crashing the entire app.
  *
- * Three boundary levels are used in the app:
+ * Two boundary levels are used in the app:
  *   1. SchemaErrorBoundary — wraps DynamicClinicalForm (schema fetch failures)
- *   2. PredictionErrorBoundary — wraps prediction/SHAP results panel
- *   3. GlobalErrorBoundary — wraps the entire DiseaseProvider subtree
+ *   2. GlobalErrorBoundary — wraps the entire DiseaseProvider subtree
  */
 
 import { Component } from 'react';
@@ -97,33 +96,3 @@ export function SchemaErrorBoundary({ children, disease }) {
   );
 }
 
-/**
- * PredictionErrorBoundary — wraps prediction/SHAP results.
- * Shows a minimal error card on failure without breaking the form.
- */
-export function PredictionErrorBoundary({ children }) {
-  return (
-    <ErrorBoundary
-      fallback={({ error, retry }) => (
-        <div className="card border-red-200 bg-red-50">
-          <div className="card-body text-center py-6">
-            <p className="text-sm font-medium text-red-700 mb-2">
-              Prediction Error
-            </p>
-            <p className="text-xs text-red-600 mb-4">
-              {error?.message || 'An unexpected error occurred during analysis.'}
-            </p>
-            <button
-              onClick={retry}
-              className="btn-secondary text-xs"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
-    >
-      {children}
-    </ErrorBoundary>
-  );
-}

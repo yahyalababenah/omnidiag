@@ -5,9 +5,8 @@
  *
  * Responsibilities:
  *   1. Fetch available diseases from GET /api/v4/diseases on mount
- *   2. Pre-fetch JSON schemas for each disease (cache for instant form rendering)
- *   3. Provide selectedDisease state + setter globally
- *   4. Persist selection in localStorage for session continuity
+ *   2. Provide selectedDisease state + setter globally
+ *   3. Persist selection in localStorage for session continuity
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -28,7 +27,6 @@ const STORAGE_KEY = 'omnidiag_selected_disease';
 export function DiseaseProvider({ children }) {
   const [availableDiseases, setAvailableDiseases] = useState([]);
   const [selectedDisease, setSelectedDisease] = useState(null);
-  const [schemaCache, setSchemaCache] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const initialised = useRef(false);
@@ -57,9 +55,6 @@ export function DiseaseProvider({ children }) {
           : diseases[0]?.name || null;
 
         setSelectedDisease(defaultDisease);
-
-        // Pre-fetch schemas for all diseases
-        await preFetchSchemas(diseases);
       } catch (err) {
         if (!cancelled) {
           console.error('[DiseaseContext] Failed to load diseases:', err);
@@ -75,46 +70,11 @@ export function DiseaseProvider({ children }) {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Pre-fetch schemas for all diseases ──
-  const preFetchSchemas = useCallback(async (diseases) => {
-    const cache = {};
-    const fetchPromises = diseases.map(async (d) => {
-      try {
-        const schema = await api.getSchema(d.name);
-        cache[d.name] = schema;
-      } catch (err) {
-        console.warn(`[DiseaseContext] Failed to fetch schema for "${d.name}":`, err.message);
-        cache[d.name] = null; // mark as failed, will retry on demand
-      }
-    });
-
-    await Promise.allSettled(fetchPromises);
-    setSchemaCache((prev) => ({ ...prev, ...cache }));
-  }, []);
-
   // ── Select disease (persisted) ──
   const selectDisease = useCallback((diseaseName) => {
     setSelectedDisease(diseaseName);
     localStorage.setItem(STORAGE_KEY, diseaseName);
   }, []);
-
-  // ── Get schema for the currently selected disease ──
-  const getSchemaForDisease = useCallback(async (diseaseName) => {
-    // Check cache first
-    if (schemaCache[diseaseName]) {
-      return schemaCache[diseaseName];
-    }
-
-    // Fetch on demand
-    try {
-      const schema = await api.getSchema(diseaseName);
-      setSchemaCache((prev) => ({ ...prev, [diseaseName]: schema }));
-      return schema;
-    } catch (err) {
-      console.error(`[DiseaseContext] Failed to fetch schema for "${diseaseName}":`, err);
-      throw err;
-    }
-  }, [schemaCache]);
 
   // ── Retry fetching diseases (e.g., after error) ──
   const retry = useCallback(async () => {
@@ -128,14 +88,12 @@ export function DiseaseProvider({ children }) {
       if (!selectedDisease && diseases.length > 0) {
         setSelectedDisease(diseases[0].name);
       }
-
-      await preFetchSchemas(diseases);
     } catch (err) {
       setError(err.message || 'Retry failed.');
     } finally {
       setLoading(false);
     }
-  }, [selectedDisease, preFetchSchemas]);
+  }, [selectedDisease]);
 
   // ── Get disease info for current selection ──
   const currentDiseaseInfo = availableDiseases.find(
@@ -143,19 +101,12 @@ export function DiseaseProvider({ children }) {
   );
 
   const value = {
-    // State
     availableDiseases,
     selectedDisease,
-    schemaCache,
     loading,
     error,
-
-    // Derived
     currentDiseaseInfo,
-
-    // Actions
     selectDisease,
-    getSchemaForDisease,
     retry,
   };
 

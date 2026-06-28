@@ -16,15 +16,24 @@
 import { useController } from 'react-hook-form';
 import MedicalTooltip from './MedicalTooltip';
 
-// ── Icons per component type ──
-const componentIcons = {
-  segmented: '⊙',
-  toggle: '⊡',
-  select: '▼',
-  slider: '═',
-  number: '#',
-  text: 'Aa',
-};
+const SLIDER_CLASS = `flex-1 h-2 rounded-full appearance-none cursor-pointer
+                     bg-gray-200 accent-blue-600
+                     [&::-webkit-slider-thumb]:appearance-none
+                     [&::-webkit-slider-thumb]:w-4
+                     [&::-webkit-slider-thumb]:h-4
+                     [&::-webkit-slider-thumb]:rounded-full
+                     [&::-webkit-slider-thumb]:bg-blue-600
+                     [&::-webkit-slider-thumb]:shadow-md`;
+
+function ValueBadge({ value }) {
+  return (
+    <span className="inline-flex items-center justify-center min-w-[2rem] h-5 px-2
+                     text-xs font-bold text-blue-800 bg-blue-100
+                     border border-blue-200 rounded-md shadow-sm">
+      {value}
+    </span>
+  );
+}
 
 /**
  * Toggle/Switch — binary 0/1 field rendered as a styled checkbox.
@@ -157,11 +166,7 @@ function SliderField({ field, meta, error }) {
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
         {' '}
-        <span className="inline-flex items-center justify-center min-w-[2rem] h-5 px-2
-                         text-xs font-bold text-blue-800 bg-blue-100
-                         border border-blue-200 rounded-md shadow-sm">
-          {val}
-        </span>
+        <ValueBadge value={val} />
       </label>
       <div className="flex items-center gap-3">
         <span className="text-xs text-gray-400 w-6 text-right">{min}</span>
@@ -173,14 +178,7 @@ function SliderField({ field, meta, error }) {
           step={1}
           value={val}
           onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
-          className="flex-1 h-2 rounded-full appearance-none cursor-pointer
-                     bg-gray-200 accent-blue-600
-                     [&::-webkit-slider-thumb]:appearance-none
-                     [&::-webkit-slider-thumb]:w-4
-                     [&::-webkit-slider-thumb]:h-4
-                     [&::-webkit-slider-thumb]:rounded-full
-                     [&::-webkit-slider-thumb]:bg-blue-600
-                     [&::-webkit-slider-thumb]:shadow-md"
+          className={SLIDER_CLASS}
         />
         <span className="text-xs font-mono font-semibold text-gray-700 w-6">{val}</span>
       </div>
@@ -212,11 +210,7 @@ function NumberField({ field, meta, error }) {
         {showSlider && (
           <>
             {' '}
-            <span className="inline-flex items-center justify-center min-w-[2rem] h-5 px-2
-                             text-xs font-bold text-blue-800 bg-blue-100
-                             border border-blue-200 rounded-md shadow-sm">
-              {typeof currentVal === 'number' ? currentVal.toFixed(meta.type === 'number' ? 1 : 0) : currentVal}
-            </span>
+            <ValueBadge value={typeof currentVal === 'number' ? currentVal.toFixed(meta.type === 'number' ? 1 : 0) : currentVal} />
           </>
         )}
       </label>
@@ -229,14 +223,7 @@ function NumberField({ field, meta, error }) {
             step={step}
             value={currentVal}
             onChange={(e) => field.onChange(parseFloat(e.target.value))}
-            className="flex-1 h-2 rounded-full appearance-none cursor-pointer
-                       bg-gray-200 accent-blue-600
-                       [&::-webkit-slider-thumb]:appearance-none
-                       [&::-webkit-slider-thumb]:w-4
-                       [&::-webkit-slider-thumb]:h-4
-                       [&::-webkit-slider-thumb]:rounded-full
-                       [&::-webkit-slider-thumb]:bg-blue-600
-                       [&::-webkit-slider-thumb]:shadow-md"
+            className={SLIDER_CLASS}
           />
         )}
         <input
