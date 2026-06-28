@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { X, FileText, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { api } from '../api';
-import { useAuth } from '../context/AuthContext';
 
 /**
  * Modal that generates and displays an AI clinical report for a single prediction.
@@ -25,7 +24,6 @@ export default function ClinicalReportModal({
   features = {},
   onClose,
 }) {
-  const { token } = useAuth();
   const [report, setReport] = useState('');
   const [source, setSource] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,17 +34,14 @@ export default function ClinicalReportModal({
     setError('');
     setReport('');
     try {
-      const res = await api.generateReport(
-        {
-          disease,
-          probability,
-          label,
-          confidence_band: confidenceBand,
-          shap_values: shapValues,
-          features,
-        },
-        token
-      );
+      const res = await api.generateReport({
+        disease,
+        probability,
+        label,
+        confidence_band: confidenceBand,
+        shap_values: shapValues,
+        features,
+      });
       setReport(res.report);
       setSource(res.source);
     } catch (err) {
