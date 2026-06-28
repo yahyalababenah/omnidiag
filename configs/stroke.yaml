@@ -1,0 +1,106 @@
+# =============================================================================
+# OmniDiag Configuration — Stroke Risk
+# =============================================================================
+# Stroke risk prediction using XGBoost on the Kaggle Stroke Prediction Dataset.
+# 11 clinical features + 5 engineered biomarkers.
+# =============================================================================
+
+disease:
+  name: "stroke"
+  display_name: "Stroke Risk Assessment"
+  description: "Ischemic stroke risk triage using XGBoost with SHAP explainability — 11 clinical features + engineered vascular risk markers"
+  target_column: "stroke"
+  version: "1.0.0"
+
+# ---------------------------------------------------------------------------
+# Data paths
+# ---------------------------------------------------------------------------
+data:
+  raw_path: "data/stroke/raw/"
+  processed_path: "data/stroke/processed/"
+  interim_path: "data/stroke/interim/"
+  raw_files:
+    - "healthcare-dataset-stroke-data.csv"
+  merged_file: "stroke_data.csv"
+  final_clean_file: "stroke_final.csv"
+
+# ---------------------------------------------------------------------------
+# Feature engineering
+# ---------------------------------------------------------------------------
+features:
+  module: "features.stroke_features"
+  class: "StrokeFeatureEngineer"
+  categorical_columns:
+    - "gender"
+    - "ever_married"
+    - "work_type"
+    - "Residence_type"
+    - "smoking_status"
+  numerical_columns:
+    - "age"
+    - "avg_glucose_level"
+    - "bmi"
+    - "hypertension"
+    - "heart_disease"
+  imputation_features:
+    - "age"
+    - "avg_glucose_level"
+    - "bmi"
+  heuristic_features:
+    - name: "Age_Glucose_Interaction"
+      formula: "age * avg_glucose_level"
+      description: "Multiplicative interaction between age and blood glucose — captures diabetic stroke risk amplified by aging"
+    - name: "BMI_Age_Risk"
+      formula: "bmi * age"
+      description: "Obesity burden scaled by age — reflects cumulative vascular damage"
+    - name: "Vascular_Burden"
+      formula: "hypertension + heart_disease"
+      description: "Sum of major vascular comorbidities — additive stroke risk index"
+  clinical_features:
+    - name: "Stroke_Clinical_Risk"
+      formula: "exp(age * 0.05 + avg_glucose_level * 0.003 + bmi * 0.02 + hypertension * 0.8 + heart_disease * 0.6)"
+      description: "Clinical stroke risk score based on Framingham-derived vascular risk coefficients"
+
+# ---------------------------------------------------------------------------
+# Model
+# ---------------------------------------------------------------------------
+model:
+  type: "xgboost"
+  explainer_type: "tree"
+  weights_path: "models/stroke/stroke_xgb.pkl"
+  fallback_weights_path: "models/stroke/stroke_xgb.pkl"
+  preprocessors_path: "models/stroke/preprocessors/"
+  best_params:
+    n_estimators: 500
+    max_depth: 5
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    scale_pos_weight: 20
+    eval_metric: "logloss"
+    random_state: 42
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+training:
+  test_size: 0.2
+  random_state: 42
+  optimization_trials: 100
+  optimization_direction: "maximize"
+  optimization_metric: "roc_auc"
+
+# ---------------------------------------------------------------------------
+# Explainability
+# ---------------------------------------------------------------------------
+explainer:
+  enabled: true
+  type: "shap"
+  plots_output_dir: "reports/figures/stroke/"
+
+# ---------------------------------------------------------------------------
+# API
+# ---------------------------------------------------------------------------
+api:
+  endpoint_prefix: "/api/v4"
+  version: "1.0.0"
