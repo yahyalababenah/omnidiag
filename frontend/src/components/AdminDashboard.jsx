@@ -303,6 +303,150 @@ function UsersTable({ token, onIssueKey, onRevokeKey, onRefresh }) {
   )
 }
 
+// ── Annotation / Review Queue ─────────────────────────────────────────────────
+
+function AnnotationQueueTable({ token }) {
+  const [page, setPage] = useState(1)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [annotating, setAnnotating] = useState({}) // { [itemId]: 0|1|'skip' }
+
+  const load = useCallback(async (p = 1) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${BASE}/review/queue?page=${p}&limit=10`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setData(await res.json())
+      setPage(p)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  useEffect(() => { load(1) }, [load])
+
+  async function annotate(itemId, label) {
+    setAnnotating(a => ({ ...a, [itemId]: label }))
+    try {
+      const isSkip = label === 'skip'
+      await fetch(`${BASE}/review/${itemId}/${isSkip ? 'skip' : 'annotate'}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        ...(isSkip ? {} : { body: JSON.stringify({ label }) }),
+      })
+      load(page)
+    } catch {
+      // silently retry on next refresh
+    } finally {
+      setAnnotating(a => { const n = { ...a }; delete n[itemId]; return n })
+    }
+  }
+
+  const items = data?.items ?? []
+  const total = data?.total ?? 0
+
+  return (
+    <div className="card mt-6">
+      <div className="card-header flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-yellow-500" />
+          Annotation Queue
+          {total > 0 && (
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold">{total}</span>
+          )}
+        </h2>
+        <button onClick={() => load(page)} className="btn-secondary text-xs flex items-center gap-1">
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </button>
+      </div>
+      <div className="card-body">
+        {loading && <p className="text-sm text-gray-400 py-4 text-center">Loading…</p>}
+        {error && <p className="text-sm text-red-500 py-4">{error}</p>}
+        {!loading && !error && items.length === 0 && (
+          <p className="text-sm text-gray-400 py-4 text-center">No pending items in the review queue.</p>
+        )}
+        {items.length > 0 && (
+          <>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-left">
+                  <th className="py-2 px-2 text-gray-500 font-medium">Disease</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">Prediction</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">Confidence</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">Entropy</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">Queued</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(item => {
+                  const pred = item.prediction ?? {}
+                  const busy = annotating[item.id] !== undefined
+                  return (
+                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-2 font-medium capitalize">{pred.disease ?? '—'}</td>
+                      <td className="py-2 px-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                          pred.diagnosis === 'Positive' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                        }`}>{pred.diagnosis ?? '—'}</span>
+                      </td>
+                      <td className="py-2 px-2 font-mono">{pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : '—'}</td>
+                      <td className="py-2 px-2 font-mono">{item.entropy != null ? item.entropy.toFixed(3) : '—'}</td>
+                      <td className="py-2 px-2 text-gray-400">
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="py-2 px-2">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => annotate(item.id, 1)}
+                            disabled={busy}
+                            className="px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 text-xs font-medium disabled:opacity-50"
+                            title="Label as Positive (disease present)"
+                          >+ Pos</button>
+                          <button
+                            onClick={() => annotate(item.id, 0)}
+                            disabled={busy}
+                            className="px-2 py-1 rounded bg-green-50 text-green-600 hover:bg-green-100 text-xs font-medium disabled:opacity-50"
+                            title="Label as Negative (disease absent)"
+                          >− Neg</button>
+                          <button
+                            onClick={() => annotate(item.id, 'skip')}
+                            disabled={busy}
+                            className="px-2 py-1 rounded bg-gray-50 text-gray-500 hover:bg-gray-100 text-xs disabled:opacity-50"
+                            title="Skip this item"
+                          >Skip</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+              <span>{total} item{total !== 1 ? 's' : ''} pending</span>
+              <div className="flex gap-1">
+                <button onClick={() => load(page - 1)} disabled={page <= 1} className="btn-secondary py-1 px-2 disabled:opacity-40">
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="px-2 py-1">Page {page}</span>
+                <button onClick={() => load(page + 1)} disabled={items.length < 10} className="btn-secondary py-1 px-2 disabled:opacity-40">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Audit log table ───────────────────────────────────────────────────────────
 
 function AuditLogTable({ token }) {
@@ -699,6 +843,9 @@ export default function AdminDashboard() {
         onRevokeKey={revokeKey}
         onRefresh={() => setShowCreateUser(true)}
       />
+
+      {/* Annotation / Review Queue */}
+      <AnnotationQueueTable token={token} />
 
       {/* Audit log */}
       <AuditLogTable token={token} />

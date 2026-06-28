@@ -578,3 +578,34 @@ async def set_user_active(
         id=u.id, email=u.email, full_name=u.full_name, is_active=u.is_active,
         created_at=u.created_at, roles=[r.name for r in u.roles], has_api_key=bool(u.api_key_hash),
     )
+
+
+# ── POST /admin/retrain ───────────────────────────────────────────────────────
+
+class RetrainRequest(BaseModel):
+    disease: str = Field("heart_disease", description="Disease module to retrain")
+    min_samples: int = Field(5, ge=1, le=10000, description="Minimum annotated samples required")
+
+
+class RetrainResponse(BaseModel):
+    status: str
+    disease: str
+    samples_used: int = 0
+    model_path: Optional[str] = None
+    reason: Optional[str] = None
+
+
+@router.post(
+    "/retrain",
+    response_model=RetrainResponse,
+    summary="Trigger model retraining from annotated review queue (super_admin only)",
+)
+async def trigger_retrain(
+    body: RetrainRequest,
+    _: object = Depends(require_role(*ADMIN_ROLES)),
+    db: AsyncSession = Depends(get_db),
+) -> RetrainResponse:
+    from backend.active_learning.retrain import run_retrain_pipeline
+
+    result = await run_retrain_pipeline(db, body.disease, body.min_samples)
+    return RetrainResponse(**result)

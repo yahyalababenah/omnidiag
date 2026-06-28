@@ -31,6 +31,7 @@ import PDFReport from './PDFReport';
 import { useShapSnapshot } from '../hooks/useShapSnapshot';
 import PatientTimeline from './PatientTimeline';
 import ClinicalNotesInput from './ClinicalNotesInput';
+import ClinicalReportModal from './ClinicalReportModal';
 
 /**
  * Clinical EMR Mode — Doctor's View
@@ -66,6 +67,7 @@ export default function ClinicalEmrMode() {
   const [showTimeline, setShowTimeline] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const coldStartTimer = useRef(null);
   const shapChartRef = useRef(null);
   const { snapshot: shapSnapshot, capture: captureShap } = useShapSnapshot();
@@ -580,6 +582,14 @@ export default function ClinicalEmrMode() {
                       {pdfGenerating ? 'Generating…' : 'Export PDF'}
                     </button>
                     <button
+                      onClick={() => setShowReportModal(true)}
+                      className="btn-secondary text-xs"
+                      title="Generate AI clinical narrative report"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      AI Report
+                    </button>
+                    <button
                       onClick={() => runDiagnosis(selectedPatient)}
                       disabled={loading}
                       className="btn-secondary text-xs"
@@ -756,6 +766,19 @@ export default function ClinicalEmrMode() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── AI Clinical Report Modal ── */}
+      {showReportModal && result && (
+        <ClinicalReportModal
+          disease={selectedDisease}
+          probability={result.probability ?? result.confidence ?? 0}
+          label={result.diagnosis ?? result.prediction ?? ''}
+          confidenceBand={result.confidence_band ?? (result.confidence >= 0.7 ? 'HIGH' : result.confidence >= 0.4 ? 'MODERATE' : 'LOW')}
+          shapValues={shapData?.chart_data ?? []}
+          features={selectedPatient?.data ?? {}}
+          onClose={() => setShowReportModal(false)}
+        />
       )}
     </div>
   );
