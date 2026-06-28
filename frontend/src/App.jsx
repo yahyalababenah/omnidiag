@@ -5,6 +5,7 @@ import {
   Stethoscope,
   Shield,
   Table2,
+  ArrowLeftRight,
   LogIn,
   LogOut,
   Menu,
@@ -16,14 +17,16 @@ import EngineeringMode from './components/EngineeringMode';
 import ClinicalEmrMode from './components/ClinicalEmrMode';
 import AdminDashboard from './components/AdminDashboard';
 import BatchUpload from './components/BatchUpload';
+import ComparisonMode from './components/ComparisonMode';
 import OfflineBanner from './components/OfflineBanner';
 import InstallPrompt from './components/InstallPrompt';
 import LoginModal from './components/LoginModal';
 
 const CLINICAL_VIEWS = [
-  { id: 'engineering', label: 'Engineering Mode', icon: FlaskConical, component: EngineeringMode },
-  { id: 'clinical',    label: 'Clinical EMR Mode', icon: Stethoscope,  component: ClinicalEmrMode },
-  { id: 'batch',       label: 'Batch Prediction',  icon: Table2,       component: BatchUpload },
+  { id: 'engineering', label: 'Engineering Mode',    icon: FlaskConical,   component: EngineeringMode },
+  { id: 'clinical',    label: 'Clinical EMR Mode',   icon: Stethoscope,    component: ClinicalEmrMode },
+  { id: 'batch',       label: 'Batch Prediction',    icon: Table2,         component: BatchUpload },
+  { id: 'comparison',  label: 'Before/After Compare', icon: ArrowLeftRight, component: ComparisonMode },
 ];
 
 function AppContent() {
