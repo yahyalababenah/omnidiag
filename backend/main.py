@@ -11,6 +11,9 @@ import os
 import logging
 import traceback
 
+from dotenv import load_dotenv
+load_dotenv()  # loads .env file into os.environ before anything else reads it
+
 # Configure startup logging to stdout for HF Spaces debugging
 logging.basicConfig(
     stream=sys.stdout,
