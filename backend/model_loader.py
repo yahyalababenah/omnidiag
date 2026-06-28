@@ -365,10 +365,118 @@ class ModelLoader:
                     self._feature_names = []
         return self._feature_names
     
+    def generate_counterfactuals(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate What-If counterfactual scenarios for heart disease.
+
+        Uses random perturbation of mutable clinical features to find the
+        minimal changes that flip the prediction from Positive to Negative.
+        """
+        import random
+
+        baseline_result = self.predict(patient_data)
+        baseline_pred = baseline_result["prediction"]
+        baseline_prob = baseline_result["confidence"]
+
+        if baseline_pred == 0:
+            return {
+                "status": "not_applicable",
+                "counterfactuals": [],
+                "baseline_probability": baseline_prob,
+                "message": "Patient is already at low risk. No counterfactuals needed.",
+            }
+
+        # Heart disease mutable features and their perturbation ranges
+        MUTABLE = {
+            "RestingBP":   (90,  180,  False),   # (min, max, is_binary)
+            "Cholesterol": (100, 400,  False),
+            "MaxHR":       (60,  200,  False),
+            "Oldpeak":     (0.0, 6.2,  False),
+            "FastingBS":   (0,   1,    True),
+            "ExerciseAngina": (None, None, True),  # Y/N toggle
+        }
+
+        rng = random.Random(42)
+        candidates = []
+
+        for _ in range(800):
+            cf = dict(patient_data)
+            changed: List[str] = []
+
+            for feat, (lo, hi, is_binary) in MUTABLE.items():
+                if feat not in cf:
+                    continue
+                if rng.random() < 0.4:
+                    original = cf[feat]
+                    if feat == "ExerciseAngina":
+                        cf[feat] = "N" if str(original).upper() == "Y" else "Y"
+                    elif is_binary:
+                        cf[feat] = 1 - int(original)
+                    else:
+                        cf[feat] = round(rng.uniform(lo, hi), 1)
+                    if cf[feat] != original:
+                        changed.append(feat)
+
+            if not changed:
+                continue
+
+            try:
+                result = self.predict(cf)
+                if result["prediction"] == 0:
+                    candidates.append({
+                        "features": cf,
+                        "changed": changed,
+                        "probability": result["confidence"],
+                        "distance": len(changed),
+                    })
+            except Exception:
+                continue
+
+        # Sort by fewest changes, then by lowest probability
+        candidates.sort(key=lambda c: (c["distance"], c["probability"]))
+
+        # Pick top 3 with diversity (different primary change)
+        selected = []
+        seen_primary = set()
+        for c in candidates:
+            primary = c["changed"][0] if c["changed"] else ""
+            if primary not in seen_primary:
+                seen_primary.add(primary)
+                selected.append(c)
+            if len(selected) >= 3:
+                break
+
+        counterfactuals = []
+        for c in selected:
+            scenario_changes = []
+            for feat in c["changed"]:
+                original_val = patient_data.get(feat)
+                new_val = c["features"].get(feat)
+                scenario_changes.append({
+                    "feature": feat,
+                    "original_value": original_val,
+                    "counterfactual_value": new_val,
+                    "direction": "decrease" if (
+                        isinstance(new_val, (int, float)) and isinstance(original_val, (int, float))
+                        and new_val < original_val
+                    ) else "increase",
+                })
+            counterfactuals.append({
+                "scenario_id": len(counterfactuals) + 1,
+                "probability": c["probability"],
+                "changes": scenario_changes,
+            })
+
+        return {
+            "status": "success",
+            "counterfactuals": counterfactuals,
+            "baseline_probability": baseline_prob,
+        }
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    
+
     def _resolve_weights_path(self) -> str:
         """
         Resolve the model weights path, trying primary then fallback.

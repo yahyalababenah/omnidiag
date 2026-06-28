@@ -94,8 +94,10 @@ class OmniDiagRouter:
             "model_type": config.get("model", {}).get("type"),
             "explainer_type": config.get("model", {}).get("explainer_type"),
             "available": has_model,
-            # True only for ensemble diseases (EnsembleModelLoader has generate_counterfactuals)
-            "supports_counterfactuals": config.get("model", {}).get("ensemble") is not None,
+            "supports_counterfactuals": (
+                config.get("model", {}).get("ensemble") is not None
+                or config.get("model", {}).get("counterfactuals", False)
+            ),
         }
     
     def predict(self, disease: str, patient_data: Dict[str, Any]) -> Dict[str, Any]:
