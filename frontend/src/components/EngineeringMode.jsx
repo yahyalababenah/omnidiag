@@ -6,12 +6,14 @@ import {
   AlertCircle,
   CheckCircle2,
   RefreshCw,
+  FileText,
 } from 'lucide-react';
 import { api } from '../api';
 import { useDisease } from '../context/DiseaseContext';
 import DynamicClinicalForm from './DynamicClinicalForm';
 import ShapBarChart from './ShapBarChart';
 import WhatIfScenarioCard from './WhatIfScenarioCard';
+import ClinicalReportModal from './ClinicalReportModal';
 
 export default function EngineeringMode() {
   const { selectedDisease, currentDiseaseInfo } = useDisease();
@@ -23,6 +25,7 @@ export default function EngineeringMode() {
   const [counterfactualsData, setCounterfactualsData] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [lastFormData, setLastFormData] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
   const coldStartTimer = useRef(null);
 
   // Show "Waking up..." message if request takes > 8s (HF Spaces cold start)
@@ -192,6 +195,17 @@ export default function EngineeringMode() {
                     </span>
                   </div>
 
+                  {/* Generate AI Report */}
+                  {shapData && (
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="btn-secondary w-full text-sm flex items-center justify-center gap-2 mt-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Generate AI Report
+                    </button>
+                  )}
+
                   {/* Raw JSON */}
                   <details className="mt-4">
                     <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
@@ -253,6 +267,19 @@ export default function EngineeringMode() {
           )}
         </div>
       </div>
+
+      {/* AI Report Modal */}
+      {showReportModal && result && shapData && (
+        <ClinicalReportModal
+          disease={selectedDisease}
+          probability={result.confidence}
+          label={result.diagnosis}
+          confidenceBand={result.confidence >= 0.7 ? 'HIGH' : result.confidence >= 0.4 ? 'MODERATE' : 'LOW'}
+          shapValues={shapData.chart_data}
+          features={lastFormData}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </div>
   );
 }
