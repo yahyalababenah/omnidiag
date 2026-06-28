@@ -2,8 +2,8 @@
 OmniDiag — LLM Clinical Report Generator
 ==========================================
 Generates structured clinical narrative reports from prediction results
-using the Anthropic API (Claude). Falls back to a rule-based template
-when the API key is unavailable (e.g. in offline/demo environments).
+using the DeepSeek API (OpenAI-compatible). Falls back to a rule-based
+template when the API key is unavailable (e.g. in offline/demo environments).
 """
 
 import os
@@ -12,7 +12,8 @@ from typing import Any, Dict, List, Optional
 
 log = logging.getLogger("omnidiag.llm")
 
-_ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+_DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 _SYSTEM_PROMPT = """You are a senior clinical decision support AI embedded in OmniDiag,
 a multi-disease risk assessment platform used by healthcare professionals.
@@ -99,7 +100,7 @@ async def generate_report(
     confidence_band: str,
     shap_values: List[Dict[str, Any]],
     features: Dict[str, Any],
-    model: str = "claude-haiku-4-5-20251001",
+    model: str = "deepseek-chat",
 ) -> Dict[str, str]:
     """
     Generate a structured clinical report.
@@ -108,17 +109,20 @@ async def generate_report(
         - report: The generated markdown report text
         - source: 'llm' | 'rule_based'
     """
-    if not _ANTHROPIC_API_KEY:
-        log.info("ANTHROPIC_API_KEY not set — using rule-based report fallback")
+    if not _DEEPSEEK_API_KEY:
+        log.info("DEEPSEEK_API_KEY not set — using rule-based report fallback")
         return {
             "report": _rule_based_report(disease_display, probability, label, shap_values, features),
             "source": "rule_based",
         }
 
     try:
-        import anthropic  # lazy import — only needed when API key present
+        from openai import AsyncOpenAI  # lazy import — only needed when API key present
 
-        client = anthropic.AsyncAnthropic(api_key=_ANTHROPIC_API_KEY)
+        client = AsyncOpenAI(
+            api_key=_DEEPSEEK_API_KEY,
+            base_url=_DEEPSEEK_BASE_URL,
+        )
 
         user_prompt = _USER_PROMPT_TEMPLATE.format(
             disease_display=disease_display,
@@ -129,14 +133,16 @@ async def generate_report(
             features_summary=_format_features(features),
         )
 
-        message = await client.messages.create(
+        response = await client.chat.completions.create(
             model=model,
             max_tokens=600,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
         )
 
-        report_text = message.content[0].text
+        report_text = response.choices[0].message.content
         return {"report": report_text, "source": "llm"}
 
     except Exception as exc:
