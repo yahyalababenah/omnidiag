@@ -1,24 +1,22 @@
 """
 OmniDiag — Password Hashing
 =============================
-Bcrypt-based password hashing and verification using passlib.
-
-Using passlib (rather than bcrypt directly) gives us:
-  - A clean, high-level API that handles salting automatically
-  - Support for future algorithm migration via the 'deprecated' mechanism
-  - Consistent behaviour across different bcrypt C-extension versions
+Bcrypt-based password hashing and verification using the bcrypt library directly.
+passlib 1.7.4 is incompatible with bcrypt>=4.0.0 on Python 3.10 (HF Spaces),
+so we call bcrypt directly to avoid the version-detection crash.
 """
 
-from passlib.context import CryptContext
-
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 
 def hash_password(plain: str) -> str:
     """Hash a plaintext password with bcrypt. Returns the hashed string."""
-    return _pwd_context.hash(plain)
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Return True if *plain* matches the stored *hashed* password."""
-    return _pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
