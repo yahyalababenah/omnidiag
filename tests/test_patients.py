@@ -215,3 +215,93 @@ class TestPredictionHistory:
         assert "patient" in data
         assert "predictions" in data
         assert "exported_at" in data
+
+    async def test_patient_prediction_history_after_predict(self, client, doctor_token):
+        """After running /predict with patient_id, the prediction appears in history."""
+        heart_payload = {
+            "Age": 55, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 130,
+            "Cholesterol": 250, "FastingBS": 0, "RestingECG": "Normal",
+            "MaxHR": 150, "ExerciseAngina": "N", "Oldpeak": 1.5, "ST_Slope": "Up",
+        }
+        # Create a patient
+        create_resp = await client.post(
+            "/api/v4/patients/",
+            json=_patient("HIST1"),
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert create_resp.status_code == 201
+        patient_id = create_resp.json()["id"]
+
+        # Run a prediction linked to that patient
+        pred_resp = await client.post(
+            f"/api/v4/heart_disease/predict?patient_id={patient_id}",
+            json=heart_payload,
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert pred_resp.status_code == 200
+
+        # Fetch prediction history
+        hist_resp = await client.get(
+            f"/api/v4/patients/{patient_id}/predictions",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert hist_resp.status_code == 200
+        data = hist_resp.json()
+        assert data["total"] >= 1
+        assert len(data["items"]) >= 1
+
+
+class TestSoftDelete:
+    async def test_delete_patient_sets_deleted_at(self, client, admin_token, doctor_token):
+        """DELETE /api/v4/patients/{id} soft-deletes; subsequent GET returns 404."""
+        create_resp = await client.post(
+            "/api/v4/patients/",
+            json=_patient("SDEL1"),
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert create_resp.status_code == 201
+        patient_id = create_resp.json()["id"]
+
+        del_resp = await client.delete(
+            f"/api/v4/patients/{patient_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        # Admin should be allowed to delete
+        assert del_resp.status_code in (200, 204)
+
+        get_resp = await client.get(
+            f"/api/v4/patients/{patient_id}",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert get_resp.status_code == 404
+
+    async def test_deleted_patient_excluded_from_list(self, client, admin_token, doctor_token):
+        """Soft-deleted patient must not appear in the paginated patient list."""
+        create_resp = await client.post(
+            "/api/v4/patients/",
+            json=_patient("SDEL2"),
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        patient_id = create_resp.json()["id"]
+
+        await client.delete(
+            f"/api/v4/patients/{patient_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        list_resp = await client.get(
+            "/api/v4/patients/",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert list_resp.status_code == 200
+        ids = [p["id"] for p in list_resp.json()["items"]]
+        assert patient_id not in ids
+
+    async def test_viewer_cannot_create_patient(self, client, viewer_token):
+        """Viewer role must not be allowed to create patients (403)."""
+        resp = await client.post(
+            "/api/v4/patients/",
+            json=_patient("VIEWER1"),
+            headers={"Authorization": f"Bearer {viewer_token}"},
+        )
+        assert resp.status_code == 403

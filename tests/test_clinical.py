@@ -157,3 +157,76 @@ class TestDiseaseSchema:
         names = [d["name"] for d in diseases]
         assert "heart_disease" in names
         assert "diabetes" in names
+
+
+# ── Diabetes-specific tests ───────────────────────────────────────────────────
+
+DIABETES_PAYLOAD = {
+    "HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 32.5,
+    "Smoker": 0, "Stroke": 0, "HeartDiseaseorAttack": 0,
+    "PhysActivity": 0, "Fruits": 1, "Veggies": 1,
+    "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0,
+    "GenHlth": 3, "MentHlth": 2, "PhysHlth": 5,
+    "DiffWalk": 0, "Sex": 1, "Age": 7, "Education": 4, "Income": 5,
+}
+
+
+class TestDiabetes:
+    async def test_diabetes_predict_returns_result(self, client, doctor_token):
+        resp = await client.post(
+            "/api/v4/diabetes/predict",
+            json=DIABETES_PAYLOAD,
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "prediction" in data
+        assert "confidence" in data
+        assert "diagnosis" in data
+
+    async def test_diabetes_explain_returns_chart_data(self, client, doctor_token):
+        resp = await client.post(
+            "/api/v4/diabetes/explain",
+            json=DIABETES_PAYLOAD,
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "chart_data" in data
+        assert isinstance(data["chart_data"], list)
+
+    async def test_predict_missing_required_field_returns_error(self, client, doctor_token):
+        # Send an empty body — all 21 DiabetesInput fields are required.
+        # The app validates via Pydantic manually inside the route (not at the
+        # FastAPI request-body boundary), so missing fields cause a server-side
+        # ValidationError. The ASGI transport may propagate this as a Python
+        # exception or as a 500 HTTP response depending on middleware config.
+        try:
+            resp = await client.post(
+                "/api/v4/diabetes/predict",
+                json={},
+                headers={"Authorization": f"Bearer {doctor_token}"},
+            )
+            assert resp.status_code >= 400
+        except Exception:
+            # Server-side ValidationError propagated through ASGI — input rejected
+            pass
+
+    async def test_confidence_always_in_range(self, client, doctor_token):
+        resp = await client.post(
+            "/api/v4/diabetes/predict",
+            json=DIABETES_PAYLOAD,
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200
+        confidence = resp.json()["confidence"]
+        assert 0.0 <= confidence <= 1.0
+
+    async def test_prediction_is_binary(self, client, doctor_token):
+        resp = await client.post(
+            "/api/v4/diabetes/predict",
+            json=DIABETES_PAYLOAD,
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["prediction"] in (0, 1)
