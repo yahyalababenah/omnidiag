@@ -103,3 +103,22 @@ async def get_current_active_user(
             detail="This account has been deactivated. Contact your administrator.",
         )
     return current_user
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    access_token: Optional[str] = Cookie(default=None),
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """
+    Like get_current_user but returns None instead of raising 401 when no
+    credentials are provided. Used for endpoints that work for guests but
+    persist data only for authenticated users.
+    """
+    if not credentials and not access_token and not x_api_key:
+        return None
+    try:
+        return await get_current_user(credentials, access_token, x_api_key, db)
+    except HTTPException:
+        return None
