@@ -34,6 +34,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Raise limit to 4 MiB to accommodate @react-pdf/renderer bundle
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // Pre-cache the app shell
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // Cache last 5 API predict/explain responses (network-first)
