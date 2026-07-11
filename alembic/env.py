@@ -31,6 +31,7 @@ from backend.db_models import (  # noqa: F401
     user_roles,
     Role,
     Patient,
+    PatientVisit,
     Prediction,
     ReviewQueue,
     AuditLog,
