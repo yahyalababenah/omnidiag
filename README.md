@@ -617,4 +617,4 @@ All endpoints are versioned under `/api/v4/`.
 
 ## License
 
-MIT License — see [`LICENSE`](LICENSE) for full terms.
+Copyright (c) 2026 Yahya Lababenah. All Rights Reserved. — see [`LICENSE`](LICENSE) for full terms.
