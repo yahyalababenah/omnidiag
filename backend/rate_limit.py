@@ -48,7 +48,8 @@ def _rate_limit_key(request: Request) -> str:
 
 limiter = Limiter(key_func=_rate_limit_key, default_limits=["10/minute"])
 
-# Named limit strings used as decorators on individual routes
+# Named limit strings used as decorators on individual routes.
+# NOTE: no route currently gates on the "viewer" role (seeded but unused —
+# see backend/auth/rbac.py), so there is no LIMIT_VIEWER to apply yet.
 LIMIT_CLINICAL = "30/minute"   # doctor / nurse / super_admin
-LIMIT_VIEWER   = "5/minute"    # viewer (applied at the route level)
 LIMIT_ADMIN    = "60/minute"   # admin ops (generous — infrequent heavy use)

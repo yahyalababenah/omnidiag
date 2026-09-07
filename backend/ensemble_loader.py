@@ -679,6 +679,19 @@ class EnsembleModelLoader:
             raise
 
     # ------------------------------------------------------------------
+    # Hot-reload
+    # ------------------------------------------------------------------
+
+    def invalidate(self) -> None:
+        """
+        Clear cached base models / meta-learner so the next property access
+        reloads them from disk. Mirrors ModelLoader.invalidate() — called
+        after retraining to hot-swap without a process restart.
+        """
+        self._base_models = None
+        self._meta_learner = None
+
+    # ------------------------------------------------------------------
     # Internal Helpers
     # ------------------------------------------------------------------
 

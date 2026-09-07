@@ -368,6 +368,19 @@ class ModelLoader:
             log.error(traceback.format_exc())
             raise
     
+    def invalidate(self) -> None:
+        """
+        Clear cached model/explainer/feature-name state so the next property
+        access reloads them from disk.
+
+        Called after retraining writes new weights to the model's file path
+        (see backend/active_learning/retrain.py) to hot-swap the running
+        process onto the updated model without a restart.
+        """
+        self._model = None
+        self._explainer = None
+        self._feature_names = None
+
     def get_feature_names(self) -> List[str]:
         """Return the feature names expected by the model."""
         if self._feature_names is None:

@@ -174,7 +174,7 @@ _monitors: Dict[str, DriftMonitor] = {}
 
 _REFERENCE_PATHS: Dict[str, str] = {
     "heart_disease": "data/heart_disease/processed/final_ready_data.csv",
-    "diabetes":      "data/diabetes/interim/false_negatives_profile.csv",
+    "diabetes":      "data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv",
 }
 
 

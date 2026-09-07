@@ -90,6 +90,25 @@ def retrain_xgb(
     Incrementally retrain the XGBoost model for the given disease.
 
     Returns the path to the newly saved model, or None on failure.
+
+    🚧 KNOWN LIMITATION (confirmed via live testing, 2026-09-07):
+      - heart_disease: `features_list[i].values()` are the RAW predict-time
+        inputs (e.g. Sex="M", ChestPainType="ATA") — not label-encoded or
+        feature-engineered. Building `X` directly from these raises
+        `ValueError: could not convert string to float: 'ATA'`. Any real
+        active-learning cycle for heart_disease currently fails here.
+        Fix requires running the same encode→engineer pipeline used by
+        ModelLoader.predict() before constructing the DMatrix.
+      - diabetes: this function always writes to the single hardcoded path
+        `models/{disease}/omni_diag_xgb_optimized.pkl`, which is NOT one of
+        the three files EnsembleModelLoader actually loads (xgb_model.pkl,
+        lgb_model.pkl, rf_model.pkl + meta_learner.pkl). Even when this
+        succeeds numerically, it retrains an orphan file disconnected from
+        the live ensemble — a silent no-op for diabetes.
+    Hot-reload (ModelLoader.invalidate() / EnsembleModelLoader.invalidate(),
+    wired in run_retrain_pipeline() below) is verified working correctly in
+    isolation — it is this function's own model-building step that blocks
+    the pipeline before reload is ever reached.
     """
     try:
         import xgboost as xgb
@@ -171,10 +190,21 @@ async def run_retrain_pipeline(
     _log_to_mlflow(disease, len(labels), model_path)
 
     if model_path:
-        # Reload model in running process so next predict uses updated weights
+        # Reload model in running process so next predict uses updated weights.
+        # The router (backend.main.router) holds the live ModelLoader /
+        # EnsembleModelLoader instance for this disease; invalidate() clears
+        # its cached model so the next request lazy-reloads the new weights.
         try:
-            from backend.model_loader import ModelLoader
-            ModelLoader.reload(disease)
+            from backend.main import router as _router
+            loader = _router.model_loaders.get(disease)
+            if loader is not None and hasattr(loader, "invalidate"):
+                loader.invalidate()
+                log.info(f"Hot-reloaded model loader for {disease}")
+            else:
+                log.warning(
+                    f"No active loader found for {disease} — "
+                    f"will take effect on next startup"
+                )
         except Exception as exc:
             log.warning(f"Model hot-reload failed (will take effect on next startup): {exc!r}")
 

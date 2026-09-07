@@ -259,6 +259,23 @@ class CounterfactualGenerator:
             return float(result.get("confidence", 0.5))
         return float(result)
     
+    def _is_illegal_flip(self, feat: str, from_val: float, to_val: float) -> bool:
+        """
+        Clinical Firewall — return True if changing `feat` from `from_val` to
+        `to_val` would be a clinically absurd recommendation (e.g. advising a
+        patient to start smoking, raise blood pressure, or reduce physical
+        activity).
+
+        Only features listed in DIRECTIONAL_CONSTRAINTS are restricted; each
+        entry names the only clinically safe target value(s) for that
+        feature. Features not listed may flip in either direction.
+        """
+        if to_val == from_val:
+            return False  # no-op, never illegal
+        if feat not in DIRECTIONAL_CONSTRAINTS:
+            return False
+        return to_val not in DIRECTIONAL_CONSTRAINTS[feat]
+
     def _sample_candidates(self, patient_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate random perturbations of mutable features."""
         candidates = []
@@ -274,29 +291,16 @@ class CounterfactualGenerator:
                 original = float(patient_data[feat])
                 
                 if feat in BINARY_FEATURES:
-                    # Check directional constraint first
-                    if feat in DIRECTIONAL_CONSTRAINTS:
-                        allowed = DIRECTIONAL_CONSTRAINTS[feat]
-                        safe_val = float(list(allowed)[0])
-                        if original == safe_val:
-                            # Already at clinically safe value — lock it
-                            cand[feat] = safe_val
-                        else:
-                            # Original is unsafe (e.g. Smoker=1, safe=0).
-                            # Use flip_prob to decide whether to switch to safe target,
-                            # but NEVER allow illegal flips (e.g. 0→1 for smoking).
-                            flip_prob = PERTURB_SCALES.get(feat, 0.5)
-                            if self.rng.random() < flip_prob:
-                                cand[feat] = safe_val
-                            else:
-                                cand[feat] = original
+                    flip_prob = PERTURB_SCALES.get(feat, 0.5)
+                    proposed = original if self.rng.random() >= flip_prob else 1.0 - original
+
+                    # Clinical Firewall: never emit a flip that the directional
+                    # constraints forbid (e.g. Smoker 0→1, DiffWalk 0→1).
+                    # Features without a constraint entry can flip either way.
+                    if self._is_illegal_flip(feat, original, proposed):
+                        cand[feat] = original
                     else:
-                        # Standard binary flip (original behavior)
-                        flip_prob = PERTURB_SCALES.get(feat, 0.5)
-                        if self.rng.random() < flip_prob:
-                            cand[feat] = 1.0 - original  # Flip 0→1 or 1→0
-                        else:
-                            cand[feat] = original
+                        cand[feat] = proposed
                 
                 elif feat in CLINICAL_BOUNDS:
                     lo, hi = CLINICAL_BOUNDS[feat]
