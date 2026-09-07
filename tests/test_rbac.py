@@ -21,16 +21,30 @@ HEART_PAYLOAD = {
 
 
 class TestUnauthenticated:
-    async def test_predict_requires_auth(self, client, db_tables):
+    """
+    predict / explain / counterfactuals are intentionally open to anonymous
+    callers so the public demo can be tried without an account — they use
+    Depends(get_optional_user), and results are only persisted for
+    authenticated users. Everything that touches stored data (batch, admin,
+    patients) still requires a role.
+    """
+
+    async def test_predict_allows_anonymous(self, client, db_tables):
         resp = await client.post("/api/v4/heart_disease/predict", json=HEART_PAYLOAD)
-        assert resp.status_code in (401, 403)
+        assert resp.status_code == 200
 
-    async def test_explain_requires_auth(self, client, db_tables):
+    async def test_explain_allows_anonymous(self, client, db_tables):
         resp = await client.post("/api/v4/heart_disease/explain", json=HEART_PAYLOAD)
-        assert resp.status_code in (401, 403)
+        assert resp.status_code == 200
 
-    async def test_counterfactuals_requires_auth(self, client, db_tables):
+    async def test_counterfactuals_allows_anonymous(self, client, db_tables):
         resp = await client.post("/api/v4/heart_disease/counterfactuals", json=HEART_PAYLOAD)
+        # 200 with scenarios, or 501 when the loader has no CF generator —
+        # either way it must not be an auth rejection.
+        assert resp.status_code not in (401, 403)
+
+    async def test_batch_requires_auth(self, client, db_tables):
+        resp = await client.post("/api/v4/heart_disease/batch")
         assert resp.status_code in (401, 403)
 
     async def test_admin_audit_logs_requires_auth(self, client, db_tables):
@@ -43,23 +57,27 @@ class TestUnauthenticated:
 
 
 class TestViewerRole:
-    """Viewer role must NOT access clinical or admin routes."""
+    """
+    Viewer role must NOT access admin routes or anything that writes stored
+    data. predict/explain are open to everyone (including anonymous), so a
+    viewer token is no more restricted there than no token at all.
+    """
 
-    async def test_viewer_cannot_predict(self, client, viewer_token):
+    async def test_viewer_can_predict_like_anonymous(self, client, viewer_token):
         resp = await client.post(
             "/api/v4/heart_disease/predict",
             json=HEART_PAYLOAD,
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
-    async def test_viewer_cannot_explain(self, client, viewer_token):
+    async def test_viewer_can_explain_like_anonymous(self, client, viewer_token):
         resp = await client.post(
             "/api/v4/heart_disease/explain",
             json=HEART_PAYLOAD,
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
     async def test_viewer_cannot_access_admin(self, client, viewer_token):
         resp = await client.get(

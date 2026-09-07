@@ -28,7 +28,7 @@ _FEATURES = {"Age": 55, "BMI": 34.0, "HighBP": 1, "Smoker": 0}
 class TestRuleBasedFallback:
     async def test_fallback_used_when_no_api_key(self):
         """L-1: When ANTHROPIC_API_KEY is empty, rule-based report is returned."""
-        with patch.object(rg, "_ANTHROPIC_API_KEY", ""):
+        with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Coronary Artery Disease",
                 probability=0.75,
@@ -42,7 +42,7 @@ class TestRuleBasedFallback:
 
     async def test_fallback_report_contains_disease_name(self):
         """L-2: Rule-based report includes the disease name."""
-        with patch.object(rg, "_ANTHROPIC_API_KEY", ""):
+        with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Coronary Artery Disease Risk",
                 probability=0.75,
@@ -55,7 +55,7 @@ class TestRuleBasedFallback:
 
     async def test_fallback_report_contains_probability(self):
         """L-2b: Rule-based report includes the probability percentage."""
-        with patch.object(rg, "_ANTHROPIC_API_KEY", ""):
+        with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
                 probability=0.82,
@@ -69,7 +69,7 @@ class TestRuleBasedFallback:
 
     async def test_fallback_report_contains_top_features(self):
         """L-2c: Rule-based report lists top SHAP features."""
-        with patch.object(rg, "_ANTHROPIC_API_KEY", ""):
+        with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
                 probability=0.82,
@@ -83,7 +83,7 @@ class TestRuleBasedFallback:
 
     async def test_low_probability_fallback_includes_low_actions(self):
         """L-2d: Low-probability rule-based report includes low-priority guidance."""
-        with patch.object(rg, "_ANTHROPIC_API_KEY", ""):
+        with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
                 probability=0.2,
@@ -98,20 +98,24 @@ class TestRuleBasedFallback:
 
 
 class TestMockedAPICall:
+    """
+    The generator calls DeepSeek through the OpenAI SDK
+    (`from openai import AsyncOpenAI`, imported lazily inside generate_report),
+    so these tests patch `openai.AsyncOpenAI` rather than the Anthropic SDK.
+    """
+
     async def test_llm_path_returns_api_response(self):
         """L-3: When API key is set and client returns content, use that content."""
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "Test clinical report from LLM"
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Test clinical report from LLM"
 
         mock_client_instance = MagicMock()
-        mock_client_instance.messages.create = AsyncMock(return_value=mock_message)
+        mock_client_instance.chat.completions.create = AsyncMock(return_value=mock_response)
+        MockAsyncOpenAI = MagicMock(return_value=mock_client_instance)
 
-        MockAnthropic = MagicMock(return_value=mock_client_instance)
-
-        with patch.object(rg, "_ANTHROPIC_API_KEY", "fake-api-key"):
-            with patch("backend.llm.report_generator.anthropic", create=True) as mock_anthropic_module:
-                mock_anthropic_module.AsyncAnthropic = MockAnthropic
+        with patch.object(rg, "_get_api_key", lambda: "fake-api-key"):
+            with patch("openai.AsyncOpenAI", MockAsyncOpenAI):
                 result = await generate_report(
                     disease_display="Heart Disease",
                     probability=0.75,
@@ -121,15 +125,15 @@ class TestMockedAPICall:
                     features=_FEATURES,
                 )
 
-        # If the anthropic module was patched properly, we should get LLM source
-        # or at least a valid report
-        assert len(result["report"]) > 0
+        assert result["source"] == "llm"
+        assert result["report"] == "Test clinical report from LLM"
+        assert result["llm_model"] == "deepseek-chat"
+        assert "latency_ms" in result
 
     async def test_llm_exception_falls_back_to_rule_based(self):
         """L-3b: If the LLM call raises an exception, fall back gracefully."""
-        with patch.object(rg, "_ANTHROPIC_API_KEY", "fake-key"):
-            with patch("backend.llm.report_generator.anthropic", create=True) as mock_module:
-                mock_module.AsyncAnthropic.side_effect = Exception("API failure")
+        with patch.object(rg, "_get_api_key", lambda: "fake-key"):
+            with patch("openai.AsyncOpenAI", side_effect=Exception("API failure")):
                 result = await generate_report(
                     disease_display="Diabetes",
                     probability=0.5,
