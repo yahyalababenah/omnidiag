@@ -36,7 +36,13 @@ class ModelLoader:
         _explainer: Cached SHAP explainer (loaded on first access).
         _preprocessors: Cached preprocessor objects (loaded on first access).
     """
-    
+
+    # The heart disease training CSV has inverted labels:
+    # HeartDisease=0 means "has disease", HeartDisease=1 means "healthy".
+    # Single source of truth for that correction — used by both predict() and
+    # explain() so the decision and its SHAP explanation can never drift apart.
+    _LABELS_INVERTED = True
+
     def __init__(self, config: dict):
         """
         Initialize the loader with a disease config.
@@ -298,8 +304,8 @@ class ModelLoader:
         # HeartDisease=0 means "has disease", HeartDisease=1 means "healthy".
         # Verified via feature correlations (Oldpeak, Age, MaxHR are all sign-flipped
         # vs clinical expectations). We correct here so the API returns clinical truth.
-        has_disease = (raw_pred == 0)
-        confidence = float(raw_proba[0])  # P(class=0) = P(disease)
+        has_disease = (raw_pred == 0) if self._LABELS_INVERTED else (raw_pred == 1)
+        confidence = float(raw_proba[0] if self._LABELS_INVERTED else raw_proba[1])
         return {
             "prediction": 1 if has_disease else 0,
             "confidence": confidence,
@@ -350,7 +356,22 @@ class ModelLoader:
             log.debug(f"SHAP values computed, shape={shap_values.values.shape}")
             
             feature_names = list(df.columns)
-            
+
+            # TreeExplainer explains the log-odds of class=1, which — because the
+            # training labels are inverted (see _LABELS_INVERTED) — is the "healthy"
+            # class. Left raw, every sign reads backwards: the strongest disease
+            # markers would be reported as risk-reducing. Flip the whole array here,
+            # before generate_shap_explanation() builds chart_data and the wording,
+            # so the explanation sits on the same axis as `confidence` (P(disease)).
+            #
+            # base_values must be negated too, otherwise additivity breaks:
+            #   sum(-phi) + (-base) = -(sum(phi) + base)
+            # keeps sigmoid(...) equal to the reported confidence. This is why
+            # base_value is reported as a negative number for this module.
+            if self._LABELS_INVERTED:
+                shap_values.values = -shap_values.values
+                shap_values.base_values = -shap_values.base_values
+
             result = generate_shap_explanation(shap_values, feature_names)
 
             # Attach prediction + confidence (same inversion fix as predict())
