@@ -380,7 +380,7 @@ function AnnotationQueueTable({ token }) {
                 <tr className="border-b border-gray-200 text-left">
                   <th className="py-2 px-2 text-gray-500 font-medium">Disease</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Prediction</th>
-                  <th className="py-2 px-2 text-gray-500 font-medium">Confidence</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">Risk Probability</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Entropy</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Queued</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Actions</th>
@@ -727,7 +727,7 @@ export default function AdminDashboard() {
             />
             <StatCard
               icon={TrendingUp}
-              label="Avg Confidence"
+              label="Avg Risk Probability"
               value={pct(stats.avg_confidence)}
               color="text-green-600"
             />

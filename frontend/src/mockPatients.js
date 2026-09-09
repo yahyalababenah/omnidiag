@@ -5,11 +5,14 @@
  * Each patient has realistic vitals/data matching the disease's schema fields,
  * plus clinical meta-fields (history, medications, admittingComplaint).
  *
- * Diabetes profiles (4 total — 2 Positive, 2 Negative):
- *   D-001 Layla Mansour (POSITIVE)  — SHAP dominated by HIGH BMI + HighBP + GenHlth
- *   D-002 Mohammed Al-Sayed (POSITIVE) — SHAP dominated by GenHlth(Poor) + Smoker + HeartDiseaseorAttack
- *   D-003 Nora Al-Mutairi (NEGATIVE) — SHAP dominated by strong protective features (PhysActivity, Fruits, low BMI)
- *   D-004 Youssef Al-Farouk (NEGATIVE) — SHAP mixed: borderline risk balanced by protective factors
+ * Diabetes profiles (4 total — the A/B/C/D demo set, verified live against
+ * EnsembleModelLoader.predict()/.explain() so the printed probabilities
+ * below are actual model output, not estimates):
+ *   D-001 Dana Al-Amin (NEGATIVE, 23.6%)     — Case A: no risk factors, healthy baseline
+ *   D-002 Bilal Hourani (POSITIVE, 44.0%)    — Case B: one isolated risk factor (HighBP), otherwise fit
+ *   D-003 Fadi Boutros (POSITIVE, 90.0%)     — Case C: multiple compounding risk factors
+ *   D-004 Rania Saad (POSITIVE, 29.3%)       — Case D: same healthy baseline as Dana + isolated HighBP —
+ *                                               deliberately borderline, just above the 0.275 clinical threshold
  */
 const mockPatients = {
   heart_disease: [
@@ -85,89 +88,23 @@ const mockPatients = {
   ],
 
   diabetes: [
-    // ── POSITIVE 1: SHAP dominated by HIGH BMI + HighBP + GenHlth ──
+    // ── Case A — clear negative baseline (verified: 23.6%, Negative) ──
+    // No risk factors present anywhere in the input: normal BMI, youngest
+    // age band, excellent self-rated health, active, non-smoker.
     {
       id: 'D-001',
-      name: 'Layla Mansour',
-      age: 58,
+      name: 'Dana Al-Amin',
+      age: 22,
       sex: 'F',
-      avatar: 'LM',
-      history: 'Type 2 Diabetes (8 yrs), Hypertension, Hyperlipidemia, Obesity (BMI 32.4)',
-      medications: 'Metformin 1000mg, Lisinopril 10mg, Atorvastatin 20mg',
-      admittingComplaint: 'Follow-up visit — elevated HbA1c and fasting glucose',
-      data: {
-        HighBP: 1,
-        HighChol: 1,
-        CholCheck: 1,
-        BMI: 32.4,
-        Smoker: 0,
-        Stroke: 0,
-        HeartDiseaseorAttack: 0,
-        PhysActivity: 0,
-        Fruits: 0,
-        Veggies: 0,
-        HvyAlcoholConsump: 0,
-        AnyHealthcare: 1,
-        NoDocbcCost: 0,
-        GenHlth: 3,
-        MentHlth: 12,
-        PhysHlth: 18,
-        DiffWalk: 1,
-        Sex: 0,
-        Age: 10,
-        Education: 3,
-        Income: 4,
-      },
-    },
-    // ── POSITIVE 2: SHAP dominated by GenHlth(Poor) + Smoker + HeartDiseaseorAttack ──
-    {
-      id: 'D-002',
-      name: 'Mohammed Al-Sayed',
-      age: 64,
-      sex: 'M',
-      avatar: 'MS',
-      history: 'Type 2 Diabetes (15 yrs), CAD s/p PCI, CKD Stage 3, Active smoker',
-      medications: 'Metformin 1000mg, Glipizide 10mg, Aspirin 81mg, Atorvastatin 40mg',
-      admittingComplaint: 'Chest discomfort and shortness of breath × 3 days',
-      data: {
-        HighBP: 1,
-        HighChol: 1,
-        CholCheck: 1,
-        BMI: 28.7,
-        Smoker: 1,
-        Stroke: 0,
-        HeartDiseaseorAttack: 1,
-        PhysActivity: 0,
-        Fruits: 1,
-        Veggies: 0,
-        HvyAlcoholConsump: 0,
-        AnyHealthcare: 1,
-        NoDocbcCost: 0,
-        GenHlth: 4,
-        MentHlth: 8,
-        PhysHlth: 22,
-        DiffWalk: 1,
-        Sex: 1,
-        Age: 11,
-        Education: 2,
-        Income: 3,
-      },
-    },
-    // ── NEGATIVE 1: SHAP dominated by strong protective features ──
-    {
-      id: 'D-003',
-      name: 'Nora Al-Mutairi',
-      age: 34,
-      sex: 'F',
-      avatar: 'NM',
-      history: 'No significant medical history, Non-smoker, Active lifestyle',
+      avatar: 'DA',
+      history: 'No significant medical history, non-smoker, physically active',
       medications: 'None',
       admittingComplaint: 'Routine annual check-up — no complaints',
       data: {
         HighBP: 0,
         HighChol: 0,
         CholCheck: 1,
-        BMI: 22.0,
+        BMI: 21,
         Smoker: 0,
         Stroke: 0,
         HeartDiseaseorAttack: 0,
@@ -178,45 +115,127 @@ const mockPatients = {
         AnyHealthcare: 1,
         NoDocbcCost: 0,
         GenHlth: 1,
-        MentHlth: 2,
+        MentHlth: 0,
         PhysHlth: 0,
         DiffWalk: 0,
         Sex: 0,
-        Age: 4,
-        Education: 6,
-        Income: 8,
+        Age: 1,
+        Education: 5,
+        Income: 6,
       },
     },
-    // ── NEGATIVE 2: SHAP mixed — borderline risk balanced by protective factors ──
+    // ── Case B — moderate positive (verified: 44.0%, Positive) ──
+    // Exactly one real risk factor (HighBP, newly found) against an
+    // otherwise fit, active, slightly-overweight profile — a "watch and
+    // treat" case rather than an alarming one.
     {
-      id: 'D-004',
-      name: 'Youssef Al-Farouk',
-      age: 52,
+      id: 'D-002',
+      name: 'Bilal Hourani',
+      age: 27,
       sex: 'M',
-      avatar: 'YF',
-      history: 'Pre-hypertension, Overweight (BMI 27.0), Moderate alcohol use, Physically active',
-      medications: 'None regular',
-      admittingComplaint: 'Occasional fatigue — wants bloodwork done',
+      avatar: 'BH',
+      history: 'Hypertension diagnosed this year, otherwise healthy, physically active',
+      medications: 'Amlodipine 5mg (started 2 months ago)',
+      admittingComplaint: 'Follow-up visit for newly diagnosed high blood pressure',
       data: {
-        HighBP: 0,
-        HighChol: 1,
+        HighBP: 1,
+        HighChol: 0,
         CholCheck: 1,
-        BMI: 27.0,
+        BMI: 27,
         Smoker: 0,
         Stroke: 0,
         HeartDiseaseorAttack: 0,
         PhysActivity: 1,
         Fruits: 1,
         Veggies: 1,
-        HvyAlcoholConsump: 1,
+        HvyAlcoholConsump: 0,
         AnyHealthcare: 1,
         NoDocbcCost: 0,
         GenHlth: 2,
-        MentHlth: 5,
-        PhysHlth: 4,
+        MentHlth: 0,
+        PhysHlth: 0,
         DiffWalk: 0,
         Sex: 1,
-        Age: 8,
+        Age: 2,
+        Education: 4,
+        Income: 5,
+      },
+    },
+    // ── Case C — strong positive (verified: 90.0%, Positive) ──
+    // Multiple compounding risk factors: obesity, hypertension,
+    // hyperlipidemia, active smoking, prior MI, poor self-rated health,
+    // and difficulty walking. Age band 11 = 70–74 (BRFSS coding).
+    {
+      id: 'D-003',
+      name: 'Fadi Boutros',
+      age: 72,
+      sex: 'M',
+      avatar: 'FB',
+      history: 'Type 2 Diabetes risk profile: prior MI, hypertension, hyperlipidemia, ' +
+        '40-yr smoking history, obesity (BMI 38), poor mobility',
+      medications: 'Lisinopril 20mg, Atorvastatin 40mg, Aspirin 81mg',
+      admittingComplaint: 'Chest discomfort on exertion, worsening fatigue, difficulty walking',
+      data: {
+        HighBP: 1,
+        HighChol: 1,
+        CholCheck: 1,
+        BMI: 38,
+        Smoker: 1,
+        Stroke: 0,
+        HeartDiseaseorAttack: 1,
+        PhysActivity: 0,
+        Fruits: 0,
+        Veggies: 0,
+        HvyAlcoholConsump: 0,
+        AnyHealthcare: 1,
+        NoDocbcCost: 0,
+        GenHlth: 5,
+        MentHlth: 5,
+        PhysHlth: 15,
+        DiffWalk: 1,
+        Sex: 1,
+        Age: 11,
+        Education: 3,
+        Income: 3,
+      },
+    },
+    // ── Case D — deliberately borderline (verified: 29.3%, Positive) ──
+    // Identical healthy baseline to Case A (Dana) with one isolated
+    // HighBP added — crosses the 0.275 clinical threshold by a narrow
+    // margin. Pairs with Case A to teach "one risk factor is sometimes
+    // just enough". NOTE: entropy at this probability (~0.87) sits just
+    // under the 0.88 active-learning review threshold, so this case does
+    // NOT get auto-queued for review despite being probability-borderline
+    // — a useful contrast to point out in a demo.
+    {
+      id: 'D-004',
+      name: 'Rania Saad',
+      age: 26,
+      sex: 'F',
+      avatar: 'RS',
+      history: 'Hypertension found at a routine visit, otherwise healthy and active',
+      medications: 'None yet — lifestyle modification advised',
+      admittingComplaint: 'Routine check-up flagged elevated blood pressure',
+      data: {
+        HighBP: 1,
+        HighChol: 0,
+        CholCheck: 1,
+        BMI: 21,
+        Smoker: 0,
+        Stroke: 0,
+        HeartDiseaseorAttack: 0,
+        PhysActivity: 1,
+        Fruits: 1,
+        Veggies: 1,
+        HvyAlcoholConsump: 0,
+        AnyHealthcare: 1,
+        NoDocbcCost: 0,
+        GenHlth: 1,
+        MentHlth: 0,
+        PhysHlth: 0,
+        DiffWalk: 0,
+        Sex: 0,
+        Age: 2,
         Education: 5,
         Income: 6,
       },

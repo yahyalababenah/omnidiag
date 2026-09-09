@@ -127,7 +127,7 @@ function ResultColumn({ label, result, loading, error, color, colorLight }) {
             {result.diagnosis ?? (isPositive ? 'Positive' : 'Negative')}
           </span>
         </div>
-        <p className="text-xs text-gray-500">Confidence</p>
+        <p className="text-xs text-gray-500">Risk Probability</p>
         <p className={`text-2xl font-black ${isPositive ? 'text-red-600' : 'text-green-600'}`}>{conf}%</p>
         <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
           <div
@@ -220,7 +220,7 @@ function ComparisonChart({ beforeResult, afterResult, beforeName, afterName }) {
       After:  Math.round(riskScore(afterResult) * 100),
     },
     {
-      name: 'Confidence',
+      name: 'Risk Probability',
       Before: Math.round((beforeResult.confidence ?? 0) * 100),
       After:  Math.round((afterResult.confidence ?? 0) * 100),
     },

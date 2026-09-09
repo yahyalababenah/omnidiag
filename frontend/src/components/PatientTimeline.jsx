@@ -43,7 +43,7 @@ function SparkTooltip({ active, payload, label }) {
     <div className="bg-white border border-clinical-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="text-gray-500 mb-0.5">{label}</p>
       <p className={`font-semibold ${p.value >= 0.5 ? 'text-red-600' : 'text-green-600'}`}>
-        Confidence: {Math.round(p.value * 100)}%
+        Risk Probability: {Math.round(p.value * 100)}%
       </p>
     </div>
   )
@@ -101,9 +101,9 @@ function PredictionCard({ prediction, index }) {
             </div>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-            {/* Confidence bar */}
+            {/* Risk probability bar */}
             <div className="hidden sm:block">
-              <p className="text-[10px] text-gray-500 text-right mb-0.5">Confidence {conf}%</p>
+              <p className="text-[10px] text-gray-500 text-right mb-0.5">Risk Probability {conf}%</p>
               <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full ${isPositive ? 'bg-red-500' : 'bg-green-500'}`}
@@ -221,7 +221,7 @@ function RiskTrendCard({ predictions }) {
           </LineChart>
         </ResponsiveContainer>
         <p className="text-[10px] text-gray-400 mt-2 text-center">
-          Risk score = model confidence toward positive prediction
+          Risk score = model risk probability toward positive prediction
         </p>
       </div>
     </div>

@@ -21,7 +21,7 @@ import { useDisease } from '../context/DiseaseContext'
 const BASE = '/api/v4'
 
 function downloadCsv(rows, disease) {
-  const headers = ['row', 'status', 'prediction', 'confidence', 'diagnosis', 'error']
+  const headers = ['row', 'status', 'prediction', 'risk_probability', 'diagnosis', 'error']
   const lines = [headers.join(',')]
   for (const r of rows) {
     lines.push([
@@ -120,7 +120,7 @@ function ResultsTable({ results }) {
         <table className="w-full text-xs">
           <thead className="bg-slate-50">
             <tr>
-              {['Row', 'Status', 'Prediction', 'Confidence', 'Diagnosis', 'Error'].map(h => (
+              {['Row', 'Status', 'Prediction', 'Risk Probability', 'Diagnosis', 'Error'].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-gray-500 font-medium uppercase tracking-wide text-[10px]">{h}</th>
               ))}
             </tr>

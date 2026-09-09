@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
   },
 
-  // ── Confidence bar ─────────────────────────────────────────────────────────
+  // ── Risk probability bar ──────────────────────────────────────────────────
   confLabel: { fontSize: 7, color: C.muted, marginBottom: 3 },
   confBarBg: { height: 6, backgroundColor: C.border, borderRadius: 3, width: 160 },
   confBarFill: { height: 6, borderRadius: 3 },
@@ -251,7 +251,7 @@ export default function PDFReport({
           <View style={styles.badgeRow}>
             <Text style={badgeStyle}>{diagnosisLabel}</Text>
             <View>
-              <Text style={styles.confLabel}>Model Confidence</Text>
+              <Text style={styles.confLabel}>Risk Probability</Text>
               <View style={styles.confBarBg}>
                 <View style={[styles.confBarFill, { width: `${confidence}%`, backgroundColor: barColor }]} />
               </View>

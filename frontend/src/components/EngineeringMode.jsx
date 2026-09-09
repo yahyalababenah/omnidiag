@@ -14,6 +14,8 @@ import DynamicClinicalForm from './DynamicClinicalForm';
 import ShapBarChart from './ShapBarChart';
 import WhatIfScenarioCard from './WhatIfScenarioCard';
 import ClinicalReportModal from './ClinicalReportModal';
+import ThresholdBar from './ThresholdBar';
+import { getDisplayThreshold } from '../constants/thresholds';
 
 export default function EngineeringMode() {
   const { selectedDisease, currentDiseaseInfo } = useDisease();
@@ -175,7 +177,10 @@ export default function EngineeringMode() {
                 </div>
               )}
 
-              {result && (
+              {result && (() => {
+                const displayThreshold = getDisplayThreshold(selectedDisease, result);
+                const thresholdPct = displayThreshold != null ? (displayThreshold * 100).toFixed(1) : null;
+                return (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Diagnosis</span>
@@ -188,11 +193,14 @@ export default function EngineeringMode() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Confidence</span>
+                    <span className="text-sm text-gray-600">
+                      Risk Probability{thresholdPct != null ? ` (threshold: ${thresholdPct}%)` : ''}
+                    </span>
                     <span className="text-sm font-mono font-semibold">
                       {(result.confidence * 100).toFixed(2)}%
                     </span>
                   </div>
+                  <ThresholdBar probability={result.confidence} threshold={displayThreshold} />
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Prediction</span>
                     <span className="text-sm font-mono font-semibold">
@@ -221,7 +229,8 @@ export default function EngineeringMode() {
                     </pre>
                   </details>
                 </div>
-              )}
+                );
+              })()}
             </div>
           </div>
 

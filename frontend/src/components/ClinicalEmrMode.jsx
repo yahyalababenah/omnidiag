@@ -32,6 +32,8 @@ import { useShapSnapshot } from '../hooks/useShapSnapshot';
 import PatientTimeline from './PatientTimeline';
 import ClinicalNotesInput from './ClinicalNotesInput';
 import ClinicalReportModal from './ClinicalReportModal';
+import ThresholdBar from './ThresholdBar';
+import { getDisplayThreshold } from '../constants/thresholds';
 
 /**
  * Clinical EMR Mode — Doctor's View
@@ -147,6 +149,8 @@ export default function ClinicalEmrMode() {
 
   const isPositive = result?.diagnosis === 'Positive';
   const confidencePct = result ? (result.confidence * 100).toFixed(1) : null;
+  const displayThreshold = result ? getDisplayThreshold(selectedDisease, result) : null;
+  const thresholdPct = displayThreshold != null ? (displayThreshold * 100).toFixed(1) : null;
 
   // ── Derive a status for a patient data field ──
   const getFieldStatus = (fieldName, value) => {
@@ -504,7 +508,7 @@ export default function ClinicalEmrMode() {
 
                 {result && !error && (
                   <div className="space-y-6">
-                    {/* Diagnosis badge + confidence */}
+                    {/* Diagnosis badge + risk probability */}
                     <div className="flex items-center justify-between p-4 rounded-lg border" style={{
                       backgroundColor: isPositive ? '#fef2f2' : '#f0fdf4',
                       borderColor: isPositive ? '#fecaca' : '#bbf7d0',
@@ -532,14 +536,19 @@ export default function ClinicalEmrMode() {
                         <span className={isPositive ? 'badge-positive text-base' : 'badge-negative text-base'}>
                           {confidencePct}%
                         </span>
-                        <p className="text-xs text-gray-500 mt-1">Confidence</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Risk Probability{thresholdPct != null ? ` (threshold: ${thresholdPct}%)` : ''}
+                        </p>
                       </div>
                     </div>
+
+                    {/* Probability vs. threshold bar */}
+                    <ThresholdBar probability={result.confidence} threshold={displayThreshold} />
 
                     {/* Key metrics row */}
                     <div className="grid grid-cols-3 gap-4">
                       <MetricBox label="Prediction" value={result.prediction === 1 ? 'Positive' : 'Negative'} color={isPositive ? 'red' : 'green'} />
-                      <MetricBox label="Confidence" value={`${confidencePct}%`} color="blue" />
+                      <MetricBox label="Risk Probability" value={`${confidencePct}%`} color="blue" />
                       <MetricBox label="SHAP Base Value" value={shapData?.base_value?.toFixed(4) || '\u2014'} color="gray" />
                     </div>
                   </div>
