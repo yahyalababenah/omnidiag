@@ -18,8 +18,13 @@ import MedicalTooltip from './MedicalTooltip';
  * - If the patient is truly negative (prediction=0), counterfactuals are irrelevant → show green card.
  * - If the patient is positive (prediction=1), ALWAYS show actionable scenarios (real or mock).
  * - Never let a missing/empty counterfactuals array suppress the What-If UI for a positive case.
+ *
+ * Real backend scenario shape (POST /api/v4/{disease}/counterfactuals):
+ *   { scenario_id, probability, changes: [{ feature, original_value, counterfactual_value, direction }] }
+ * `baselineProbability` (the request's `baseline_probability`) is required to turn a scenario's
+ * `probability` into a risk-reduction percentage; pass it whenever available.
  */
-export default function WhatIfScenarioCard({ counterfactuals, loading, prediction }) {
+export default function WhatIfScenarioCard({ counterfactuals, loading, prediction, baselineProbability }) {
   /* ── Mock placeholder data (fallback when API unavailable) ── */
   const mockScenarios = [
     {
@@ -116,13 +121,16 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
 
   /**
    * Extract the risk-reduction percentage from both data formats:
-   * - Mock:  s.riskReduction  (number, e.g. 44)
-   * - Backend: s.risk_reduction (string, e.g. "44%")
+   * - Mock:    s.riskReduction (number, e.g. 44)
+   * - Backend: derived from (baselineProbability - s.probability), since the API
+   *   returns absolute post-intervention probabilities, not a precomputed percentage.
+   *   Falls back to 0 when baselineProbability wasn't passed in.
    */
   const getReductionPct = (s) => {
     if (typeof s.riskReduction === 'number') return s.riskReduction;
-    if (typeof s.risk_reduction === 'string')
-      return parseInt(s.risk_reduction, 10) || 0;
+    if (typeof s.probability === 'number' && typeof baselineProbability === 'number') {
+      return Math.round((baselineProbability - s.probability) * 100);
+    }
     return 0;
   };
 
@@ -155,7 +163,7 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
         </p>
 
         {scenarios.map((s, idx) => {
-          const isBackendFormat = s.scenario !== undefined;
+          const isBackendFormat = s.scenario_id !== undefined;
           const reductionPct = getReductionPct(s);
           const isHighImpact = reductionPct >= 30;
 
@@ -218,15 +226,10 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
             );
           }
 
-          /* ── Backend format: multi-feature counterfactual scenario ── */
-          const featureNames = Object.keys(s.changes || {}).join(', ');
-          const feasibility = s.feasibility || null;
-          const feasibilityColor =
-            feasibility === 'high'
-              ? 'text-green-600 bg-green-100'
-              : feasibility === 'medium'
-                ? 'text-amber-600 bg-amber-100'
-                : 'text-red-600 bg-red-100';
+          /* ── Backend format: multi-feature counterfactual scenario ──
+             s.changes is an array of { feature, original_value, counterfactual_value, direction } */
+          const changes = s.changes || [];
+          const featureNames = changes.map((c) => c.feature).join(', ');
 
           return (
             <div
@@ -241,7 +244,7 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <TrendingDown className="w-4 h-4 text-green-500 shrink-0" />
-                    <MedicalTooltip term={featureNames.split(', ')[0]}>
+                    <MedicalTooltip term={changes[0]?.feature}>
                       <span className="text-sm font-semibold text-gray-800">
                         {featureNames}
                       </span>
@@ -251,23 +254,26 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
                         High Impact
                       </span>
                     )}
-                    {feasibility && (
-                      <span
-                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${feasibilityColor}`}
-                      >
-                        {feasibility.charAt(0).toUpperCase() +
-                          feasibility.slice(1)}{' '}
-                        Feasibility
-                      </span>
-                    )}
                   </div>
-                  <p className="text-sm text-gray-700 mt-1">{s.scenario}</p>
-                  {s.new_probability !== undefined && (
+                  <p className="text-sm text-gray-700 mt-1">
+                    {changes.map((c, i) => (
+                      <span key={c.feature ?? i}>
+                        {i > 0 && ', '}
+                        <strong className="text-gray-900">{c.feature}</strong>{' '}
+                        <span className="text-red-600 font-semibold">
+                          {String(c.original_value)}
+                        </span>
+                        {' → '}
+                        <span className="text-green-600 font-semibold">
+                          {String(c.counterfactual_value)}
+                        </span>
+                      </span>
+                    ))}
+                  </p>
+                  {typeof s.probability === 'number' && (
                     <p className="text-xs text-gray-500 mt-1">
                       Post-intervention probability:{' '}
-                      <strong>
-                        {(s.new_probability * 100).toFixed(1)}%
-                      </strong>
+                      <strong>{(s.probability * 100).toFixed(1)}%</strong>
                     </p>
                   )}
                 </div>

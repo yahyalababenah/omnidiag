@@ -130,13 +130,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   tableCell: { fontSize: 8, color: C.primary },
-  feasBadge: {
-    fontSize: 7,
-    fontFamily: 'Helvetica-Bold',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
 
   // ── Footer ─────────────────────────────────────────────────────────────────
   footer: {
@@ -173,12 +166,6 @@ function LabelValue({ label, value }) {
   )
 }
 
-function feasColor(f) {
-  if (f === 'high')   return { backgroundColor: '#dcfce7', color: '#15803d' }
-  if (f === 'medium') return { backgroundColor: '#fef9c3', color: '#a16207' }
-  return                       { backgroundColor: '#fee2e2', color: '#b91c1c' }
-}
-
 // ── Main PDF document ─────────────────────────────────────────────────────────
 
 export default function PDFReport({
@@ -187,6 +174,7 @@ export default function PDFReport({
   result,
   shapText,
   counterfactuals,
+  counterfactualsBaseline,
   shapImageUrl,
   doctorName,
   clinicName,
@@ -200,7 +188,17 @@ export default function PDFReport({
     : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
   const barColor = isPositive ? C.positive : C.negative
 
-  const cfs = (counterfactuals ?? []).slice(0, 3)
+  // Real API shape: { scenario_id, probability, changes: [{ feature, original_value, counterfactual_value }] }.
+  // Risk reduction is derived from (baseline - scenario probability); scenario text is built from `changes`.
+  const cfs = (counterfactuals ?? []).slice(0, 3).map((cf) => ({
+    scenarioText: (cf.changes ?? [])
+      .map((c) => `${c.feature}: ${c.original_value} → ${c.counterfactual_value}`)
+      .join('; '),
+    riskReductionPct:
+      typeof cf.probability === 'number' && typeof counterfactualsBaseline === 'number'
+        ? Math.round((counterfactualsBaseline - cf.probability) * 100)
+        : null,
+  }))
   const dateStr = reportDate ?? new Date().toLocaleDateString('en-GB')
 
   return (
@@ -281,17 +279,13 @@ export default function PDFReport({
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderCell, { flex: 3 }]}>Scenario</Text>
                 <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Risk Reduction</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Feasibility</Text>
               </View>
               {cfs.map((cf, i) => (
                 <View key={i} style={[styles.tableRow, i === cfs.length - 1 && { borderBottomWidth: 0 }]}>
-                  <Text style={[styles.tableCell, { flex: 3 }]}>{cf.scenario}</Text>
-                  <Text style={[styles.tableCell, { flex: 1 }]}>{cf.risk_reduction}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.feasBadge, feasColor(cf.feasibility)]}>
-                      {cf.feasibility?.toUpperCase()}
-                    </Text>
-                  </View>
+                  <Text style={[styles.tableCell, { flex: 3 }]}>{cf.scenarioText || '—'}</Text>
+                  <Text style={[styles.tableCell, { flex: 1 }]}>
+                    {cf.riskReductionPct !== null ? `-${cf.riskReductionPct}%` : '—'}
+                  </Text>
                 </View>
               ))}
             </View>

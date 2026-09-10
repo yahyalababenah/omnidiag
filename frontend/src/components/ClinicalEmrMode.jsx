@@ -64,6 +64,7 @@ export default function ClinicalEmrMode() {
   const [result, setResult] = useState(null);
   const [shapData, setShapData] = useState(null);
   const [counterfactualsData, setCounterfactualsData] = useState(null);
+  const [counterfactualsBaseline, setCounterfactualsBaseline] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -106,6 +107,7 @@ export default function ClinicalEmrMode() {
     setResult(null);
     setShapData(null);
     setCounterfactualsData(null);
+    setCounterfactualsBaseline(null);
 
     try {
       const [pred, expl] = await Promise.all([
@@ -125,11 +127,14 @@ export default function ClinicalEmrMode() {
       try {
         const cfResponse = await api.counterfactuals(selectedDisease, patient.data);
         setCounterfactualsData(cfResponse?.counterfactuals ?? null);
+        setCounterfactualsBaseline(cfResponse?.baseline_probability ?? null);
       } catch {
         setCounterfactualsData(null);
+        setCounterfactualsBaseline(null);
       }
     } else {
       setCounterfactualsData(null);
+      setCounterfactualsBaseline(null);
     }
     setLoading(false);
     setCounterfactualsLoading(false);
@@ -217,7 +222,8 @@ export default function ClinicalEmrMode() {
           disease={selectedDisease}
           result={result}
           shapText={shapData?.text_explanation}
-          counterfactuals={counterfactualsData?.counterfactuals}
+          counterfactuals={counterfactualsData}
+          counterfactualsBaseline={counterfactualsBaseline}
           shapImageUrl={imgUrl}
           reportDate={new Date().toLocaleDateString('en-GB')}
         />
@@ -623,6 +629,7 @@ export default function ClinicalEmrMode() {
                   <div className="mt-6">
                     <WhatIfScenarioCard
                       counterfactuals={counterfactualsData}
+                      baselineProbability={counterfactualsBaseline}
                       loading={counterfactualsLoading}
                       prediction={result?.prediction}
                     />
