@@ -25,6 +25,7 @@ export default function EngineeringMode() {
   const [result, setResult] = useState(null);
   const [shapData, setShapData] = useState(null);
   const [counterfactualsData, setCounterfactualsData] = useState(null);
+  const [counterfactualsBaseline, setCounterfactualsBaseline] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [lastFormData, setLastFormData] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -52,6 +53,7 @@ export default function EngineeringMode() {
     setResult(null);
     setShapData(null);
     setCounterfactualsData(null);
+    setCounterfactualsBaseline(null);
     setLastFormData(formData);
 
     try {
@@ -72,11 +74,14 @@ export default function EngineeringMode() {
       try {
         const cfResponse = await api.counterfactuals(selectedDisease, formData);
         setCounterfactualsData(cfResponse?.counterfactuals ?? null);
+        setCounterfactualsBaseline(cfResponse?.baseline_probability ?? null);
       } catch {
         setCounterfactualsData(null);
+        setCounterfactualsBaseline(null);
       }
     } else {
       setCounterfactualsData(null);
+      setCounterfactualsBaseline(null);
     }
     setLoading(false);
     setCounterfactualsLoading(false);
@@ -253,6 +258,7 @@ export default function EngineeringMode() {
                 <div className="mt-6">
                   <WhatIfScenarioCard
                     counterfactuals={counterfactualsData}
+                    baselineProbability={counterfactualsBaseline}
                     loading={counterfactualsLoading}
                     prediction={result?.prediction}
                   />
