@@ -81,6 +81,14 @@ def predict_cache_key(disease: str, patient_data: dict) -> str:
     return _make_key("predict", disease, fingerprint)
 
 
+def counterfactuals_cache_key(disease: str, patient_data: dict) -> str:
+    """Deterministic cache key for a counterfactuals request."""
+    fingerprint = hashlib.sha256(
+        json.dumps({"disease": disease, "data": patient_data}, sort_keys=True).encode()
+    ).hexdigest()[:16]
+    return _make_key("counterfactuals", disease, fingerprint)
+
+
 def schema_cache_key(disease: str) -> str:
     return _make_key("schema", disease)
 

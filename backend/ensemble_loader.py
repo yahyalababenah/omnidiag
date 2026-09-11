@@ -438,7 +438,7 @@ class EnsembleModelLoader:
             pipeline_fn=pipeline_fn,
             feature_names=feature_names,
             raw_feature_names=raw_feature_names,
-            n_samples=500,
+            n_samples=100,
             n_counterfactuals=3,
             random_state=42,
             inference_threshold=self._inference_threshold,

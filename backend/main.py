@@ -55,7 +55,7 @@ from backend.admin.routes import router as admin_router
 from backend.patients.routes import router as patients_router
 from backend.auth.rbac import require_role, CLINICAL_ROLES
 from backend.auth.dependencies import get_current_active_user, get_optional_user
-from backend.cache import init_cache, cache_get, cache_set, predict_cache_key, schema_cache_key
+from backend.cache import init_cache, cache_get, cache_set, predict_cache_key, schema_cache_key, counterfactuals_cache_key
 from backend.database import get_db, engine, AsyncSessionLocal, Base
 from backend.db_models.prediction import Prediction
 from backend.db_models.user import User
@@ -495,17 +495,30 @@ async def counterfactuals_disease(
     request: Request,
     disease: str,
     patient: dict,
+    response: Response,
     _user: Optional[User] = Depends(get_optional_user),
 ):
     """
     توليد سيناريوهات "ماذا لو" لتقليل المخاطر. يعمل بدون تسجيل دخول.
+
+    النتائج مؤقتة في الكاش لـ 60 دقيقة — التوليد مكلف (استدلال متكرر)
+    والمخرجات ثابتة لنفس المدخلات.
     """
     try:
         patient_data = _validate_patient_input(disease, patient)
 
+        cache_key = counterfactuals_cache_key(disease, patient_data)
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            response.headers["Cache-Hit"] = "true"
+            return cached
+
         _cf_log.debug(f"Counterfactuals request for disease={disease}")
         result = router.counterfactuals(disease, patient_data)
         _cf_log.debug(f"Counterfactuals completed: status={result.get('status')}")
+
+        await cache_set(cache_key, result, ttl=3600)
+        response.headers["Cache-Hit"] = "false"
         return result
     except HTTPException:
         raise

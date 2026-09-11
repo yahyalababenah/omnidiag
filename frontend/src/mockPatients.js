@@ -11,12 +11,24 @@
  * are actual production output, not estimates):
  *   D-001 Noor Sabbagh (NEGATIVE, 9.6%)         — Case A: no real risk factors, healthy baseline
  *   D-002 Karim Yaghi (POSITIVE, 43.2%)         — Case B: one risk factor (HighBP) + fair self-rated health
- *   D-003 Samir Abu-Ghazaleh (POSITIVE, 85.8%)  — Case C: multiple compounding risk factors
+ *   D-003 Samir Abu-Ghazaleh (POSITIVE, 86.5%)  — Case C: severe but fully mutable risk profile
+ *                                                  (obesity, hypertension, hyperlipidemia, active
+ *                                                  smoking, sedentary, poor GenHlth/PhysHlth, DiffWalk)
  *   D-004 Hala Mansour (POSITIVE, 33.8%)        — Case D: hypertension only, otherwise clean —
  *                                                  deliberately borderline, comfortably above the 0.275
  *                                                  clinical threshold (not flush against it — LightGBM's
  *                                                  output varies slightly by inference environment, so a
  *                                                  case placed right at the edge could flip sides)
+ *
+ * Case C note: HeartDiseaseorAttack and Stroke are deliberately 0 (Negative).
+ * Both are IMMUTABLE_FEATURES in counterfactual_generator.py — the What-If
+ * engine never proposes changing past medical history — so a patient whose
+ * severity depends on either one is structurally unreachable: no combination
+ * of the remaining mutable features (BMI, HighBP, HighChol, Smoker,
+ * PhysActivity, GenHlth, MentHlth, PhysHlth, DiffWalk) can flip the
+ * prediction, and the endpoint returns zero valid scenarios no matter how
+ * large n_samples is. Case C's severity comes entirely from mutable factors
+ * instead, so What-If has real, actionable ground to work with.
  */
 const mockPatients = {
   heart_disease: [
@@ -166,40 +178,44 @@ const mockPatients = {
         Income: 6,
       },
     },
-    // ── Case C — strong positive (verified live on Space: 85.8%, Positive) ──
-    // Multiple compounding risk factors: obesity, hypertension, hyperlipidemia,
-    // active smoking, prior MI, poor self-rated health, and difficulty walking.
-    // Age band 10 = 65–69 (BRFSS coding).
+    // ── Case C — strong positive (verified live on Space: 86.5%, Positive) ──
+    // Severity comes entirely from mutable risk factors: obesity (BMI 38),
+    // hypertension, hyperlipidemia, active smoking, sedentary lifestyle, poor
+    // self-rated general health, heavy physical-health burden (25 unwell
+    // days/month), and difficulty walking. No prior MI/stroke — see the
+    // "Case C note" at the top of this file for why that matters for What-If.
+    // Age band 9 = 60–64 (BRFSS coding).
     {
       id: 'D-003',
       name: 'Samir Abu-Ghazaleh',
-      age: 67,
+      age: 62,
       sex: 'M',
       avatar: 'SA',
-      history: 'Type 2 Diabetes risk profile: prior MI, hypertension, hyperlipidemia, ' +
-        'active smoker, obesity (BMI 35), poor mobility, multiple unwell days',
-      medications: 'Amlodipine 10mg, Rosuvastatin 20mg, Aspirin 81mg',
+      history: 'Type 2 Diabetes risk profile: obesity (BMI 38), hypertension, ' +
+        'hyperlipidemia, active smoker, sedentary lifestyle, poor general health, ' +
+        'significant physical-health burden, poor mobility',
+      medications: 'Amlodipine 10mg, Rosuvastatin 20mg',
       admittingComplaint: 'Fatigue and difficulty walking, worsening over recent weeks',
       data: {
         HighBP: 1,
         HighChol: 1,
         CholCheck: 1,
-        BMI: 35,
+        BMI: 38,
         Smoker: 1,
         Stroke: 0,
-        HeartDiseaseorAttack: 1,
+        HeartDiseaseorAttack: 0,
         PhysActivity: 0,
         Fruits: 0,
-        Veggies: 1,
+        Veggies: 0,
         HvyAlcoholConsump: 0,
         AnyHealthcare: 1,
         NoDocbcCost: 0,
-        GenHlth: 4,
-        MentHlth: 3,
-        PhysHlth: 10,
+        GenHlth: 5,
+        MentHlth: 20,
+        PhysHlth: 25,
         DiffWalk: 1,
         Sex: 1,
-        Age: 10,
+        Age: 9,
         Education: 4,
         Income: 4,
       },

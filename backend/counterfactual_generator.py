@@ -115,6 +115,8 @@ DIRECTIONAL_CONSTRAINTS: Dict[str, Set[int]] = {
     "Fruits": {1},              # Only allow adopting fruit intake, never dropping
     "PhysActivity": {1},        # Only allow adopting physical activity, never dropping
     "DiffWalk": {0},            # Never advise decreasing mobility (0→1 forbidden)
+    "HighBP": {0},              # Only allow resolving high blood pressure, never inducing it
+    "HighChol": {0},            # Only allow resolving high cholesterol, never inducing it
 }
 
 
