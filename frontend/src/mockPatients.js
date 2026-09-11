@@ -11,7 +11,7 @@
  * are actual production output, not estimates):
  *   D-001 Noor Sabbagh (NEGATIVE, 9.6%)         — Case A: no real risk factors, healthy baseline
  *   D-002 Karim Yaghi (POSITIVE, 43.2%)         — Case B: one risk factor (HighBP) + fair self-rated health
- *   D-003 Samir Abu-Ghazaleh (POSITIVE, 81.1%)  — Case C: severe but fully mutable risk profile
+ *   D-003 Samir Abu-Ghazaleh (POSITIVE, 75.8%)  — Case C: severe but fully mutable risk profile
  *                                                  (obesity, hypertension, hyperlipidemia, active
  *                                                  smoking, sedentary, fair GenHlth, DiffWalk)
  *   D-004 Hala Mansour (POSITIVE, 33.8%)        — Case D: hypertension only, otherwise clean —
@@ -29,6 +29,19 @@
  * prediction, and the endpoint returns zero valid scenarios no matter how
  * large n_samples is. Case C's severity comes entirely from mutable factors
  * instead, so What-If has real, actionable ground to work with.
+ *
+ * Case C stability caveat: the number of valid counterfactuals returned for
+ * this patient has been observed to vary between 1 and 3 across different
+ * container builds of the live Space, with the *baseline* confidence
+ * (75.8%) identical bit-for-bit every time. The cause is inference jitter
+ * (floating-point, likely multi-threaded XGBoost/LightGBM/RandomForest) that
+ * is not controlled by CounterfactualGenerator's fixed random_state=42 — a
+ * borderline candidate can land a hair on either side of the 0.275 decision
+ * threshold depending on the container instance, even for identical input.
+ * This patient was pushed as low-severity as practical to minimize that
+ * risk, but it cannot be eliminated by patient-data tuning alone; a true
+ * fix would require either ensembling/averaging repeated model calls inside
+ * the generator or pinning single-threaded, deterministic inference.
  */
 const mockPatients = {
   heart_disease: [
@@ -178,15 +191,22 @@ const mockPatients = {
         Income: 6,
       },
     },
-    // ── Case C — strong positive (verified live on Space: 81.1%, Positive) ──
-    // Severity comes entirely from mutable risk factors: obesity (BMI 34),
+    // ── Case C — strong positive (verified live on Space: 75.8%, Positive) ──
+    // Severity comes entirely from mutable risk factors: obesity (BMI 33),
     // hypertension, hyperlipidemia, active smoking, sedentary lifestyle,
     // fair self-rated general health, and difficulty walking. No prior
     // MI/stroke — see the "Case C note" at the top of this file for why
-    // that matters for What-If. Tuned down from an earlier BMI-38/severe
-    // draft that landed at 86.5% but gave 0/3 valid counterfactuals on the
-    // live Space at n_samples=100 (too extreme to flip); this profile was
-    // verified live to give 3/3.
+    // that matters for What-If.
+    //
+    // Tuning history: an earlier BMI-38 draft (86.5%) gave 0/3 valid
+    // counterfactuals (too extreme to flip at n_samples=100); a BMI-34 draft
+    // (81.1%) gave 3/3 on one deterministic live call but only 1/3 after
+    // the next container rebuild, with the baseline confidence identical
+    // bit-for-bit both times — see the "Case C stability caveat" at the top
+    // of this file. This BMI-33 profile was pushed as low-severity as
+    // practical to sit further from the 0.275 threshold, but per that
+    // caveat, the same 1-to-3 variance cannot be ruled out here either —
+    // it was observed to give 3/3 on its one live test.
     // Age band 9 = 60–64 (BRFSS coding).
     {
       id: 'D-003',
@@ -194,7 +214,7 @@ const mockPatients = {
       age: 62,
       sex: 'M',
       avatar: 'SA',
-      history: 'Type 2 Diabetes risk profile: obesity (BMI 34), hypertension, ' +
+      history: 'Type 2 Diabetes risk profile: obesity (BMI 33), hypertension, ' +
         'hyperlipidemia, active smoker, sedentary lifestyle, fair general health, ' +
         'poor mobility',
       medications: 'Amlodipine 10mg, Rosuvastatin 20mg',
@@ -203,7 +223,7 @@ const mockPatients = {
         HighBP: 1,
         HighChol: 1,
         CholCheck: 1,
-        BMI: 34,
+        BMI: 33,
         Smoker: 1,
         Stroke: 0,
         HeartDiseaseorAttack: 0,
@@ -214,8 +234,8 @@ const mockPatients = {
         AnyHealthcare: 1,
         NoDocbcCost: 0,
         GenHlth: 4,
-        MentHlth: 7,
-        PhysHlth: 14,
+        MentHlth: 5,
+        PhysHlth: 12,
         DiffWalk: 1,
         Sex: 1,
         Age: 9,
