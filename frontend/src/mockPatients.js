@@ -5,14 +5,18 @@
  * Each patient has realistic vitals/data matching the disease's schema fields,
  * plus clinical meta-fields (history, medications, admittingComplaint).
  *
- * Diabetes profiles (4 total — the A/B/C/D demo set, verified live against
- * EnsembleModelLoader.predict()/.explain() so the printed probabilities
- * below are actual model output, not estimates):
- *   D-001 Dana Al-Amin (NEGATIVE, 23.6%)     — Case A: no risk factors, healthy baseline
- *   D-002 Bilal Hourani (POSITIVE, 44.0%)    — Case B: one isolated risk factor (HighBP), otherwise fit
- *   D-003 Fadi Boutros (POSITIVE, 90.0%)     — Case C: multiple compounding risk factors
- *   D-004 Rania Saad (POSITIVE, 29.3%)       — Case D: same healthy baseline as Dana + isolated HighBP —
- *                                               deliberately borderline, just above the 0.275 clinical threshold
+ * Diabetes profiles (4 total — the A/B/C/D demo set, regenerated 2026-09-11
+ * after the ensemble-model-mismatch fix; verified live against the deployed
+ * Space's EnsembleModelLoader.predict(), so the printed probabilities below
+ * are actual production output, not estimates):
+ *   D-001 Noor Sabbagh (NEGATIVE, 9.6%)         — Case A: no real risk factors, healthy baseline
+ *   D-002 Karim Yaghi (POSITIVE, 43.2%)         — Case B: one risk factor (HighBP) + fair self-rated health
+ *   D-003 Samir Abu-Ghazaleh (POSITIVE, 85.8%)  — Case C: multiple compounding risk factors
+ *   D-004 Hala Mansour (POSITIVE, 33.8%)        — Case D: hypertension only, otherwise clean —
+ *                                                  deliberately borderline, comfortably above the 0.275
+ *                                                  clinical threshold (not flush against it — LightGBM's
+ *                                                  output varies slightly by inference environment, so a
+ *                                                  case placed right at the edge could flip sides)
  */
 const mockPatients = {
   heart_disease: [
@@ -88,15 +92,16 @@ const mockPatients = {
   ],
 
   diabetes: [
-    // ── Case A — clear negative baseline (verified: 23.6%, Negative) ──
-    // No risk factors present anywhere in the input: normal BMI, youngest
-    // age band, excellent self-rated health, active, non-smoker.
+    // ── Case A — clear negative baseline (verified live on Space: 9.6%, Negative) ──
+    // No real risk factors: no hypertension, no high cholesterol, normal BMI,
+    // good self-rated health, active, non-smoker. Regenerated 2026-09-11 after
+    // the ensemble-model-mismatch fix (see mockPatients.js history).
     {
       id: 'D-001',
-      name: 'Dana Al-Amin',
-      age: 22,
+      name: 'Noor Sabbagh',
+      age: 37,
       sex: 'F',
-      avatar: 'DA',
+      avatar: 'NS',
       history: 'No significant medical history, non-smoker, physically active',
       medications: 'None',
       admittingComplaint: 'Routine annual check-up — no complaints',
@@ -104,44 +109,7 @@ const mockPatients = {
         HighBP: 0,
         HighChol: 0,
         CholCheck: 1,
-        BMI: 21,
-        Smoker: 0,
-        Stroke: 0,
-        HeartDiseaseorAttack: 0,
-        PhysActivity: 1,
-        Fruits: 1,
-        Veggies: 1,
-        HvyAlcoholConsump: 0,
-        AnyHealthcare: 1,
-        NoDocbcCost: 0,
-        GenHlth: 1,
-        MentHlth: 0,
-        PhysHlth: 0,
-        DiffWalk: 0,
-        Sex: 0,
-        Age: 1,
-        Education: 5,
-        Income: 6,
-      },
-    },
-    // ── Case B — moderate positive (verified: 44.0%, Positive) ──
-    // Exactly one real risk factor (HighBP, newly found) against an
-    // otherwise fit, active, slightly-overweight profile — a "watch and
-    // treat" case rather than an alarming one.
-    {
-      id: 'D-002',
-      name: 'Bilal Hourani',
-      age: 27,
-      sex: 'M',
-      avatar: 'BH',
-      history: 'Hypertension diagnosed this year, otherwise healthy, physically active',
-      medications: 'Amlodipine 5mg (started 2 months ago)',
-      admittingComplaint: 'Follow-up visit for newly diagnosed high blood pressure',
-      data: {
-        HighBP: 1,
-        HighChol: 0,
-        CholCheck: 1,
-        BMI: 27,
+        BMI: 24,
         Smoker: 0,
         Stroke: 0,
         HeartDiseaseorAttack: 0,
@@ -155,72 +123,30 @@ const mockPatients = {
         MentHlth: 0,
         PhysHlth: 0,
         DiffWalk: 0,
-        Sex: 1,
-        Age: 2,
-        Education: 4,
-        Income: 5,
+        Sex: 0,
+        Age: 4,
+        Education: 6,
+        Income: 7,
       },
     },
-    // ── Case C — strong positive (verified: 90.0%, Positive) ──
-    // Multiple compounding risk factors: obesity, hypertension,
-    // hyperlipidemia, active smoking, prior MI, poor self-rated health,
-    // and difficulty walking. Age band 11 = 70–74 (BRFSS coding).
+    // ── Case B — moderate positive (verified live on Space: 43.2%, Positive) ──
+    // One real risk factor (hypertension) plus only fair self-rated health and
+    // a couple of recent unwell days — a "watch and treat" case rather than an
+    // alarming one. No cholesterol issue and otherwise active.
     {
-      id: 'D-003',
-      name: 'Fadi Boutros',
-      age: 72,
+      id: 'D-002',
+      name: 'Karim Yaghi',
+      age: 48,
       sex: 'M',
-      avatar: 'FB',
-      history: 'Type 2 Diabetes risk profile: prior MI, hypertension, hyperlipidemia, ' +
-        '40-yr smoking history, obesity (BMI 38), poor mobility',
-      medications: 'Lisinopril 20mg, Atorvastatin 40mg, Aspirin 81mg',
-      admittingComplaint: 'Chest discomfort on exertion, worsening fatigue, difficulty walking',
-      data: {
-        HighBP: 1,
-        HighChol: 1,
-        CholCheck: 1,
-        BMI: 38,
-        Smoker: 1,
-        Stroke: 0,
-        HeartDiseaseorAttack: 1,
-        PhysActivity: 0,
-        Fruits: 0,
-        Veggies: 0,
-        HvyAlcoholConsump: 0,
-        AnyHealthcare: 1,
-        NoDocbcCost: 0,
-        GenHlth: 5,
-        MentHlth: 5,
-        PhysHlth: 15,
-        DiffWalk: 1,
-        Sex: 1,
-        Age: 11,
-        Education: 3,
-        Income: 3,
-      },
-    },
-    // ── Case D — deliberately borderline (verified: 29.3%, Positive) ──
-    // Identical healthy baseline to Case A (Dana) with one isolated
-    // HighBP added — crosses the 0.275 clinical threshold by a narrow
-    // margin. Pairs with Case A to teach "one risk factor is sometimes
-    // just enough". NOTE: entropy at this probability (~0.87) sits just
-    // under the 0.88 active-learning review threshold, so this case does
-    // NOT get auto-queued for review despite being probability-borderline
-    // — a useful contrast to point out in a demo.
-    {
-      id: 'D-004',
-      name: 'Rania Saad',
-      age: 26,
-      sex: 'F',
-      avatar: 'RS',
-      history: 'Hypertension found at a routine visit, otherwise healthy and active',
-      medications: 'None yet — lifestyle modification advised',
-      admittingComplaint: 'Routine check-up flagged elevated blood pressure',
+      avatar: 'KY',
+      history: 'Hypertension diagnosed two years ago, otherwise active, fair general health',
+      medications: 'Losartan 50mg',
+      admittingComplaint: 'Follow-up visit for blood pressure management',
       data: {
         HighBP: 1,
         HighChol: 0,
         CholCheck: 1,
-        BMI: 21,
+        BMI: 29,
         Smoker: 0,
         Stroke: 0,
         HeartDiseaseorAttack: 0,
@@ -230,12 +156,91 @@ const mockPatients = {
         HvyAlcoholConsump: 0,
         AnyHealthcare: 1,
         NoDocbcCost: 0,
-        GenHlth: 1,
+        GenHlth: 3,
+        MentHlth: 0,
+        PhysHlth: 2,
+        DiffWalk: 0,
+        Sex: 1,
+        Age: 6,
+        Education: 5,
+        Income: 6,
+      },
+    },
+    // ── Case C — strong positive (verified live on Space: 85.8%, Positive) ──
+    // Multiple compounding risk factors: obesity, hypertension, hyperlipidemia,
+    // active smoking, prior MI, poor self-rated health, and difficulty walking.
+    // Age band 10 = 65–69 (BRFSS coding).
+    {
+      id: 'D-003',
+      name: 'Samir Abu-Ghazaleh',
+      age: 67,
+      sex: 'M',
+      avatar: 'SA',
+      history: 'Type 2 Diabetes risk profile: prior MI, hypertension, hyperlipidemia, ' +
+        'active smoker, obesity (BMI 35), poor mobility, multiple unwell days',
+      medications: 'Amlodipine 10mg, Rosuvastatin 20mg, Aspirin 81mg',
+      admittingComplaint: 'Fatigue and difficulty walking, worsening over recent weeks',
+      data: {
+        HighBP: 1,
+        HighChol: 1,
+        CholCheck: 1,
+        BMI: 35,
+        Smoker: 1,
+        Stroke: 0,
+        HeartDiseaseorAttack: 1,
+        PhysActivity: 0,
+        Fruits: 0,
+        Veggies: 1,
+        HvyAlcoholConsump: 0,
+        AnyHealthcare: 1,
+        NoDocbcCost: 0,
+        GenHlth: 4,
+        MentHlth: 3,
+        PhysHlth: 10,
+        DiffWalk: 1,
+        Sex: 1,
+        Age: 10,
+        Education: 4,
+        Income: 4,
+      },
+    },
+    // ── Case D — deliberately borderline (verified live on Space: 33.8%, Positive) ──
+    // Hypertension only, everything else clean: no high cholesterol, active,
+    // good diet, normal-to-mildly-elevated BMI. Lands comfortably above the
+    // 0.275 clinical threshold (margin ≈ +0.06) rather than flush against it —
+    // LightGBM's output shifts a few points between inference environments,
+    // so a case placed right at the edge could flip Positive/Negative on
+    // redeploy. Pairs with Case A to show "one risk factor is sometimes
+    // just enough", without being fragile to reproduce.
+    {
+      id: 'D-004',
+      name: 'Hala Mansour',
+      age: 47,
+      sex: 'F',
+      avatar: 'HM',
+      history: 'Hypertension found at a routine visit, otherwise healthy and active',
+      medications: 'Amlodipine 5mg (started recently)',
+      admittingComplaint: 'Routine check-up flagged elevated blood pressure',
+      data: {
+        HighBP: 1,
+        HighChol: 0,
+        CholCheck: 1,
+        BMI: 26,
+        Smoker: 0,
+        Stroke: 0,
+        HeartDiseaseorAttack: 0,
+        PhysActivity: 1,
+        Fruits: 1,
+        Veggies: 1,
+        HvyAlcoholConsump: 0,
+        AnyHealthcare: 1,
+        NoDocbcCost: 0,
+        GenHlth: 3,
         MentHlth: 0,
         PhysHlth: 0,
         DiffWalk: 0,
         Sex: 0,
-        Age: 2,
+        Age: 6,
         Education: 5,
         Income: 6,
       },
