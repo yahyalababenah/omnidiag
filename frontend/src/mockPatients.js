@@ -11,9 +11,9 @@
  * are actual production output, not estimates):
  *   D-001 Noor Sabbagh (NEGATIVE, 9.6%)         — Case A: no real risk factors, healthy baseline
  *   D-002 Karim Yaghi (POSITIVE, 43.2%)         — Case B: one risk factor (HighBP) + fair self-rated health
- *   D-003 Samir Abu-Ghazaleh (POSITIVE, 86.5%)  — Case C: severe but fully mutable risk profile
+ *   D-003 Samir Abu-Ghazaleh (POSITIVE, 81.1%)  — Case C: severe but fully mutable risk profile
  *                                                  (obesity, hypertension, hyperlipidemia, active
- *                                                  smoking, sedentary, poor GenHlth/PhysHlth, DiffWalk)
+ *                                                  smoking, sedentary, fair GenHlth, DiffWalk)
  *   D-004 Hala Mansour (POSITIVE, 33.8%)        — Case D: hypertension only, otherwise clean —
  *                                                  deliberately borderline, comfortably above the 0.275
  *                                                  clinical threshold (not flush against it — LightGBM's
@@ -178,12 +178,15 @@ const mockPatients = {
         Income: 6,
       },
     },
-    // ── Case C — strong positive (verified live on Space: 86.5%, Positive) ──
-    // Severity comes entirely from mutable risk factors: obesity (BMI 38),
-    // hypertension, hyperlipidemia, active smoking, sedentary lifestyle, poor
-    // self-rated general health, heavy physical-health burden (25 unwell
-    // days/month), and difficulty walking. No prior MI/stroke — see the
-    // "Case C note" at the top of this file for why that matters for What-If.
+    // ── Case C — strong positive (verified live on Space: 81.1%, Positive) ──
+    // Severity comes entirely from mutable risk factors: obesity (BMI 34),
+    // hypertension, hyperlipidemia, active smoking, sedentary lifestyle,
+    // fair self-rated general health, and difficulty walking. No prior
+    // MI/stroke — see the "Case C note" at the top of this file for why
+    // that matters for What-If. Tuned down from an earlier BMI-38/severe
+    // draft that landed at 86.5% but gave 0/3 valid counterfactuals on the
+    // live Space at n_samples=100 (too extreme to flip); this profile was
+    // verified live to give 3/3.
     // Age band 9 = 60–64 (BRFSS coding).
     {
       id: 'D-003',
@@ -191,16 +194,16 @@ const mockPatients = {
       age: 62,
       sex: 'M',
       avatar: 'SA',
-      history: 'Type 2 Diabetes risk profile: obesity (BMI 38), hypertension, ' +
-        'hyperlipidemia, active smoker, sedentary lifestyle, poor general health, ' +
-        'significant physical-health burden, poor mobility',
+      history: 'Type 2 Diabetes risk profile: obesity (BMI 34), hypertension, ' +
+        'hyperlipidemia, active smoker, sedentary lifestyle, fair general health, ' +
+        'poor mobility',
       medications: 'Amlodipine 10mg, Rosuvastatin 20mg',
       admittingComplaint: 'Fatigue and difficulty walking, worsening over recent weeks',
       data: {
         HighBP: 1,
         HighChol: 1,
         CholCheck: 1,
-        BMI: 38,
+        BMI: 34,
         Smoker: 1,
         Stroke: 0,
         HeartDiseaseorAttack: 0,
@@ -210,9 +213,9 @@ const mockPatients = {
         HvyAlcoholConsump: 0,
         AnyHealthcare: 1,
         NoDocbcCost: 0,
-        GenHlth: 5,
-        MentHlth: 20,
-        PhysHlth: 25,
+        GenHlth: 4,
+        MentHlth: 7,
+        PhysHlth: 14,
         DiffWalk: 1,
         Sex: 1,
         Age: 9,
