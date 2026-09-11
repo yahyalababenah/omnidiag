@@ -40,9 +40,9 @@ RUN mkdir -p models/heart_disease/preprocessors models/diabetes/preprocessors &&
     curl -fsSL "${HF}/label_encoders.pkl"             -o models/heart_disease/preprocessors/label_encoders.pkl && \
     curl -fsSL "${HF}/standard_scaler.pkl"            -o models/heart_disease/preprocessors/standard_scaler.pkl && \
     echo "=== diabetes ===" && \
-    curl -fsSL "${HF}/diabetes/xgb_model.pkl"                     -o models/diabetes/xgb_model.pkl && \
-    curl -fsSL "${HF}/diabetes/lgb_model.pkl"                     -o models/diabetes/lgb_model.pkl && \
-    curl -fsSL "${HF}/diabetes/rf_model.pkl"                      -o models/diabetes/rf_model.pkl && \
+    curl -fsSL "${HF}/diabetes/omni_diag_xgb_optimized.pkl"       -o models/diabetes/omni_diag_xgb_optimized.pkl && \
+    curl -fsSL "${HF}/diabetes/omni_diag_lgb_optimized.pkl"       -o models/diabetes/omni_diag_lgb_optimized.pkl && \
+    curl -fsSL "${HF}/diabetes/omni_diag_rf.pkl"                  -o models/diabetes/omni_diag_rf.pkl && \
     curl -fsSL "${HF}/diabetes/meta_learner.pkl"                  -o models/diabetes/meta_learner.pkl && \
     curl -fsSL "${HF}/diabetes/preprocessors/standard_scaler.pkl" -o models/diabetes/preprocessors/standard_scaler.pkl && \
     echo "=== all models downloaded ==="

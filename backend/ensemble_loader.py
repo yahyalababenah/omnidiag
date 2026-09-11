@@ -239,6 +239,40 @@ class EnsembleModelLoader:
         return df
 
     # ------------------------------------------------------------------
+    # Feature alignment
+    # ------------------------------------------------------------------
+
+    def _align_features(
+        self, df: pd.DataFrame, model: object, model_name: str
+    ) -> pd.DataFrame:
+        """
+        Reorder df's columns to the exact order `model` was fitted with.
+
+        Tree models care about column *order*, not just names: XGBoost raises
+        a feature_names mismatch, while SHAP's TreeExplainer silently returns
+        values computed against the wrong columns. Both are avoided here.
+
+        A bare df[cols] reindex would quietly insert an all-NaN column for
+        anything missing, so every expected column is verified to be present
+        first and a missing one is named in the error instead of being filled.
+        """
+        expected = getattr(model, "feature_names_in_", None)
+        if expected is None:
+            # Fitted without column names — the model is positional only.
+            return df
+
+        expected = [str(c) for c in expected]
+        missing = [c for c in expected if c not in df.columns]
+        if missing:
+            raise ValueError(
+                f"Base model '{model_name}' expects feature(s) {missing} "
+                f"which are absent from the input data. "
+                f"Available columns: {list(df.columns)}"
+            )
+
+        return df[expected]
+
+    # ------------------------------------------------------------------
     # Public API: predict
     # ------------------------------------------------------------------
 
@@ -258,22 +292,25 @@ class EnsembleModelLoader:
                 - ensemble_variance: float (std of base model probabilities)
                 - model_agreement: str ("high", "moderate", "low")
         """
-        # ── Feature engineering + preprocessing (shared) ──────────────
+        # ── Preprocessing + feature engineering (shared) ──────────────
         df = pd.DataFrame([patient_data])
-        df = self._engineer_features(df)
-        df = self._apply_preprocessors(df)
+        df = self._apply_preprocessors(df)   # scale first (matches training pipeline)
+        df = self._engineer_features(df)     # then engineer from scaled values
 
         # ── Get probabilities from each base model ────────────────────
+        # A base model that cannot predict is a broken ensemble, not a
+        # degraded one — substituting a neutral 0.5 here would hide that
+        # from every caller, so the failure is raised instead.
         probas = {}
         for name, model in self.base_models.items():
+            aligned = self._align_features(df, model, name)
             try:
-                proba = float(model.predict_proba(df)[0][1])
-                probas[name] = proba
+                probas[name] = float(model.predict_proba(aligned)[0][1])
             except Exception as e:
-                log.warning(
-                    f"Base model '{name}' prediction failed: {e}. Using 0.5"
-                )
-                probas[name] = 0.5
+                raise RuntimeError(
+                    f"Base model '{name}' failed to predict: "
+                    f"{type(e).__name__}: {e}"
+                ) from e
 
         # ── Combine predictions ───────────────────────────────────────
         if self._ensemble_type == "stacking" and self.meta_learner is not None:
@@ -349,9 +386,9 @@ class EnsembleModelLoader:
         
         # Build the pipeline function that raw → engineered → preprocessed → predict
         def pipeline_fn(df: pd.DataFrame) -> pd.DataFrame:
-            """Apply feature engineering + preprocessing to raw DataFrame."""
-            df = self._engineer_features(df)
-            df = self._apply_preprocessors(df)
+            """Apply preprocessing + feature engineering to raw DataFrame."""
+            df = self._apply_preprocessors(df)   # scale first (matches training pipeline)
+            df = self._engineer_features(df)     # then engineer from scaled values
             return df
         
         # Build the predict function for the generator (wraps predict)
@@ -361,11 +398,14 @@ class EnsembleModelLoader:
             # We need a method that works on preprocessed data directly
             probas = {}
             for name, model in self.base_models.items():
+                aligned = self._align_features(df, model, name)
                 try:
-                    proba = float(model.predict_proba(df)[0][1])
-                    probas[name] = proba
-                except Exception:
-                    probas[name] = 0.5
+                    probas[name] = float(model.predict_proba(aligned)[0][1])
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Base model '{name}' failed to predict: "
+                        f"{type(e).__name__}: {e}"
+                    ) from e
             
             if self._ensemble_type == "stacking" and self.meta_learner is not None:
                 X_meta = np.array(
@@ -446,18 +486,21 @@ class EnsembleModelLoader:
         """
         try:
             df = pd.DataFrame([patient_data])
-            df = self._engineer_features(df)
-            df = self._apply_preprocessors(df)
+            df = self._apply_preprocessors(df)   # scale first (matches training pipeline)
+            df = self._engineer_features(df)     # then engineer from scaled values
             feature_names = list(df.columns)
 
             # ── Ensemble variance from base model predictions (P1) ─────
             probas = {}
             for name, model in self.base_models.items():
+                aligned = self._align_features(df, model, name)
                 try:
-                    proba = float(model.predict_proba(df)[0][1])
-                    probas[name] = proba
-                except Exception:
-                    probas[name] = 0.5
+                    probas[name] = float(model.predict_proba(aligned)[0][1])
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Base model '{name}' failed to predict: "
+                        f"{type(e).__name__}: {e}"
+                    ) from e
             proba_values = list(probas.values())
             ensemble_variance = float(np.std(proba_values)) if len(proba_values) > 0 else 0.0
             if ensemble_variance < 0.05:
@@ -542,8 +585,9 @@ class EnsembleModelLoader:
                             name,
                         )
 
+                    aligned = self._align_features(df_float, fresh_model, name)
                     explainer = shap.TreeExplainer(fresh_model)
-                    sv = explainer(df_float)
+                    sv = explainer(aligned)
                     # For binary classifiers, sv.values shape is (1, n_features, 2)
                     # Take class 1 (positive) values from the last axis
                     vals = sv.values
@@ -555,8 +599,14 @@ class EnsembleModelLoader:
                     # np.ravel flattens any shape to 1D; [-1] takes the positive class
                     bv_raw = sv.base_values if hasattr(sv, "base_values") else 0.0
                     bv_scalar = float(np.ravel(bv_raw)[-1])
+                    # SHAP returned these in `aligned`'s column order; map them
+                    # back onto feature_names so the positional weighted sum
+                    # and the chart labels below stay in agreement.
+                    by_name = dict(
+                        zip(list(aligned.columns), vals.flatten().tolist())
+                    )
                     per_model_shap[name] = {
-                        "values": vals.flatten().tolist(),
+                        "values": [by_name.get(c, 0.0) for c in feature_names],
                         "base_value": bv_scalar,
                     }
                     nz = sum(1 for v in vals.flatten() if abs(v) > 1e-10)

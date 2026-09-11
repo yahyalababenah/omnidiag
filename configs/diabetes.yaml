@@ -85,7 +85,7 @@ model:
   type: "ensemble"                    # Signals EnsembleModelLoader in router
   explainer_type: "tree"              # All base models use TreeExplainer
   inference_threshold: 0.275          # Clinical-optimised (FN penalty=2x) — 91.7% sensitivity at 54.6% specificity
-  weights_path: "models/diabetes/xgb_model.pkl"
+  weights_path: "models/diabetes/omni_diag_xgb_optimized.pkl"
   fallback_weights_path: "models/diabetes/voting_ensemble.pkl"
   preprocessors_path: "models/diabetes/preprocessors/"
   best_params:
@@ -104,13 +104,13 @@ model:
     type: "stacking"                    # "stacking" or "voting" — stacking improves by +0.13% with Kaggle-trained models
     base_models:
       - name: "xgboost"
-        weights_path: "models/diabetes/xgb_model.pkl"
+        weights_path: "models/diabetes/omni_diag_xgb_optimized.pkl"
         explainer_type: "tree"
       - name: "lightgbm"
-        weights_path: "models/diabetes/lgb_model.pkl"
+        weights_path: "models/diabetes/omni_diag_lgb_optimized.pkl"
         explainer_type: "tree"
       - name: "random_forest"
-        weights_path: "models/diabetes/rf_model.pkl"
+        weights_path: "models/diabetes/omni_diag_rf.pkl"
         explainer_type: "tree"
     meta_learner:
       type: "logistic_regression"
