@@ -44,7 +44,9 @@ router = APIRouter()
 _COOKIE_OPTS = dict(httponly=True, secure=True, samesite="lax")
 
 
-def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+def _set_auth_cookies(
+    response: Response, access_token: str, refresh_token: str
+) -> None:
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -60,6 +62,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
 
 
 # ── POST /auth/register ───────────────────────────────────────────────────────
+
 
 @router.post(
     "/register",
@@ -93,10 +96,13 @@ async def register(
     )
     db.add(user)
     await db.commit()
-    return MessageResponse(message="Account created successfully. An administrator will assign your role.")
+    return MessageResponse(
+        message="Account created successfully. An administrator will assign your role."
+    )
 
 
 # ── POST /auth/login ──────────────────────────────────────────────────────────
+
 
 @router.post(
     "/login",
@@ -145,6 +151,7 @@ async def login(
 
 
 # ── POST /auth/refresh ────────────────────────────────────────────────────────
+
 
 @router.post(
     "/refresh",
@@ -197,6 +204,7 @@ async def refresh(
 
 # ── POST /auth/logout ─────────────────────────────────────────────────────────
 
+
 @router.post(
     "/logout",
     response_model=MessageResponse,
@@ -216,6 +224,7 @@ async def logout(response: Response) -> MessageResponse:
 
 
 # ── GET /auth/me ──────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/me",
