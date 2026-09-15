@@ -1,0 +1,90 @@
+{
+  "diabetes": {
+    "counterfactuals": [
+      {
+        "scenario": "If BMI drops to 29.1, blood pressure is controlled and physical health improves (0 poor days)",
+        "changes": {
+          "HighBP": 0.0,
+          "BMI": 29.06559412332036,
+          "PhysHlth": 0.0
+        },
+        "new_probability": 0.2595,
+        "risk_reduction": "40%",
+        "feasibility": "low"
+      },
+      {
+        "scenario": "If BMI drops to 28.1, blood pressure is controlled and mental health days drop to 4",
+        "changes": {
+          "HighBP": 0.0,
+          "BMI": 28.141924782746308,
+          "MentHlth": 4.0
+        },
+        "new_probability": 0.1829,
+        "risk_reduction": "58%",
+        "feasibility": "low"
+      },
+      {
+        "scenario": "If BMI drops to 26.2, general health improves to level 2 and blood pressure is controlled",
+        "changes": {
+          "HighBP": 0.0,
+          "BMI": 26.220163277415036,
+          "GenHlth": 2.0
+        },
+        "new_probability": 0.1405,
+        "risk_reduction": "68%",
+        "feasibility": "low"
+      }
+    ],
+    "status": "generated",
+    "baseline_probability": 0.43515814119340773,
+    "message": null
+  },
+  "heart": {
+    "status": "success",
+    "counterfactuals": [
+      {
+        "scenario_id": 1,
+        "probability": 0.2555962800979614,
+        "changes": [
+          {
+            "feature": "Oldpeak",
+            "original_value": 2.3,
+            "counterfactual_value": 0.0,
+            "direction": "decrease"
+          }
+        ]
+      },
+      {
+        "scenario_id": 2,
+        "probability": 0.36784642934799194,
+        "changes": [
+          {
+            "feature": "ExerciseAngina",
+            "original_value": "Y",
+            "counterfactual_value": "N",
+            "direction": "increase"
+          }
+        ]
+      },
+      {
+        "scenario_id": 3,
+        "probability": 0.22949373722076416,
+        "changes": [
+          {
+            "feature": "RestingBP",
+            "original_value": 158,
+            "counterfactual_value": 169.6,
+            "direction": "increase"
+          },
+          {
+            "feature": "Oldpeak",
+            "original_value": 2.3,
+            "counterfactual_value": 0.4,
+            "direction": "decrease"
+          }
+        ]
+      }
+    ],
+    "baseline_probability": 0.716181755065918
+  }
+}
