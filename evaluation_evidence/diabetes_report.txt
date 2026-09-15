@@ -1,0 +1,70 @@
+Dataset: data/diabetes/raw/...BRFSS2015.csv
+shape=(70692, 22)
+Split (reproducing preprocess_diabetes.run_diabetes_preprocessing): test_size=0.2, random_state=42, stratify=y -> train=56553 test=14139
+
+Scaler check — shipped standard_scaler.pkl vs one refit on this train split:
+  max |mean_ delta|  = 0.000e+00
+  max |scale_ delta| = 0.000e+00
+  -> shipped scaler IS the train-fitted one (no leakage) if deltas ~0
+Loaded base model 'xgboost': models/diabetes/omni_diag_xgb_optimized.pkl (XGBClassifier)
+Loaded base model 'lightgbm': models/diabetes/omni_diag_lgb_optimized.pkl (LGBMClassifier)
+Loaded base model 'random_forest': models/diabetes/omni_diag_rf.pkl (RandomForestClassifier)
+Loaded meta-learner: models/diabetes/meta_learner.pkl (LogisticRegression) coef_=[0.4362, 3.8572, 0.9019] intercept_=[-2.6573]
+
+  base 'xgboost' AUC = 0.8310
+  base 'lightgbm' AUC = 0.8298
+  base 'random_forest' AUC = 0.8286
+========================================================================
+STACKING ENSEMBLE @ production threshold (configs/diabetes.yaml)   (threshold = 0.275)
+confusion_matrix [[tn fp][fn tp]] = [[3866 3204][597 6472]]
+accuracy    = 73.12%
+roc_auc     = 0.8305
+sensitivity = 91.55%
+specificity = 54.68%
+              precision    recall  f1-score   support
+
+         Neg     0.8662    0.5468    0.6704      7070
+         Pos     0.6689    0.9155    0.7730      7069
+
+    accuracy                         0.7312     14139
+   macro avg     0.7676    0.7312    0.7217     14139
+weighted avg     0.7676    0.7312    0.7217     14139
+
+========================================================================
+STACKING ENSEMBLE @ 0.5 (for reference)   (threshold = 0.5)
+confusion_matrix [[tn fp][fn tp]] = [[5096 1974][1528 5541]]
+accuracy    = 75.23%
+roc_auc     = 0.8305
+sensitivity = 78.38%
+specificity = 72.08%
+              precision    recall  f1-score   support
+
+         Neg     0.7693    0.7208    0.7443      7070
+         Pos     0.7373    0.7838    0.7599      7069
+
+    accuracy                         0.7523     14139
+   macro avg     0.7533    0.7523    0.7521     14139
+weighted avg     0.7533    0.7523    0.7521     14139
+
+========================================================================
+VOTING ENSEMBLE (fallback path) @ production threshold   (threshold = 0.275)
+confusion_matrix [[tn fp][fn tp]] = [[3488 3582][440 6629]]
+accuracy    = 71.55%
+roc_auc     = 0.8311
+sensitivity = 93.78%
+specificity = 49.34%
+              precision    recall  f1-score   support
+
+         Neg     0.8880    0.4934    0.6343      7070
+         Pos     0.6492    0.9378    0.7672      7069
+
+    accuracy                         0.7155     14139
+   macro avg     0.7686    0.7156    0.7008     14139
+weighted avg     0.7686    0.7155    0.7008     14139
+
+========================================================================
+COMPARISON vs CLAIMED (acc 75.18%, AUC 0.831, sens 91.70%, spec 54.63%, thr 0.275)
+variant                     acc   Δacc pp      auc     sens  Δsens pp     spec  Δspec pp
+stacking@0.275           73.12%     -2.06   0.8305   91.55%     -0.15   54.68%      0.05
+stacking@0.5             75.23%      0.05   0.8305   78.38%    -13.32   72.08%     17.45
+voting@0.275             71.55%     -3.63   0.8311   93.78%      2.08   49.34%     -5.29
