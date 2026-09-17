@@ -56,7 +56,10 @@ from backend.admin.routes import router as admin_router
 from backend.patients.routes import router as patients_router
 from backend.auth.rbac import require_role, CLINICAL_ROLES
 from backend.auth.dependencies import get_current_active_user, get_optional_user
-from backend.cache import init_cache, cache_get, cache_set, predict_cache_key, schema_cache_key, counterfactuals_cache_key
+from backend.cache import (init_cache, cache_get, cache_set, predict_cache_key,
+                           schema_cache_key, counterfactuals_cache_key,
+                           cached_payload_matches_scale)
+from backend.probability_scale import Scale
 from backend.database import get_db, engine, AsyncSessionLocal, Base
 from backend.db_models.prediction import Prediction
 from backend.db_models.user import User
@@ -396,6 +399,19 @@ async def predict_disease(
         cache_key = predict_cache_key(disease, patient_data)
         if not patient_id:
             cached = await cache_get(cache_key)
+            # A payload written by an older release can still be live for up
+            # to the 300 s TTL after a deploy. Serving it would hand back a
+            # raw-scale probability under a corrected-scale contract, so the
+            # scale is checked rather than assumed; a mismatch is a miss.
+            if cached is not None and not cached_payload_matches_scale(
+                cached, router.disease_configs.get(disease)
+            ):
+                log.warning(
+                    "predict: discarding cached payload for disease=%s — "
+                    "probability scale does not match the current contract",
+                    disease,
+                )
+                cached = None
             if cached is not None:
                 response.headers["Cache-Hit"] = "true"
                 return cached
@@ -412,7 +428,7 @@ async def predict_disease(
             record_prediction(
                 disease=disease,
                 prediction=int(result.get("prediction", 0)),
-                confidence=float(result.get("confidence", 0.0)),
+                probability_corrected=float(result.get("confidence", 0.0)),
             )
         except Exception:
             pass
@@ -436,6 +452,7 @@ async def predict_disease(
                     input_features=patient_data,
                     prediction=int(result.get("prediction", 0)),
                     confidence=confidence_corrected,
+                    probability_scale=Scale.CORRECTED.value,
                     diagnosis=result.get("diagnosis"),
                     created_by=current_user.id,
                 )
@@ -503,13 +520,17 @@ async def explain_disease(
         # Persist prediction + SHAP data only for authenticated users
         if current_user:
             try:
+                # /explain mirrors /predict's probability, so it is on the
+                # same (corrected) scale and is stamped the same way.
+                confidence_corrected = float(result.get("confidence", 0.0))
                 record = Prediction(
                     id=str(_uuid.uuid4()),
                     patient_id=patient_id,
                     disease=disease,
                     input_features=patient_data,
                     prediction=int(result.get("prediction", 0)),
-                    confidence=float(result.get("confidence", 0.0)),
+                    confidence=confidence_corrected,
+                    probability_scale=Scale.CORRECTED.value,
                     diagnosis=result.get("diagnosis"),
                     shap_chart_data=result.get("chart_data"),
                     created_by=current_user.id,

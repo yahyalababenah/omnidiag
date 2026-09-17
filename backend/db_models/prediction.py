@@ -17,6 +17,13 @@ Design decisions:
       past prediction.
     - shap_chart_data is stored as nullable JSON since /explain is an
       optional separate call after /predict.
+    - probability_scale says which scale `confidence` is on. Diabetes rows
+      written before the prevalence correction hold a raw-prior probability
+      in the same column as rows written after it hold a corrected one; the
+      two differ by roughly a factor of six near the decision threshold and
+      must never be averaged, plotted or drift-compared together. Old rows
+      are left NULL because the scale of a past row cannot be recovered from
+      the row itself.
 """
 
 import uuid
@@ -44,6 +51,10 @@ class Prediction(Base):
     input_features = Column(MutableDict.as_mutable(JSON), nullable=False)
     prediction = Column(Integer, nullable=False)  # 0 or 1
     confidence = Column(Float, nullable=False)  # 0.0–1.0
+    # 'raw' | 'corrected' — the scale `confidence` is stated on. See
+    # backend/probability_scale.py. NULL means "written before this column
+    # existed, scale unknown".
+    probability_scale = Column(String(16), nullable=True)
     diagnosis = Column(String(100), nullable=True)  # "Positive" / "Negative"
     shap_chart_data = Column(JSON, nullable=True)
     created_by = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -61,5 +72,6 @@ class Prediction(Base):
     def __repr__(self) -> str:
         return (
             f"<Prediction(id={self.id}, disease='{self.disease}', "
-            f"prediction={self.prediction}, confidence={self.confidence:.3f})>"
+            f"prediction={self.prediction}, confidence={self.confidence:.3f} "
+            f"[{self.probability_scale or 'scale unknown'}])>"
         )

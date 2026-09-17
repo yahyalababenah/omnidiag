@@ -21,6 +21,20 @@ Usage in main.py:
 TTLs:
     Schema responses  → 86400 s  (24 h) — changes only on deployment
     Predict responses →   300 s  ( 5 m) — short enough to stay fresh
+
+Probability scale and the cache
+-------------------------------
+A cached /predict payload carries a probability, and a probability is only
+meaningful together with its scale. For up to the 300 s TTL after a deploy,
+entries written by the previous release are still live — and before the
+prevalence correction those held raw-prior probabilities.
+
+Two independent defences, because the failure is silent and clinical:
+
+  1. PROBABILITY_SCALE_CONTRACT is part of every predict/counterfactual cache
+     key, so bumping it makes every old entry unreachable rather than stale.
+  2. cached_payload_matches_scale() re-checks the payload itself before it is
+     served, so an entry that somehow survives is dropped instead of returned.
 """
 
 import hashlib
@@ -34,6 +48,11 @@ log = logging.getLogger("omnidiag.cache")
 # Will be set by init_cache()
 _backend = None
 _PREFIX = "omnidiag"
+
+# Bump whenever the meaning of a cached probability changes — a new scale, a
+# new threshold basis, a renamed probability field. v2 = prevalence-corrected
+# probabilities (backend/prevalence_correction.py).
+PROBABILITY_SCALE_CONTRACT = "v2"
 
 
 async def init_cache() -> None:
@@ -74,19 +93,40 @@ def _make_key(*parts: str) -> str:
 
 
 def predict_cache_key(disease: str, patient_data: dict) -> str:
-    """Deterministic cache key for a predict request."""
+    """Deterministic cache key for a predict request, scoped to the scale contract."""
     fingerprint = hashlib.sha256(
         json.dumps({"disease": disease, "data": patient_data}, sort_keys=True).encode()
     ).hexdigest()[:16]
-    return _make_key("predict", disease, fingerprint)
+    return _make_key("predict", PROBABILITY_SCALE_CONTRACT, disease, fingerprint)
 
 
 def counterfactuals_cache_key(disease: str, patient_data: dict) -> str:
-    """Deterministic cache key for a counterfactuals request."""
+    """Deterministic cache key for a counterfactuals request, scoped to the scale contract."""
     fingerprint = hashlib.sha256(
         json.dumps({"disease": disease, "data": patient_data}, sort_keys=True).encode()
     ).hexdigest()[:16]
-    return _make_key("counterfactuals", disease, fingerprint)
+    return _make_key("counterfactuals", PROBABILITY_SCALE_CONTRACT, disease, fingerprint)
+
+
+def cached_payload_matches_scale(payload: Any, disease_config: Optional[dict]) -> bool:
+    """
+    True when a cached /predict payload is on the scale the caller expects.
+
+    A disease whose config declares both prevalence priors returns corrected
+    probabilities, and its payload must say so via `prevalence_correction_applied`.
+    A disease that declares neither (heart_disease) has one scale only, so any
+    payload is acceptable.
+
+    Returns False rather than raising: an unreadable payload is a cache miss,
+    not an error.
+    """
+    model_cfg = (disease_config or {}).get("model", {}) or {}
+    corrected_expected = {"prevalence_train", "prevalence_deploy"} <= set(model_cfg)
+    if not corrected_expected:
+        return True
+    if not isinstance(payload, dict):
+        return False
+    return payload.get("prevalence_correction_applied") is True
 
 
 def schema_cache_key(disease: str) -> str:
