@@ -1,0 +1,42 @@
+==================================================================================
+1. DUPLICATE ROWS ACROSS THE SPLIT
+==================================================================================
+  test rows whose exact feature vector also appears in train: 564 / 14139  (3.99%)
+  All 21 features are binary or coarse ordinal, so identical patients are
+  expected by chance, not only by true duplication. Still, these rows are
+  memorised, not predicted. Scores below are reported both ways.
+
+  test ROC-AUC, all rows              0.8302
+  test ROC-AUC, de-duplicated rows    0.8253   (n=13575)
+
+==================================================================================
+2. THRESHOLD: selected on test (shipped) vs out-of-fold train (correct)
+==================================================================================
+  evaluated on the held-out test set:
+  shipped 0.275 (from y_test)        thr 0.2750   sens 93.32%   spec 50.74%   FN   472   FP  3483
+  re-derived on y_test               thr 0.2907   sens 92.69%   spec 52.60%   FN   517   FP  3351
+  out-of-fold on training  <- correct thr 0.3203   sens 91.33%   spec 55.15%   FN   613   FP  3171
+
+  selection-bias gap: 0.0295 in threshold units
+  cost at shipped 0.275   : 4427
+  cost at out-of-fold thr : 4397
+
+==================================================================================
+3. PREVALENCE — the larger problem
+==================================================================================
+  training file prevalence : 50.0%  (pre-balanced 50/50 variant)
+  real BRFSS prevalence    : ~14%
+
+  What the same threshold does as the base rate falls, holding the model
+  fixed and resampling the test set to each prevalence:
+
+   prevalence   flagged     sens     spec      PPV  per 1000 screened
+          50%     68.1%    91.3%    55.1%    67.1%   680 referred, 224 needlessly
+          30%     58.7%    90.9%    55.1%    46.5%   586 referred, 313 needlessly
+          20%     54.2%    91.6%    55.1%    33.8%   541 referred, 358 needlessly
+          14%     51.3%    90.6%    55.1%    24.7%   512 referred, 385 needlessly
+          10%     49.4%    90.8%    55.1%    18.4%   494 referred, 403 needlessly
+
+  Sensitivity and specificity are stable (they are prevalence-independent).
+  PPV is not. At a realistic base rate most people the system flags do not
+  have diabetes, and the threshold was never chosen with that in mind.

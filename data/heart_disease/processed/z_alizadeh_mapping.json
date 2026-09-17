@@ -1,0 +1,57 @@
+{
+  "Age": {
+    "kind": "DIRECT",
+    "source": "Age",
+    "rule": "years, identical definition"
+  },
+  "Sex": {
+    "kind": "DIRECT",
+    "source": "Sex",
+    "rule": "'Male'->M, 'Fmale'->F (source misspells 'Female')"
+  },
+  "RestingBP": {
+    "kind": "DIRECT",
+    "source": "BP",
+    "rule": "systolic blood pressure at rest, mm Hg"
+  },
+  "FastingBS": {
+    "kind": "DERIVED",
+    "source": "FBS",
+    "rule": "1 if FBS > 120 mg/dl else 0 \u2014 the UCI definition. NOT the DM column: DM is a recorded diabetes diagnosis, which includes treated patients whose fasting glucose is currently normal. The two agree on only 88.8% of patients."
+  },
+  "Cholesterol": {
+    "kind": "DERIVED",
+    "source": "LDL, HDL, TG",
+    "rule": "total cholesterol = LDL + HDL + TG/5, the Friedewald equation rearranged. Valid only for TG < 400 mg/dl; patients above that are set missing rather than estimated."
+  },
+  "ChestPainType": {
+    "kind": "DERIVED",
+    "source": "Typical Chest Pain, Atypical, Nonanginal",
+    "rule": "TA if Typical Chest Pain==1; else ATA if Atypical=='Y'; else NAP if Nonanginal=='Y'; else ASY (asymptomatic by exclusion)."
+  },
+  "RestingECG": {
+    "kind": "DERIVED",
+    "source": "LVH, St Elevation, St Depression, Tinversion",
+    "rule": "LVH if LVH=='Y'; else ST if any ST-T abnormality (St Elevation, St Depression or T-wave inversion); else Normal. Matches UCI restecg 0/1/2."
+  },
+  "MaxHR": {
+    "kind": "UNAVAILABLE",
+    "source": "\u2014",
+    "rule": "UCI thalach is peak heart rate during an EXERCISE stress test. The source only records PR, resting pulse (range 50-110 vs 71-202 for thalach). Different measurement; not substitutable."
+  },
+  "Oldpeak": {
+    "kind": "UNAVAILABLE",
+    "source": "\u2014",
+    "rule": "UCI oldpeak is ST depression in mm, a magnitude. The source records St Depression as binary present/absent only. No magnitude exists to map."
+  },
+  "ST_Slope": {
+    "kind": "UNAVAILABLE",
+    "source": "\u2014",
+    "rule": "No exercise-ECG ST-segment slope is recorded."
+  },
+  "ExerciseAngina": {
+    "kind": "UNAVAILABLE",
+    "source": "Exertional CP",
+    "rule": "The column exists but is 'N' for all 303 patients \u2014 zero variance in the source itself. Carries no information."
+  }
+}
