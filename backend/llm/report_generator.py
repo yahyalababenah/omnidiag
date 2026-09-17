@@ -4,15 +4,38 @@ OmniDiag — LLM Clinical Report Generator
 Generates structured clinical narrative reports from prediction results
 using the DeepSeek API (OpenAI-compatible). Falls back to a rule-based
 template when the API key is unavailable (e.g. in offline/demo environments).
+
+── Probability scale ──────────────────────────────────────────────────────
+`probability_corrected` is on the deployment scale — the same scale as the
+diagnosis label and as `risk_bands`, both taken from the /predict response.
+For diabetes that means a Positive patient can read 11%, because the decision
+threshold there is 5.98%, not 50%.
+
+Bands therefore come from `risk_bands` and never from a literal. Reading
+HIGH/MODERATE off hardcoded 0.70/0.40 put every corrected-scale patient in
+LOW: on the 14,139-row test split that was 6,576 Positive patients being told
+"routine follow-up, rescreen in 12 months", and HIGH became unreachable.
+
+The band shown in the report, the band used to pick the recommended actions
+and the band sent to the LLM are all the same value, computed once here.
 """
 
 import os
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
+
+from backend.probability_scale import classify_band
 
 log = logging.getLogger("omnidiag.llm")
 
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+# Fallback display bands for a disease that configures none. These are the
+# same numbers as DEFAULT_RISK_BANDS in frontend/src/constants/thresholds.js
+# and are correct for heart_disease, whose probabilities are on the model's
+# own scale with an argmax 0.5 cut-point. A disease WITH configured bands
+# (diabetes) always passes them in; this constant is never its band source.
+DEFAULT_RISK_BANDS: Dict[str, float] = {"high": 0.7, "moderate": 0.4}
 
 
 def _get_api_key() -> str:
@@ -36,9 +59,14 @@ Do NOT hallucinate lab values or history not provided."""
 _USER_PROMPT_TEMPLATE = """Generate a clinical assessment report for the following patient.
 
 Disease Module: {disease_display}
-Risk Probability: {probability:.1%}
+Risk Probability: {probability:.1%}  (calibrated to real-world prevalence)
+Decision Threshold: {threshold_note}
 Risk Label: {label}
-Confidence Band: {confidence_band}
+Risk Band: {confidence_band}
+
+Note: this probability is stated on the deployment population's prevalence, so
+it is NOT comparable to a 50% cut-off. Judge it against the decision threshold
+and the risk band above, never against 50%.
 
 Top Risk Factors (SHAP-ranked):
 {shap_summary}
@@ -68,13 +96,39 @@ def _format_features(features: Dict[str, Any]) -> str:
     return "\n".join(lines[:20])  # cap to avoid prompt bloat
 
 
+def _resolve_probability(
+    probability_corrected: Optional[float], probability: Optional[float]
+) -> float:
+    """
+    Accept either the explicit name or the legacy scaleless one.
+
+    `probability=` predates the prevalence correction and says nothing about
+    which scale its value is on. It is still accepted so existing callers keep
+    working, but it is deprecated: pass `probability_corrected=`.
+    """
+    if probability_corrected is not None:
+        return float(probability_corrected)
+    if probability is not None:
+        log.debug(
+            "report_generator: `probability=` is deprecated and carries no scale; "
+            "pass `probability_corrected=` instead"
+        )
+        return float(probability)
+    raise TypeError("probability_corrected is required")
+
+
 def _rule_based_report(
     disease_display: str,
-    probability: float,
-    label: str,
-    shap_values: List[Dict[str, Any]],
-    features: Dict[str, Any],
+    probability_corrected: Optional[float] = None,
+    label: str = "",
+    shap_values: Optional[List[Dict[str, Any]]] = None,
+    features: Optional[Dict[str, Any]] = None,
+    risk_bands: Optional[Mapping[str, float]] = None,
+    probability: Optional[float] = None,          # deprecated alias
 ) -> str:
+    probability_corrected = _resolve_probability(probability_corrected, probability)
+    shap_values = shap_values or []
+    features = features or {}
     top = sorted(shap_values, key=lambda x: abs(x.get("shap_value", 0)), reverse=True)[:3]
     top_names = [s["feature"] for s in top]
     actions = {
@@ -82,49 +136,83 @@ def _rule_based_report(
         "MODERATE": "- Schedule follow-up within 4 weeks\n- Lifestyle modification counselling\n- Monitor key biomarkers",
         "LOW": "- Routine follow-up\n- Reinforce preventive measures\n- Rescreen in 12 months",
     }
-    band = "HIGH" if probability >= 0.7 else ("MODERATE" if probability >= 0.4 else "LOW")
+    band = classify_band(probability_corrected, risk_bands or DEFAULT_RISK_BANDS)
     report = (
         f"**Clinical Summary**\n"
         f"Patient assessed for {disease_display} risk. "
-        f"Model probability: {probability:.1%} ({label}). "
+        f"Model probability: {probability_corrected:.1%} ({label}). "
         f"Top contributing factors: {', '.join(top_names)}.\n\n"
         f"**Key Risk Drivers**\n"
         + "\n".join(f"- {s['feature']} (SHAP {s['shap_value']:+.3f})" for s in top)
         + f"\n\n**Recommended Actions**\n{actions.get(band, actions['MODERATE'])}\n\n"
         f"**Risk Stratification Note**\n"
-        f"This assessment is {band.lower()} priority based on the {probability:.1%} probability estimate."
+        f"This assessment is {band.lower()} priority: a {probability_corrected:.1%} "
+        f"probability on this population's prevalence, classified against the "
+        f"module's own risk bands."
     )
     return report
 
 
 async def generate_report(
     disease_display: str,
-    probability: float,
-    label: str,
-    confidence_band: str,
-    shap_values: List[Dict[str, Any]],
-    features: Dict[str, Any],
+    probability_corrected: Optional[float] = None,
+    label: str = "",
+    confidence_band: Optional[str] = None,
+    shap_values: Optional[List[Dict[str, Any]]] = None,
+    features: Optional[Dict[str, Any]] = None,
     model: str = "deepseek-chat",
+    risk_bands: Optional[Mapping[str, float]] = None,
+    decision_threshold: Optional[float] = None,
+    probability: Optional[float] = None,          # deprecated alias
 ) -> Dict[str, Any]:
     """
     Generate a structured clinical report.
 
+    `probability_corrected` and `risk_bands` must be on the same scale — both
+    come straight from the /predict response for this disease.
+
+    `confidence_band` is accepted for backwards compatibility but is NOT
+    trusted: the band is recomputed here from the probability and the bands,
+    so the narrative, the recommended actions and the label the LLM is given
+    can never disagree with one another. A caller-supplied band that differs
+    is logged and discarded.
+
     Returns a dict with keys:
         - report:        The generated markdown report text
         - source:        'llm' | 'rule_based'
+        - risk_band:     The band actually used
         - llm_model:     Model name used (only when source='llm')
         - latency_ms:    Round-trip time in milliseconds (only when source='llm')
         - fallback_reason: Why rule-based was used (only when source='rule_based')
     """
     import time
 
+    probability_corrected = _resolve_probability(probability_corrected, probability)
+    shap_values = shap_values or []
+    features = features or {}
+    bands = risk_bands or DEFAULT_RISK_BANDS
+    band = classify_band(probability_corrected, bands)
+    if confidence_band and confidence_band != band:
+        log.info(
+            "Discarding caller-supplied confidence_band=%r; %.4f against bands %r is %r",
+            confidence_band, probability_corrected, dict(bands), band,
+        )
+    threshold_note = (
+        f"{decision_threshold:.4f} — at or above this the patient is classified Positive"
+        if decision_threshold is not None
+        else "not exposed by this module (argmax)"
+    )
+
     api_key = _get_api_key()
 
     if not api_key:
         log.warning("DEEPSEEK_API_KEY not set — falling back to rule-based report")
         return {
-            "report": _rule_based_report(disease_display, probability, label, shap_values, features),
+            "report": _rule_based_report(
+                disease_display, probability_corrected, label, shap_values, features, bands
+            ),
             "source": "rule_based",
+            "risk_band": band,
             "fallback_reason": "DEEPSEEK_API_KEY environment variable is not set",
         }
 
@@ -138,9 +226,10 @@ async def generate_report(
 
         user_prompt = _USER_PROMPT_TEMPLATE.format(
             disease_display=disease_display,
-            probability=probability,
+            probability=probability_corrected,
+            threshold_note=threshold_note,
             label=label,
-            confidence_band=confidence_band,
+            confidence_band=band,
             shap_summary=_format_shap(shap_values),
             features_summary=_format_features(features),
         )
@@ -164,6 +253,7 @@ async def generate_report(
         return {
             "report": report_text,
             "source": "llm",
+            "risk_band": band,
             "llm_model": model,
             "latency_ms": latency_ms,
         }
@@ -171,7 +261,10 @@ async def generate_report(
     except Exception as exc:
         log.error(f"DeepSeek API call failed: {exc!r}")
         return {
-            "report": _rule_based_report(disease_display, probability, label, shap_values, features),
+            "report": _rule_based_report(
+                disease_display, probability_corrected, label, shap_values, features, bands
+            ),
             "source": "rule_based",
+            "risk_band": band,
             "fallback_reason": str(exc),
         }

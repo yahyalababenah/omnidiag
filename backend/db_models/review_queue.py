@@ -1,11 +1,14 @@
 """
 OmniDiag — ReviewQueue Model
 ==============================
-Stores uncertain predictions (confidence 40–60%) that require expert review.
+Stores predictions that sit close to the decision boundary and therefore
+warrant expert review.
 
 This table is the core of the Active Learning / Human-in-the-Loop feature.
-When the system produces a prediction with low confidence, it can be flagged
-for a human expert (doctor) to review and provide a label.
+"Close to the boundary" is threshold-relative, not a fixed 40-60% window: the
+diabetes threshold is 0.059776 on the deployment prior, so a 50% probability
+there is a confident Positive, not an uncertain case. See
+backend/active_learning/sampler.py.
 
 Design decisions:
     - prediction_id has a UNIQUE constraint to enforce one review entry per
@@ -14,6 +17,8 @@ Design decisions:
     - reviewer_id is nullable until a reviewer picks up the case.
     - label stores the expert's annotation (0 or 1) separately from the
       model's original prediction.
+    - uncertainty_scale / decision_threshold record how uncertainty_score was
+      computed, so scores from different releases are never averaged blindly.
 """
 
 import uuid
@@ -41,6 +46,13 @@ class ReviewQueue(Base):
         nullable=False,
     )
     uncertainty_score = Column(Float, nullable=True)
+    # Which probability scale uncertainty_score was computed on, and the
+    # decision threshold it was measured around. Without these two a stored
+    # score cannot be compared with one written by a different release:
+    # rows created before the prevalence correction hold a 0.5-centred
+    # entropy on the raw scale and are left NULL here.
+    uncertainty_scale = Column(String(16), nullable=True)   # 'raw' | 'corrected'
+    decision_threshold = Column(Float, nullable=True)
     reviewer_id = Column(
         String(36),
         ForeignKey("users.id", ondelete="SET NULL"),

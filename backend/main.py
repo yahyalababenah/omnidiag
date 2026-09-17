@@ -44,6 +44,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from pydantic import ValidationError as PydanticValidationError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,14 +87,21 @@ except Exception as _e:
 
 try:
     from backend.active_learning.routes import router as review_router
-    from backend.active_learning.sampler import should_queue_for_review, prediction_entropy
+    from backend.active_learning.sampler import (
+        DEFAULT_DECISION_THRESHOLD,
+        UNCERTAINTY_SCALE,
+        should_queue_for_review,
+        prediction_entropy,
+    )
     _HAS_AL = True
 except Exception as _e:
     log.warning("Active learning module unavailable (%s) — review queue disabled", _e)
     review_router = None
     _HAS_AL = False
-    def should_queue_for_review(_p): return False
-    def prediction_entropy(_p): return 0.0
+    DEFAULT_DECISION_THRESHOLD = 0.5
+    UNCERTAINTY_SCALE = "corrected"
+    def should_queue_for_review(_p, decision_threshold=0.5): return False
+    def prediction_entropy(_p, decision_threshold=0.5): return 0.0
 
 # 1. تهيئة الموجه الديناميكي (يُحمّل جميع الإعدادات من configs/ تلقائياً)
 log.info("Initializing OmniDiagRouter...")
@@ -333,11 +341,32 @@ async def get_disease_schema(disease: str, response: Response):
 # =========================================================================
 
 def _validate_patient_input(disease: str, patient: dict) -> dict:
-    """Validate and coerce patient data against the disease schema if one exists."""
+    """
+    Validate and coerce patient data against the disease schema if one exists.
+
+    A bad payload is the caller's problem, not a server fault: the pydantic
+    error is re-raised as HTTP 422 so it is not swallowed by the endpoints'
+    generic `except Exception` and reported as a 500. The field names are kept
+    in the message, since "which column is missing" is the whole answer.
+    """
     schema = get_schema_for_disease(disease)
-    if schema:
+    if schema is None:
+        return patient
+    try:
         return schema(**patient).model_dump()
-    return patient
+    except PydanticValidationError as exc:
+        fields = [
+            ".".join(str(part) for part in err.get("loc", ())) or "(body)"
+            for err in exc.errors()
+        ]
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": f"Invalid patient input for '{disease}': {', '.join(fields)}",
+                "code": "VALIDATION_ERROR",
+                "detail": _json_safe(exc.errors()),
+            },
+        ) from exc
 
 
 @app.post("/api/v4/{disease}/predict", tags=["Clinical Diagnosis"])
@@ -391,27 +420,43 @@ async def predict_disease(
         # Persist to predictions table only for authenticated users
         if current_user:
             try:
-                confidence = float(result.get("confidence", 0.0))
+                # By contract every probability leaving a loader's predict() is
+                # on the deployment (corrected) scale — see
+                # backend/probability_scale.py. The threshold travels with it in
+                # the same response, on the same scale; diseases that expose no
+                # threshold (heart) use sklearn's argmax cut-point.
+                confidence_corrected = float(result.get("confidence", 0.0))
+                decision_threshold = float(
+                    result.get("inference_threshold", DEFAULT_DECISION_THRESHOLD)
+                )
                 record = Prediction(
                     id=str(_uuid.uuid4()),
                     patient_id=patient_id,
                     disease=disease,
                     input_features=patient_data,
                     prediction=int(result.get("prediction", 0)),
-                    confidence=confidence,
+                    confidence=confidence_corrected,
                     diagnosis=result.get("diagnosis"),
                     created_by=current_user.id,
                 )
                 db.add(record)
                 await db.flush()
 
-                # Auto-queue uncertain predictions for human review (Feature 1.3)
-                if should_queue_for_review(confidence):
+                # Auto-queue uncertain predictions for human review (Feature 1.3).
+                # Uncertainty is measured around the decision boundary, not
+                # around 0.5 — see backend/active_learning/sampler.py.
+                if should_queue_for_review(
+                    confidence_corrected, decision_threshold=decision_threshold
+                ):
                     from backend.db_models.review_queue import ReviewQueue
                     rq = ReviewQueue(
                         id=str(_uuid.uuid4()),
                         prediction_id=record.id,
-                        uncertainty_score=prediction_entropy(confidence),
+                        uncertainty_score=prediction_entropy(
+                            confidence_corrected, decision_threshold=decision_threshold
+                        ),
+                        uncertainty_scale=UNCERTAINTY_SCALE,
+                        decision_threshold=decision_threshold,
                     )
                     db.add(rq)
 
@@ -653,12 +698,43 @@ async def batch_predict(
 # ---------------------------------------------------------------------------
 
 class ReportRequest(BaseModel):
+    """
+    Input for /api/v4/generate-report.
+
+    `probability_corrected` is the probability exactly as /predict returned it
+    (field `confidence`) — on the deployment scale for diabetes, on the model's
+    own scale for heart. `probability` is the legacy name for the same field
+    and is still accepted.
+
+    `confidence_band` is optional and advisory only. The server classifies the
+    probability against the disease's own risk_bands, so the report can never
+    contradict itself; see backend/llm/report_generator.generate_report.
+    """
+
     disease: str
-    probability: float
+    probability_corrected: float | None = None
+    probability: float | None = None          # deprecated alias
     label: str
-    confidence_band: str
+    confidence_band: str | None = None        # advisory; server recomputes
     shap_values: List[Dict[str, Any]]
     features: Dict[str, Any]
+
+    @property
+    def resolved_probability_corrected(self) -> float:
+        value = (
+            self.probability_corrected
+            if self.probability_corrected is not None
+            else self.probability
+        )
+        if value is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "probability_corrected (or its legacy alias probability) is required",
+                    "code": "MISSING_PROBABILITY",
+                },
+            )
+        return float(value)
 
 
 @app.post(
@@ -674,22 +750,40 @@ async def generate_clinical_report(
 ) -> Dict[str, Any]:
     disease_info = router.get_disease_info(body.disease)
     disease_display = (disease_info or {}).get("display_name", body.disease)
+    probability_corrected = body.resolved_probability_corrected
+
+    # Bands come from the disease itself, already on the same scale as the
+    # probability (router.get_disease_info corrects them for diabetes). The
+    # client's own band, if any, is advisory and discarded downstream.
+    risk_bands = (disease_info or {}).get("risk_bands")
+    decision_threshold = (
+        router.disease_configs.get(body.disease, {})
+        .get("model", {})
+        .get("inference_threshold")
+    )
 
     if _generate_report is None:
-        # Fallback when anthropic package is not installed
+        # Fallback when the LLM client package is not installed
         from backend.llm.report_generator import _rule_based_report
         report_text = _rule_based_report(
-            disease_display, body.probability, body.label, body.shap_values, body.features
+            disease_display,
+            probability_corrected,
+            body.label,
+            body.shap_values,
+            body.features,
+            risk_bands,
         )
         return {"disease": body.disease, "report": report_text, "source": "rule_based"}
 
     result = await _generate_report(
         disease_display=disease_display,
-        probability=body.probability,
+        probability_corrected=probability_corrected,
         label=body.label,
         confidence_band=body.confidence_band,
         shap_values=body.shap_values,
         features=body.features,
+        risk_bands=risk_bands,
+        decision_threshold=decision_threshold,
     )
     return {"disease": body.disease, **result}
 
