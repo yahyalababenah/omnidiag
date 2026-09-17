@@ -171,24 +171,34 @@ class CounterfactualGenerator:
         
         Returns:
             List of counterfactual dicts, each containing:
-                - scenario: Human-readable description of changes
+                - scenario: Human-readable description of changes (text only)
                 - changes: Dict of feature_name → new_value (only changed features)
-                - new_probability: Float probability of positive class (0-1)
-                - risk_reduction: String like "44%"
+                - new_probability: Float probability after the changes, CORRECTED
+                  scale (kept under its original name for existing clients)
+                - new_probability_corrected: the same value, explicitly named
+                - baseline_probability_corrected: probability before the changes
+                - risk_reduction: relative reduction as a string, e.g. "74%"
+                - risk_reduction_relative_pct: float, (base - after) / base * 100
+                - risk_reduction_absolute_pp: float, (base - after) * 100
+                - probability_scale: always "corrected" here
                 - feasibility: "high", "medium", or "low"
+
+        Every probability in the returned dicts is on the deployment
+        (prevalence-corrected) scale, the same scale as inference_threshold.
         """
         # Get baseline prediction
         baseline_df = self.pipeline_fn(pd.DataFrame([patient_data]))
-        baseline_proba = self._get_proba(baseline_df)
+        baseline_proba_corrected = self._get_proba_corrected(baseline_df)
         
         log.debug(
-            f"Generating counterfactuals: baseline_proba={baseline_proba:.4f}, "
+            f"Generating counterfactuals: baseline_proba_corrected="
+            f"{baseline_proba_corrected:.4f}, "
             f"desired_class={desired_class}, n_samples={self.n_samples}"
         )
         
         # If patient is already Negative (low risk), no counterfactuals needed
-        if (desired_class == 0 and baseline_proba < self.inference_threshold) or \
-           (desired_class == 1 and baseline_proba >= self.inference_threshold):
+        if (desired_class == 0 and baseline_proba_corrected < self.inference_threshold) or \
+           (desired_class == 1 and baseline_proba_corrected >= self.inference_threshold):
             log.debug("Patient already in desired class — no counterfactuals generated")
             return []
         
@@ -200,11 +210,11 @@ class CounterfactualGenerator:
         for cand_raw in candidates:
             try:
                 cand_df = self.pipeline_fn(pd.DataFrame([cand_raw]))
-                cand_proba = self._get_proba(cand_df)
+                cand_proba_corrected = self._get_proba_corrected(cand_df)
                 
                 # Check if prediction flips to desired class
-                if (desired_class == 0 and cand_proba < self.inference_threshold) or \
-                   (desired_class == 1 and cand_proba >= self.inference_threshold):
+                if (desired_class == 0 and cand_proba_corrected < self.inference_threshold) or \
+                   (desired_class == 1 and cand_proba_corrected >= self.inference_threshold):
                     
                     # Calculate changes relative to baseline
                     changes = self._compute_changes(patient_data, cand_raw)
@@ -214,8 +224,8 @@ class CounterfactualGenerator:
                     
                     valid_candidates.append({
                         "raw": cand_raw,
-                        "proba": cand_proba,
-                        "baseline_proba": baseline_proba,
+                        "proba_corrected": cand_proba_corrected,
+                        "baseline_proba_corrected": baseline_proba_corrected,
                         "changes": changes,
                         "proximity": proximity,
                     })
@@ -230,19 +240,32 @@ class CounterfactualGenerator:
         # Sort by proximity (closest first), then select diverse subset
         selected = self._select_diverse(valid_candidates)
         
-        # Build response
+        # Build response.
+        #
+        # Two different numbers can both be called "risk reduction", and they
+        # are far apart on the corrected scale: a patient going from 0.145 to
+        # 0.038 has dropped 74% of their risk but only 10.7 percentage points.
+        # Both are emitted, each named for what it is, so no consumer has to
+        # infer which one it is holding. `risk_reduction` keeps the relative
+        # reading it has always had.
         counterfactuals = []
         for cand in selected:
-            risk_reduction_pct = max(
-                0, (cand["baseline_proba"] - cand["proba"]) / max(cand["baseline_proba"], 0.001) * 100
-            )
+            baseline = cand["baseline_proba_corrected"]
+            after = cand["proba_corrected"]
+            relative_pct = max(0.0, (baseline - after) / max(baseline, 0.001) * 100)
+            absolute_pp = max(0.0, (baseline - after) * 100)
             feasibility = self._assess_feasibility(cand["changes"])
             
             counterfactuals.append({
-                "scenario": self._build_scenario(cand["changes"], risk_reduction_pct),
+                "scenario": self._build_scenario(cand["changes"]),
                 "changes": cand["changes"],
-                "new_probability": round(cand["proba"], 4),
-                "risk_reduction": f"{int(round(risk_reduction_pct))}%",
+                "new_probability": round(after, 4),
+                "new_probability_corrected": round(after, 4),
+                "baseline_probability_corrected": round(baseline, 4),
+                "risk_reduction": f"{int(round(relative_pct))}%",
+                "risk_reduction_relative_pct": round(relative_pct, 2),
+                "risk_reduction_absolute_pp": round(absolute_pp, 2),
+                "probability_scale": "corrected",
                 "feasibility": feasibility,
             })
         
@@ -253,12 +276,30 @@ class CounterfactualGenerator:
     # Internal methods
     # ------------------------------------------------------------------
     
-    def _get_proba(self, df: pd.DataFrame) -> float:
-        """Get positive-class probability from the predictor function."""
-        # predict_fn returns dict with 'confidence' key
+    def _get_proba_corrected(self, df: pd.DataFrame) -> float:
+        """
+        Positive-class probability from the predictor, on the deployment scale.
+
+        `predict_fn` is EnsembleModelLoader's, which applies the prevalence
+        correction before returning, so every probability in this module is
+        corrected — the same scale as `self.inference_threshold`.
+
+        A missing value falls back to the decision threshold, not to 0.5. On
+        the raw prior those coincided; on the deployment prior 0.5 is roughly
+        eight times the threshold, so the old fallback turned a failed lookup
+        into a confident Positive.
+        """
         result = self.predict_fn(df)
         if isinstance(result, dict):
-            return float(result.get("confidence", 0.5))
+            value_corrected = result.get("confidence")
+            if value_corrected is None:
+                log.warning(
+                    "predict_fn returned no 'confidence'; falling back to the "
+                    "decision threshold (%s) as the neutral point",
+                    self.inference_threshold,
+                )
+                return float(self.inference_threshold)
+            return float(value_corrected)
         return float(result)
     
     def _is_illegal_flip(self, feat: str, from_val: float, to_val: float) -> bool:
@@ -512,16 +553,20 @@ class CounterfactualGenerator:
         # Only lifestyle changes
         return "high"
     
-    def _build_scenario(
-        self, changes: Dict[str, float], risk_reduction_pct: float
-    ) -> str:
+    def _build_scenario(self, changes: Dict[str, float]) -> str:
         """
         Build a human-readable scenario description.
-        
+
+        Text only — deliberately no percentage. The reduction is carried by
+        `risk_reduction_relative_pct` / `risk_reduction_absolute_pp`, so the
+        sentence cannot drift out of step with the numbers beside it. (The
+        old signature took a percentage it never rendered, while the docstring
+        showed examples containing one.)
+
         Examples:
-            - "If BMI drops from 34 to 27 (—44% risk)"
-            - "If PhysActivity increases and Fruits increases (—34% risk)"
-            - "If HighBP is controlled with medication (—55% risk)"
+            - "If BMI drops to 27.0"
+            - "If starts physical activity and increases fruit intake"
+            - "If blood pressure is controlled"
         """
         if not changes:
             return "No changes needed"

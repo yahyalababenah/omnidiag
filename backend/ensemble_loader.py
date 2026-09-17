@@ -18,6 +18,7 @@ Usage:
 
 import os
 import json
+import math
 import logging
 import traceback
 import importlib
@@ -29,6 +30,11 @@ import pandas as pd
 import shap
 
 from backend.shap_service import generate_shap_explanation
+from backend.prevalence_correction import (
+    apply_prevalence_correction,
+    invert_prevalence_correction,
+    prior_odds_ratio,
+)
 from backend.counterfactual_generator import CounterfactualGenerator
 
 log = logging.getLogger("omnidiag.ensemble_loader")
@@ -76,6 +82,41 @@ class EnsembleModelLoader:
             config.get("model", {}).get("inference_threshold", 0.5)
         )
 
+        # Prior-shift correction. The ensemble was trained on a 50/50
+        # resample, so its raw probabilities sit on the training prior.
+        # predict() moves them to the deployment prior before they are
+        # compared or returned; inference_threshold is stated on that same
+        # deployment scale. Both priors are required — a silent default
+        # would put the threshold and the probability on different scales.
+        model_cfg = config.get("model", {})
+        missing = [k for k in ("prevalence_train", "prevalence_deploy") if k not in model_cfg]
+        if missing:
+            raise KeyError(
+                f"model.{missing[0]} is required in the ensemble config "
+                f"(missing: {missing})"
+            )
+        self._prevalence_train: float = float(model_cfg["prevalence_train"])
+        self._prevalence_deploy: float = float(model_cfg["prevalence_deploy"])
+        # Same threshold on the model's own (training-prior) scale, returned
+        # by predict() so a caller can audit the raw decision.
+        self._inference_threshold_raw: float = float(invert_prevalence_correction(
+            self._inference_threshold, self._prevalence_train, self._prevalence_deploy
+        ))
+
+        # Display bands for the risk badge. Configured on the raw model scale
+        # and returned on both scales, so the UI never hard-codes a cut-point
+        # and a patient's band does not change with the correction.
+        self._risk_bands_raw: Dict[str, float] = {
+            name: float(value)
+            for name, value in (model_cfg.get("risk_bands") or {}).items()
+        }
+        self._risk_bands: Dict[str, float] = {
+            name: float(apply_prevalence_correction(
+                value, self._prevalence_train, self._prevalence_deploy
+            ))
+            for name, value in self._risk_bands_raw.items()
+        }
+
         # Cached objects
         self._base_models: Optional[Dict[str, object]] = None
         self._meta_learner: Optional[object] = None
@@ -87,7 +128,8 @@ class EnsembleModelLoader:
         log.info(
             f"EnsembleModelLoader initialized: type={self._ensemble_type}, "
             f"base_models={[m['name'] for m in self.ensemble_config.get('base_models', [])]}, "
-            f"inference_threshold={self._inference_threshold}"
+            f"inference_threshold={self._inference_threshold}, "
+            f"prevalence {self._prevalence_train} -> {self._prevalence_deploy}"
         )
 
     # ------------------------------------------------------------------
@@ -286,7 +328,14 @@ class EnsembleModelLoader:
         Returns:
             Dictionary with keys:
                 - prediction: int (0 = Negative, 1 = Positive)
-                - confidence: float (probability of positive class)
+                - confidence: float (probability of positive class, corrected
+                  to the deployment prevalence — same value as probability_corrected)
+                - probability_raw: float (meta-learner output, training prior)
+                - probability_corrected: float (Bayes prior-shift corrected)
+                - prevalence_correction_applied: bool (always True here)
+                - inference_threshold: float (deployment-prior scale)
+                - risk_bands: Dict of band name -> cut-point, deployment-prior
+                  scale, for the UI's HIGH / MODERATE / LOW badge
                 - diagnosis: str ("Positive" or "Negative")
                 - model_contributions: Dict of model_name → probability
                 - ensemble_variance: float (std of base model probabilities)
@@ -325,6 +374,11 @@ class EnsembleModelLoader:
             # Voting: simple average
             final_proba = float(np.mean(list(probas.values())))
 
+        # ── Prior-shift correction, before the decision and the response ─
+        raw_proba = final_proba
+        final_proba = float(apply_prevalence_correction(
+            raw_proba, self._prevalence_train, self._prevalence_deploy
+        ))
         final_pred = int(final_proba >= self._inference_threshold)
 
         # ── Ensemble variance (P1) ──────────────────────────────────────
@@ -341,10 +395,18 @@ class EnsembleModelLoader:
         return {
             "prediction": final_pred,
             "confidence": final_proba,
+            "probability_raw": raw_proba,
+            "probability_corrected": final_proba,
+            "prevalence_correction_applied": True,
+            "prevalence_train": self._prevalence_train,
+            "prevalence_deploy": self._prevalence_deploy,
             "diagnosis": "Positive" if final_pred == 1 else "Negative",
             "model_contributions": probas,
             "ensemble_type": self._ensemble_type,
             "inference_threshold": self._inference_threshold,
+            "inference_threshold_raw": self._inference_threshold_raw,
+            "risk_bands": self._risk_bands,
+            "risk_bands_raw": self._risk_bands_raw,
             "ensemble_variance": round(ensemble_variance, 4),
             "model_agreement": model_agreement,
         }
@@ -370,16 +432,22 @@ class EnsembleModelLoader:
                 - status: "generated" or "not_applicable" (if already low risk)
                 - baseline_probability: Current probability of positive class
         """
-        # Get baseline probability for metadata
+        # Get baseline probability for metadata. predict() always returns a
+        # corrected probability, so there is no scale ambiguity here; the
+        # threshold it is compared against is on the same scale.
         baseline_pred = self.predict(patient_data)
-        baseline_proba = baseline_pred.get("confidence", 0.5)
+        baseline_proba_corrected = float(
+            baseline_pred.get("confidence", self._inference_threshold)
+        )
         
         # If patient is already low risk (< threshold), no counterfactuals needed
-        if baseline_proba < self._inference_threshold:
+        if baseline_proba_corrected < self._inference_threshold:
             return {
                 "counterfactuals": [],
                 "status": "not_applicable",
-                "baseline_probability": baseline_proba,
+                "baseline_probability": baseline_proba_corrected,
+                "baseline_probability_corrected": baseline_proba_corrected,
+                "probability_scale": "corrected",
                 "message": "Patient is already below the clinical threshold. "
                           "Counterfactuals focus on reducing high-risk predictions.",
             }
@@ -416,7 +484,12 @@ class EnsembleModelLoader:
                 )
             else:
                 final_proba = float(np.mean(list(probas.values())))
-            
+
+            # Same scale as predict() and self._inference_threshold, so the
+            # generator's flip test and its reported probabilities match /predict.
+            final_proba = float(apply_prevalence_correction(
+                final_proba, self._prevalence_train, self._prevalence_deploy
+            ))
             return {"confidence": final_proba}
         
         # Get feature names from preprocessed data
@@ -452,7 +525,9 @@ class EnsembleModelLoader:
         return {
             "counterfactuals": counterfactuals,
             "status": "generated" if counterfactuals else "no_valid_counterfactuals",
-            "baseline_probability": baseline_proba,
+            "baseline_probability": baseline_proba_corrected,
+            "baseline_probability_corrected": baseline_proba_corrected,
+            "probability_scale": "corrected",
             "message": None if counterfactuals else (
                 "Could not find valid counterfactuals for this patient. "
                 "The patient may need more significant lifestyle or medical changes "
@@ -478,7 +553,15 @@ class EnsembleModelLoader:
             Dictionary with keys:
                 - chart_data: List of {"feature": str, "shap_value": float}
                 - text_explanation: Human-readable top-3 feature impacts
-                - base_value: Weighted average base value
+                - base_value: Weighted average base value, shifted onto the
+                  DEPLOYMENT prior so it sits on the same scale as `confidence`
+                - base_value_raw: the same value before that shift
+                - shap_scale: "corrected_log_odds"
+                - shap_reconstructed_probability_corrected: sigmoid(base_value
+                  + sum(shap_values)) — what the explanation alone implies
+                - shap_additivity_gap: |reconstruction - confidence|. Non-zero
+                  by construction: SHAP is averaged over the base models while
+                  the probability comes from the meta-learner above them
                 - per_model_shap: Dict of model_name → individual SHAP result
                 - shap_weights: Dict of model_name → weight used in average
                 - ensemble_variance: float (std of base model probabilities)
@@ -707,6 +790,46 @@ class EnsembleModelLoader:
             result["prediction"] = pred_result["prediction"]
             result["confidence"] = pred_result["confidence"]
             result["diagnosis"] = pred_result["diagnosis"]
+
+            # ── Put the SHAP decomposition on the same scale as `confidence` ──
+            #
+            # TreeExplainer works in the base models' own log-odds space, i.e.
+            # on the training prior. `confidence` is on the deployment prior.
+            # Reading the two together — a 48% probability next to an additive
+            # reconstruction that lands on 85% — is exactly the mismatch this
+            # work is about.
+            #
+            # The prior-shift map is a constant additive term in log-odds:
+            #     logit(p_corrected) = logit(p_raw) + log(R)
+            # so shifting base_value by log(R) moves the whole reconstruction
+            # to the deployment prior while leaving every per-feature SHAP
+            # value untouched — feature attributions are unchanged, only the
+            # intercept moves.
+            #
+            # Additivity is still not exact here, and was not before this
+            # change either: the SHAP values are a weighted average over the
+            # BASE models, while `confidence` comes from the meta-learner on
+            # top of them. The residual is reported rather than hidden, so a
+            # reader can see how far the explanation is from the decision.
+            base_value_raw = float(result.get("base_value", 0.0))
+            log_r = math.log(
+                prior_odds_ratio(self._prevalence_train, self._prevalence_deploy)
+            )
+            base_value_corrected = base_value_raw + log_r
+            shap_sum = float(
+                sum(item.get("shap_value", 0.0) for item in result.get("chart_data", []))
+            )
+            reconstructed_corrected = 1.0 / (
+                1.0 + math.exp(-(base_value_corrected + shap_sum))
+            )
+
+            result["base_value"] = base_value_corrected
+            result["base_value_raw"] = base_value_raw
+            result["shap_scale"] = "corrected_log_odds"
+            result["shap_reconstructed_probability_corrected"] = reconstructed_corrected
+            result["shap_additivity_gap"] = abs(
+                reconstructed_corrected - pred_result["confidence"]
+            )
 
             # Add ensemble-specific metadata
             result["per_model_shap"] = per_model_shap
