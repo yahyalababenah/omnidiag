@@ -55,6 +55,10 @@ class PredictionOut(BaseModel):
     disease: str
     prediction: int
     confidence: float
+    # 'corrected' | 'raw' | None. NULL means the row predates the column and
+    # its scale is unknown — such rows must not be plotted on the same axis as
+    # newer ones without saying so. See backend/probability_scale.py.
+    probability_scale: Optional[str] = None
     diagnosis: Optional[str]
     input_features: Dict[str, Any]
     shap_chart_data: Optional[Any]

@@ -182,23 +182,39 @@ export default function PDFReport({
 }) {
   const isPositive = result?.prediction === 1
   const confidence = Math.round((result?.confidence ?? 0) * 100)
+  // Same scale as `confidence` — both come from the /predict response.
+  const threshold =
+    typeof result?.inference_threshold === 'number' ? result.inference_threshold : null
   const diagnosisLabel = result?.diagnosis ?? (isPositive ? 'Positive' : 'Negative')
   const badgeStyle = isPositive
     ? { ...styles.badge, backgroundColor: '#fee2e2', color: C.positive }
     : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
   const barColor = isPositive ? C.positive : C.negative
 
-  // Real API shape: { scenario_id, probability, changes: [{ feature, original_value, counterfactual_value }] }.
-  // Risk reduction is derived from (baseline - scenario probability); scenario text is built from `changes`.
-  const cfs = (counterfactuals ?? []).slice(0, 3).map((cf) => ({
-    scenarioText: (cf.changes ?? [])
-      .map((c) => `${c.feature}: ${c.original_value} → ${c.counterfactual_value}`)
-      .join('; '),
-    riskReductionPct:
-      typeof cf.probability === 'number' && typeof counterfactualsBaseline === 'number'
-        ? Math.round((counterfactualsBaseline - cf.probability) * 100)
-        : null,
-  }))
+  // Counterfactual field names differ by module: diabetes returns
+  // `new_probability_corrected` / `risk_reduction_relative_pct`, heart returns
+  // `probability`. Reading only `probability` printed "—" on every diabetes
+  // report. The backend's own relative reduction is preferred over recomputing
+  // here, because subtracting two probabilities gives percentage points, which
+  // is a different number from the one this row is labelled with.
+  const cfs = (counterfactuals ?? []).slice(0, 3).map((cf) => {
+    const after =
+      cf.new_probability_corrected ?? cf.new_probability ?? cf.probability ?? null
+    let reduction = null
+    if (typeof cf.risk_reduction_relative_pct === 'number') {
+      reduction = Math.round(cf.risk_reduction_relative_pct)
+    } else if (typeof cf.risk_reduction === 'string' && !Number.isNaN(parseFloat(cf.risk_reduction))) {
+      reduction = Math.round(parseFloat(cf.risk_reduction))
+    } else if (after !== null && typeof counterfactualsBaseline === 'number' && counterfactualsBaseline > 0) {
+      reduction = Math.round(((counterfactualsBaseline - after) / counterfactualsBaseline) * 100)
+    }
+    return {
+      scenarioText: (cf.changes ?? [])
+        .map((c) => `${c.feature}: ${c.original_value} → ${c.counterfactual_value}`)
+        .join('; '),
+      riskReductionPct: reduction,
+    }
+  })
   const dateStr = reportDate ?? new Date().toLocaleDateString('en-GB')
 
   return (
@@ -253,7 +269,19 @@ export default function PDFReport({
               <View style={styles.confBarBg}>
                 <View style={[styles.confBarFill, { width: `${confidence}%`, backgroundColor: barColor }]} />
               </View>
-              <Text style={[styles.confLabel, { marginTop: 2 }]}>{confidence}%</Text>
+              <Text style={[styles.confLabel, { marginTop: 2 }]}>
+                {confidence}%
+                {threshold != null && ` (decision threshold ${(threshold * 100).toFixed(1)}%)`}
+              </Text>
+              {/* A printed report leaves the screen. Without the threshold on
+                  the page, a reader sees "Positive" beside 11% and assumes a
+                  mistake: diabetes probabilities are calibrated to real-world
+                  prevalence, so they are small by construction. */}
+              {result?.prevalence_correction_applied && (
+                <Text style={[styles.confLabel, { marginTop: 1 }]}>
+                  Calibrated to real-world prevalence
+                </Text>
+              )}
             </View>
           </View>
           {shapText && (

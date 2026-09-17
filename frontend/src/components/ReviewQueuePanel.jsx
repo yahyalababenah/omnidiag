@@ -48,13 +48,33 @@ function ReviewCard({ item, onAnnotate, onSkip }) {
             {item.model_prediction === 1 ? 'Positive' : 'Negative'}
           </p>
           <p className="text-gray-500 dark:text-gray-400 font-mono">{((item.confidence ?? 0) * 100).toFixed(1)}%</p>
+          {/* The queue holds rows from several releases. A probability without
+              its scale is not a number a reviewer can act on, so an untagged
+              row says so instead of quietly looking like the tagged ones. */}
+          {item.probability_scale ? (
+            item.decision_threshold != null && (
+              <p className="text-[10px] text-gray-400">
+                threshold {(item.decision_threshold * 100).toFixed(1)}%
+              </p>
+            )
+          ) : (
+            <p className="text-[10px] text-amber-600">scale not recorded</p>
+          )}
         </div>
       </div>
 
       {/* Uncertainty */}
       <div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Uncertainty (entropy)</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+          Uncertainty (entropy around the decision threshold)
+        </p>
         <UncertaintyBar score={item.uncertainty_score} />
+        {!item.uncertainty_scale && (
+          <p className="text-[10px] text-amber-600 mt-0.5">
+            Scored by an earlier release, centred on 50% rather than this
+            module&apos;s threshold — not comparable with the rows above.
+          </p>
+        )}
       </div>
 
       {/* Feature preview */}

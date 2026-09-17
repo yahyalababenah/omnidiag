@@ -86,6 +86,22 @@ class OmniDiagRouter:
             config.get("model", {}).get("weights_path", "")
         )
         has_model = os.path.isfile(weights_path)
+        # Display bands for the risk badge, on the same scale as the
+        # probabilities this disease returns. A disease that configures none
+        # (heart) reports None and the UI keeps its own default — nothing
+        # about that path changes.
+        model_cfg = config.get("model", {})
+        risk_bands = model_cfg.get("risk_bands") or None
+        if risk_bands and {"prevalence_train", "prevalence_deploy"} <= set(model_cfg):
+            from backend.prevalence_correction import apply_prevalence_correction
+
+            risk_bands = {
+                band: float(apply_prevalence_correction(
+                    value, model_cfg["prevalence_train"], model_cfg["prevalence_deploy"]
+                ))
+                for band, value in risk_bands.items()
+            }
+
         return {
             "name": config.get("disease", {}).get("name"),
             "display_name": config.get("disease", {}).get("display_name"),
@@ -94,6 +110,13 @@ class OmniDiagRouter:
             "model_type": config.get("model", {}).get("type"),
             "explainer_type": config.get("model", {}).get("explainer_type"),
             "available": has_model,
+            "risk_bands": risk_bands,
+            # Decision threshold on the same scale as the probabilities this
+            # disease returns (already the deployment scale for diabetes;
+            # configs/diabetes.yaml states it there). None for a disease that
+            # configures none — heart takes sklearn's argmax — and the UI
+            # falls back to its own documented constant in that case.
+            "inference_threshold": model_cfg.get("inference_threshold"),
             "supports_counterfactuals": (
                 config.get("model", {}).get("ensemble") is not None
                 or config.get("model", {}).get("counterfactuals", False)

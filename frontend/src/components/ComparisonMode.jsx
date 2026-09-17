@@ -11,7 +11,7 @@
 
 import { useState, useCallback } from 'react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
 import {
   ArrowLeftRight, TrendingUp, TrendingDown, Minus, Loader2, AlertCircle,
@@ -21,12 +21,24 @@ import { api } from '../api'
 import { useDisease } from '../context/DiseaseContext'
 import { useDiseaseSchema } from '../hooks/useDiseaseSchema'
 import { getPatientsForDisease } from '../mockPatients'
+import { getDisplayThreshold } from '../constants/thresholds'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Risk score = probability of the POSITIVE class, on the scale the API
+ * returned it (prevalence-corrected for diabetes).
+ *
+ * This used to flip to `1 - confidence` for Negative patients, which reads as
+ * "the model's confidence in its own call". That was already confusing and
+ * became wrong once the decision threshold moved off 0.5: a Positive diabetes
+ * patient at 0.07 displayed a 7% "risk score" while a Negative one at 0.01
+ * displayed 99%. Both arrows pointed the wrong way. One axis only: higher
+ * always means more risk.
+ */
 function riskScore(result) {
   if (!result) return null
-  return result.prediction === 1 ? result.confidence : 1 - result.confidence
+  return result.confidence ?? null
 }
 
 function DeltaBadge({ before, after }) {
@@ -141,8 +153,9 @@ function ResultColumn({ label, result, loading, error, color, colorLight }) {
       <div className="text-center">
         <p className="text-xs text-gray-500 uppercase tracking-wide">Risk Score</p>
         <p className={`text-3xl font-black mt-1 ${colorLight}`}>
-          {Math.round(riskScore(result) * 100)}%
+          {Math.round((riskScore(result) ?? 0) * 100)}%
         </p>
+        <p className="text-[10px] text-gray-400">probability of the positive class</p>
       </div>
     </div>
   )
@@ -210,15 +223,17 @@ function FeatureDiffTable({ beforePatient, afterPatient, fields }) {
 
 // ── Side-by-side confidence chart ─────────────────────────────────────────────
 
-function ComparisonChart({ beforeResult, afterResult, beforeName, afterName }) {
+function ComparisonChart({ beforeResult, afterResult, beforeName, afterName, disease }) {
   if (!beforeResult || !afterResult) return null
 
+  // Risk score and risk probability are now the same quantity, so the chart
+  // shows it once. What it needs instead is the decision threshold: on the
+  // corrected scale a 12% bar is well above a 6.0% boundary, and without the
+  // line drawn the bar looks reassuringly short.
+  const threshold = getDisplayThreshold(disease, beforeResult)
+  const thresholdPct = threshold != null ? threshold * 100 : null
+
   const data = [
-    {
-      name: 'Risk Score',
-      Before: Math.round(riskScore(beforeResult) * 100),
-      After:  Math.round(riskScore(afterResult) * 100),
-    },
     {
       name: 'Risk Probability',
       Before: Math.round((beforeResult.confidence ?? 0) * 100),
@@ -239,6 +254,19 @@ function ComparisonChart({ beforeResult, afterResult, beforeName, afterName }) {
             <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }} />
             <Tooltip formatter={(v) => [`${v}%`]} />
             <Legend />
+            {thresholdPct != null && (
+              <ReferenceLine
+                y={thresholdPct}
+                stroke="#dc2626"
+                strokeDasharray="4 4"
+                label={{
+                  value: `Decision threshold ${thresholdPct.toFixed(1)}%`,
+                  position: 'insideTopRight',
+                  fontSize: 10,
+                  fill: '#dc2626',
+                }}
+              />
+            )}
             <Bar name={beforeName} dataKey="Before" fill="#2563eb" radius={[4, 4, 0, 0]} />
             <Bar name={afterName}  dataKey="After"  fill="#7c3aed" radius={[4, 4, 0, 0]} />
           </BarChart>
@@ -389,6 +417,7 @@ export default function ComparisonMode() {
             afterResult={afterResult}
             beforeName={beforePatient?.name ?? 'Before'}
             afterName={afterPatient?.name ?? 'After'}
+            disease={selectedDisease}
           />
 
           {/* Feature diff table */}

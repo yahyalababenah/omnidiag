@@ -11,12 +11,26 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import { useDisease } from '../context/DiseaseContext';
+import { classifyRisk, getRiskBands } from '../constants/thresholds';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.space';
 
-function RiskBadge({ score }) {
-  if (score >= 0.7) return <span className="badge-positive text-xs">HIGH</span>;
-  if (score >= 0.4) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">MOD</span>;
+// `bands` comes from the API (GET /api/v4/diseases -> info.risk_bands) and is
+// on the same scale as the stored risk score. When several diseases are shown
+// at once there is no single scale to use, so the shared default applies and
+// the chart says so.
+//
+// CAVEAT: `risk_score` on a visit row is whatever the client that created the
+// visit sent (POST /patients/{id}/visits), and that payload carries no scale
+// marker. Visits written before the prevalence correction therefore hold a
+// raw-scale number and will be plotted against corrected bands. The
+// patient_visits table is currently empty, so nothing is mis-plotted today,
+// but the endpoint should take an explicit scale — tracked as a register item.
+function RiskBadge({ score, bands }) {
+  const band = classifyRisk(score, bands ? { risk_bands: bands } : null);
+  if (band === 'HIGH') return <span className="badge-positive text-xs">HIGH</span>;
+  if (band === 'MODERATE') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">MOD</span>;
   return <span className="badge-negative text-xs">LOW</span>;
 }
 
@@ -50,6 +64,7 @@ function CustomTooltip({ active, payload, label }) {
  */
 export default function PatientRiskTimeline({ patientId, disease }) {
   const { token } = useAuth();
+  const { availableDiseases } = useDisease();
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -86,6 +101,17 @@ export default function PatientRiskTimeline({ patientId, disease }) {
   }));
 
   const diseases = [...new Set(visits.map((v) => v.disease))];
+  // Bands are per-disease and per-scale; only meaningful with one disease selected.
+  const selectedInfo = selectedDisease
+    ? availableDiseases?.find((d) => d.name === selectedDisease)
+    : null;
+  const bands = selectedInfo?.risk_bands ?? null;
+  const highBand = getRiskBands(bands ? { risk_bands: bands } : null).high;
+  // Decision threshold from the API, on the same scale as the bands. Null
+  // (line hidden) when several diseases are shown at once or the module
+  // exposes none — a fixed 50% line was wrong for diabetes, whose threshold
+  // is ~6%.
+  const threshold = selectedInfo?.inference_threshold ?? null;
 
   return (
     <div className="space-y-4">
@@ -137,8 +163,19 @@ export default function PatientRiskTimeline({ patientId, disease }) {
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={0.5} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: '50%', fontSize: 10, fill: '#f59e0b' }} />
-                <ReferenceLine y={0.7} stroke="#ef4444" strokeDasharray="4 4" label={{ value: '70%', fontSize: 10, fill: '#ef4444' }} />
+                {threshold != null && (
+                  <ReferenceLine
+                    y={threshold}
+                    stroke="#f59e0b"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: `Decision threshold ${(threshold * 100).toFixed(1)}%`,
+                      fontSize: 10,
+                      fill: '#f59e0b',
+                    }}
+                  />
+                )}
+                <ReferenceLine y={highBand} stroke="#ef4444" strokeDasharray="4 4" label={{ value: `HIGH ${(highBand * 100).toFixed(0)}%`, fontSize: 10, fill: '#ef4444' }} />
                 <Line
                   type="monotone"
                   dataKey="risk"
@@ -176,7 +213,7 @@ export default function PatientRiskTimeline({ patientId, disease }) {
                       {(v.risk_score * 100).toFixed(1)}%
                     </td>
                     <td className="py-2 px-3">
-                      <RiskBadge score={v.risk_score} />
+                      <RiskBadge score={v.risk_score} bands={bands} />
                     </td>
                     <td className="py-2 px-3 text-xs text-gray-500 dark:text-gray-400 max-w-[200px] truncate">
                       {v.notes || '—'}

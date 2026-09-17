@@ -20,8 +20,16 @@ import { useDisease } from '../context/DiseaseContext'
 
 const BASE = '/api/v4'
 
-function downloadCsv(rows, disease) {
-  const headers = ['row', 'status', 'prediction', 'risk_probability', 'diagnosis', 'error']
+function downloadCsv(rows, disease, threshold = null) {
+  // The exported file outlives this session and gets opened in Excel with no
+  // legend, so the column name has to carry the scale. For diabetes these are
+  // prevalence-corrected probabilities compared against a ~6% threshold, not
+  // a 50% one; a bare "risk_probability" of 0.07 beside "Positive" reads as
+  // an error.
+  const headers = [
+    'row', 'status', 'prediction',
+    'risk_probability_corrected', 'decision_threshold', 'diagnosis', 'error',
+  ]
   const lines = [headers.join(',')]
   for (const r of rows) {
     lines.push([
@@ -29,6 +37,7 @@ function downloadCsv(rows, disease) {
       r.status,
       r.prediction ?? '',
       r.confidence != null ? (r.confidence * 100).toFixed(1) + '%' : '',
+      threshold != null ? (threshold * 100).toFixed(2) + '%' : '',
       r.diagnosis ?? '',
       r.error ? `"${r.error.replace(/"/g, '""')}"` : '',
     ].join(','))
@@ -86,7 +95,7 @@ function DropZone({ onFile, disabled }) {
 
 // ── Results table ─────────────────────────────────────────────────────────────
 
-function ResultsTable({ results }) {
+function ResultsTable({ results, threshold = null }) {
   const [filter, setFilter] = useState('all')
 
   const visible = results.filter(r =>
@@ -120,7 +129,11 @@ function ResultsTable({ results }) {
         <table className="w-full text-xs">
           <thead className="bg-slate-50">
             <tr>
-              {['Row', 'Status', 'Prediction', 'Risk Probability', 'Diagnosis', 'Error'].map(h => (
+              {['Row', 'Status', 'Prediction',
+                threshold != null
+                  ? `Risk Probability (threshold ${(threshold * 100).toFixed(1)}%)`
+                  : 'Risk Probability',
+                'Diagnosis', 'Error'].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-gray-500 font-medium uppercase tracking-wide text-[10px]">{h}</th>
               ))}
             </tr>
@@ -213,7 +226,11 @@ function Stat({ label, value, color }) {
 
 export default function BatchUpload() {
   const { token } = useAuth()
-  const { selectedDisease } = useDisease()
+  const { selectedDisease, availableDiseases } = useDisease()
+  // Decision threshold for the selected module, on the same scale as the
+  // probabilities the batch endpoint returns.
+  const threshold =
+    availableDiseases?.find(d => d.name === selectedDisease)?.inference_threshold ?? null
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
@@ -274,7 +291,7 @@ export default function BatchUpload() {
         {data && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => downloadCsv(data.results, selectedDisease)}
+              onClick={() => downloadCsv(data.results, selectedDisease, threshold)}
               className="btn-secondary text-sm flex items-center gap-2"
             >
               <Download className="w-4 h-4" /> Download CSV
@@ -345,7 +362,7 @@ export default function BatchUpload() {
       {data && (
         <>
           <SummaryChart data={data} />
-          <ResultsTable results={data.results} />
+          <ResultsTable results={data.results} threshold={threshold} />
         </>
       )}
     </div>

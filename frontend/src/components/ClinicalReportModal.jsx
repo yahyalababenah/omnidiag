@@ -6,26 +6,33 @@ import { api } from '../api';
  * Modal that generates and displays an AI clinical report for a single prediction.
  * Opens when the user clicks "Generate AI Report" after a prediction + SHAP explain.
  *
+ * The risk band is NOT computed here. The server classifies the probability
+ * against that disease's own risk_bands and returns the band it used, so the
+ * band shown next to the number is always the band the report was written
+ * from. Deriving it in the browser is how the two came apart: the client sent
+ * a corrected-scale band while the server re-derived its own from hardcoded
+ * raw-scale cut-points.
+ *
  * Props:
- *   disease        — disease key (e.g. 'heart_disease')
- *   probability    — prediction probability (0–1)
- *   label          — prediction label string (e.g. 'Positive')
- *   confidenceBand — string (e.g. 'HIGH', 'MODERATE', 'LOW')
- *   shapValues     — array of { feature, shap_value }
- *   features       — original patient feature dict
- *   onClose        — () => void
+ *   disease               — disease key (e.g. 'heart_disease')
+ *   probabilityCorrected  — probability exactly as /predict returned it
+ *                           (field `confidence`), 0–1
+ *   label                 — prediction label string (e.g. 'Positive')
+ *   shapValues            — array of { feature, shap_value }
+ *   features              — original patient feature dict
+ *   onClose               — () => void
  */
 export default function ClinicalReportModal({
   disease,
-  probability,
+  probabilityCorrected,
   label,
-  confidenceBand,
   shapValues = [],
   features = {},
   onClose,
 }) {
   const [report, setReport] = useState('');
   const [source, setSource] = useState('');
+  const [riskBand, setRiskBand] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,14 +43,14 @@ export default function ClinicalReportModal({
     try {
       const res = await api.generateReport({
         disease,
-        probability,
+        probability_corrected: probabilityCorrected,
         label,
-        confidence_band: confidenceBand,
         shap_values: shapValues,
         features,
       });
       setReport(res.report);
       setSource(res.source);
+      setRiskBand(res.risk_band ?? '');
     } catch (err) {
       setError(err.message || 'Failed to generate report');
     } finally {
@@ -93,16 +100,17 @@ export default function ClinicalReportModal({
             <div>
               <p className="text-gray-500 dark:text-gray-400 text-xs mb-0.5">Probability</p>
               <p className="font-medium text-gray-900 dark:text-white">
-                {(probability * 100).toFixed(1)}%
+                {(probabilityCorrected * 100).toFixed(1)}%
               </p>
             </div>
             <div>
               <p className="text-gray-500 dark:text-gray-400 text-xs mb-0.5">Risk Band</p>
               <p className={`font-semibold ${
-                confidenceBand === 'HIGH' ? 'text-red-600' :
-                confidenceBand === 'MODERATE' ? 'text-amber-600' : 'text-green-600'
+                riskBand === 'HIGH' ? 'text-red-600' :
+                riskBand === 'MODERATE' ? 'text-amber-600' :
+                riskBand ? 'text-green-600' : 'text-gray-400'
               }`}>
-                {confidenceBand}
+                {riskBand || '—'}
               </p>
             </div>
           </div>

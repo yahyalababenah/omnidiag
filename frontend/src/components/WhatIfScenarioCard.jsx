@@ -120,24 +120,57 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
   const scenarios = isMock ? mockScenarios : counterfactuals;
 
   /**
-   * Extract the risk-reduction percentage from both data formats:
-   * - Mock:    s.riskReduction (number, e.g. 44)
-   * - Backend: derived from (baselineProbability - s.probability), since the API
-   *   returns absolute post-intervention probabilities, not a precomputed percentage.
-   *   Falls back to 0 when baselineProbability wasn't passed in.
+   * Post-intervention probability, on the scale the API returned it.
+   *
+   * The diabetes endpoint names this field `new_probability_corrected`
+   * (with `new_probability` kept as its original alias); the heart endpoint
+   * names it `probability`. Reading only `probability` used to make every
+   * diabetes scenario render as "-0%".
+   */
+  const getScenarioProbability = (s) => {
+    if (typeof s.new_probability_corrected === 'number') return s.new_probability_corrected;
+    if (typeof s.new_probability === 'number') return s.new_probability;
+    if (typeof s.probability === 'number') return s.probability;
+    return null;
+  };
+
+  /**
+   * Risk reduction, relative — "this intervention removes N% of the patient's
+   * risk", not "N percentage points".
+   *
+   * The backend already computes this from the two corrected probabilities
+   * and ships it as `risk_reduction_relative_pct`, so it is used as-is. It is
+   * NOT recomputed locally: subtracting two corrected probabilities gives
+   * percentage points, a different and much smaller number (0.4795 -> 0.0395
+   * is 92% relative but 44 points), and the card is labelled as the former.
+   *
+   * - Backend (preferred): s.risk_reduction_relative_pct
+   * - Backend (legacy string): s.risk_reduction, e.g. "92%"
+   * - Mock: s.riskReduction (number)
+   * - Heart: derived, since that endpoint sends no precomputed reduction
    */
   const getReductionPct = (s) => {
+    if (typeof s.risk_reduction_relative_pct === 'number') {
+      return Math.round(s.risk_reduction_relative_pct);
+    }
+    if (typeof s.risk_reduction === 'string') {
+      const parsed = parseFloat(s.risk_reduction);
+      if (!Number.isNaN(parsed)) return Math.round(parsed);
+    }
     if (typeof s.riskReduction === 'number') return s.riskReduction;
-    if (typeof s.probability === 'number' && typeof baselineProbability === 'number') {
-      return Math.round((baselineProbability - s.probability) * 100);
+    const prob = getScenarioProbability(s);
+    if (prob !== null && typeof baselineProbability === 'number' && baselineProbability > 0) {
+      return Math.round(((baselineProbability - prob) / baselineProbability) * 100);
     }
     return 0;
   };
 
-  const totalReduction = Math.min(
-    scenarios.reduce((acc, s) => acc + getReductionPct(s), 0),
-    100,
-  );
+  // Scenarios are alternatives, not a stack — the headline is the best one
+  // available, not their sum. Summing three ~90% reductions used to saturate
+  // at the 100% clamp and read as "risk eliminated".
+  const totalReduction = scenarios.length
+    ? Math.min(Math.max(...scenarios.map(getReductionPct)), 100)
+    : 0;
 
   return (
     <div className="card border border-blue-100 bg-blue-50/30">
@@ -270,10 +303,15 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
                       </span>
                     ))}
                   </p>
-                  {typeof s.probability === 'number' && (
+                  {getScenarioProbability(s) !== null && (
                     <p className="text-xs text-gray-500 mt-1">
                       Post-intervention probability:{' '}
-                      <strong>{(s.probability * 100).toFixed(1)}%</strong>
+                      <strong>{(getScenarioProbability(s) * 100).toFixed(1)}%</strong>
+                      {s.probability_scale === 'corrected' && (
+                        <span className="text-gray-400">
+                          {' '}(calibrated to real-world prevalence)
+                        </span>
+                      )}
                     </p>
                   )}
                 </div>
@@ -282,8 +320,13 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
                     -{reductionPct}%
                   </div>
                   <div className="text-[10px] text-gray-400">
-                    Risk Reduction
+                    Relative Risk Reduction
                   </div>
+                  {typeof s.risk_reduction_absolute_pp === 'number' && (
+                    <div className="text-[10px] text-gray-400">
+                      ({s.risk_reduction_absolute_pp.toFixed(1)} pts absolute)
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

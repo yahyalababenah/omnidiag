@@ -94,6 +94,9 @@ async def list_review_queue(
             "disease": pred.disease if pred else None,
             "model_prediction": pred.prediction if pred else None,
             "confidence": pred.confidence if pred else None,
+            "probability_scale": pred.probability_scale if pred else None,
+            "uncertainty_scale": rq.uncertainty_scale,
+            "decision_threshold": rq.decision_threshold,
             "features": pred.input_features if pred else None,
         })
 

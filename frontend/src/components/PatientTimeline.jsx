@@ -20,6 +20,7 @@ import {
   AlertCircle, TrendingUp, TrendingDown, Clock, X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useDisease } from '../context/DiseaseContext'
 
 const BASE = '/api/v4'
 
@@ -42,7 +43,10 @@ function SparkTooltip({ active, payload, label }) {
   return (
     <div className="bg-white border border-clinical-border rounded-lg shadow-lg px-3 py-2 text-xs">
       <p className="text-gray-500 mb-0.5">{label}</p>
-      <p className={`font-semibold ${p.value >= 0.5 ? 'text-red-600' : 'text-green-600'}`}>
+      {/* Coloured by the model's own recorded decision, not by a 0.5 cut-off:
+          the diabetes threshold is ~6%, so 0.5 would paint every Positive
+          patient green. */}
+      <p className={`font-semibold ${p.payload?.positive ? 'text-red-600' : 'text-green-600'}`}>
         Risk Probability: {Math.round(p.value * 100)}%
       </p>
     </div>
@@ -173,17 +177,30 @@ function PredictionCard({ prediction, index }) {
 
 // ── Risk trend summary ────────────────────────────────────────────────────────
 
-function RiskTrendCard({ predictions }) {
+function RiskTrendCard({ predictions, threshold = null }) {
   if (predictions.length < 2) return null
 
+  // One axis only: the probability of the positive class, exactly as stored.
+  // This used to plot `1 - confidence` for Negative visits, so a patient whose
+  // risk fell produced a rising line. With the diabetes threshold at 6% rather
+  // than 50% the inversion also crossed the two series over each other.
   const chartData = [...predictions]
     .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
     .map(p => ({
       date: new Date(p.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-      confidence: p.prediction === 1 ? p.confidence : (1 - p.confidence),
+      confidence: p.confidence,
       raw: p.confidence,
       positive: p.prediction === 1,
+      scale: p.probability_scale ?? null,
     }))
+
+  // Rows written before the prevalence correction hold a probability on the
+  // model's raw prior; rows written after hold a corrected one. They are not
+  // the same quantity, so a series that mixes them is flagged rather than
+  // silently drawn as a trend.
+  const scales = new Set(chartData.map(d => d.scale))
+  const mixedScales = scales.size > 1
+  const unknownScale = scales.has(null)
 
   const latest = chartData[chartData.length - 1]
   const prev = chartData[chartData.length - 2]
@@ -209,7 +226,18 @@ function RiskTrendCard({ predictions }) {
             <XAxis dataKey="date" tick={{ fontSize: 10 }} />
             <YAxis domain={[0, 1]} tickFormatter={v => `${Math.round(v * 100)}%`} tick={{ fontSize: 10 }} />
             <Tooltip content={<SparkTooltip />} />
-            <ReferenceLine y={0.5} stroke="#94a3b8" strokeDasharray="4 2" label={{ value: '50%', fontSize: 9, fill: '#94a3b8' }} />
+            {threshold != null && (
+              <ReferenceLine
+                y={threshold}
+                stroke="#dc2626"
+                strokeDasharray="4 2"
+                label={{
+                  value: `Decision threshold ${(threshold * 100).toFixed(1)}%`,
+                  fontSize: 9,
+                  fill: '#dc2626',
+                }}
+              />
+            )}
             <Line
               type="monotone"
               dataKey="confidence"
@@ -221,8 +249,15 @@ function RiskTrendCard({ predictions }) {
           </LineChart>
         </ResponsiveContainer>
         <p className="text-[10px] text-gray-400 mt-2 text-center">
-          Risk score = model risk probability toward positive prediction
+          Risk score = probability of the positive class, as returned by the model
         </p>
+        {(mixedScales || unknownScale) && (
+          <p className="text-[10px] text-amber-600 mt-1 text-center">
+            {mixedScales
+              ? 'This series mixes probabilities recorded on different scales — the trend is not comparable across those points.'
+              : 'Some points were recorded before the probability scale was tracked; treat the trend with caution.'}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -232,6 +267,7 @@ function RiskTrendCard({ predictions }) {
 
 export default function PatientTimeline({ patientId, patientName, onClose }) {
   const { token } = useAuth()
+  const { availableDiseases } = useDisease()
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
@@ -267,6 +303,14 @@ export default function PatientTimeline({ patientId, patientName, onClose }) {
   const diseases = data?.items
     ? [...new Set(data.items.map(p => p.disease))].filter(Boolean)
     : []
+
+  // A decision threshold belongs to one disease on one scale. Only draw the
+  // reference line when the whole series is a single disease and the API
+  // actually reports a threshold for it.
+  const trendThreshold =
+    diseases.length === 1
+      ? availableDiseases?.find(d => d.name === diseases[0])?.inference_threshold ?? null
+      : null
 
   return (
     <div>
@@ -345,8 +389,10 @@ export default function PatientTimeline({ patientId, patientName, onClose }) {
             )}
           </div>
 
-          {/* Risk trend */}
-          <RiskTrendCard predictions={data.items} />
+          {/* Risk trend. The threshold line is only drawn when every point
+              belongs to the same disease — thresholds are per-disease and per
+              scale, so one line across a mixed series would be wrong. */}
+          <RiskTrendCard predictions={data.items} threshold={trendThreshold} />
 
           {/* Timeline */}
           {data.items.length === 0 ? (

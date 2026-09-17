@@ -788,9 +788,8 @@ export default function ClinicalEmrMode() {
       {showReportModal && result && (
         <ClinicalReportModal
           disease={selectedDisease}
-          probability={result.probability ?? result.confidence ?? 0}
+          probabilityCorrected={result.confidence ?? 0}
           label={result.diagnosis ?? result.prediction ?? ''}
-          confidenceBand={result.confidence_band ?? (result.confidence >= 0.7 ? 'HIGH' : result.confidence >= 0.4 ? 'MODERATE' : 'LOW')}
           shapValues={shapData?.chart_data ?? []}
           features={selectedPatient?.data ?? {}}
           onClose={() => setShowReportModal(false)}

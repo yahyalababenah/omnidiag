@@ -116,13 +116,45 @@ class Counterfactual(BaseModel):
     )
     new_probability: float = Field(
         ...,
-        description="Predicted probability of positive class after changes",
+        description=(
+            "Predicted probability of the positive class after the changes, on "
+            "the CORRECTED scale. Kept under its original name; "
+            "`new_probability_corrected` is the same value, explicitly named."
+        ),
         ge=0.0,
         le=1.0
     )
     risk_reduction: str = Field(
         ...,
-        description="Percentage reduction in risk (e.g., '44%')"
+        description="RELATIVE reduction in risk as a string (e.g., '74%')"
+    )
+    risk_reduction_relative_pct: Optional[float] = Field(
+        None,
+        description="(baseline - after) / baseline * 100 — share of risk removed"
+    )
+    risk_reduction_absolute_pp: Optional[float] = Field(
+        None,
+        description=(
+            "(baseline - after) * 100 — percentage POINTS removed. Much smaller "
+            "than the relative figure on a corrected scale: 0.4795 -> 0.0395 is "
+            "92% relative but 44.0 points."
+        )
+    )
+    new_probability_corrected: Optional[float] = Field(
+        None,
+        description="Same value as new_probability, named for its scale",
+        ge=0.0,
+        le=1.0
+    )
+    baseline_probability_corrected: Optional[float] = Field(
+        None,
+        description="Probability before the changes, corrected scale",
+        ge=0.0,
+        le=1.0
+    )
+    probability_scale: Optional[str] = Field(
+        None,
+        description="'corrected' for every probability in this object"
     )
     feasibility: Literal["high", "medium", "low"] = Field(
         ...,
@@ -131,14 +163,26 @@ class Counterfactual(BaseModel):
 
 
 class ExplainResponse(BaseModel):
-    """Response model for the SHAP explanation endpoint."""
+    """
+    Response model for the SHAP explanation endpoint.
+
+    Scale note: for a module with a prevalence correction (diabetes) both
+    `confidence` and `base_value` are on the DEPLOYMENT scale. The per-feature
+    SHAP values are unchanged by the correction — it is a constant additive
+    term in log-odds, absorbed entirely into `base_value`.
+    """
     prediction: Optional[int] = Field(
         None,
         description="Binary prediction (1 = Positive / disease, 0 = Negative)"
     )
     confidence: Optional[float] = Field(
         None,
-        description="Model confidence in the positive class (0.0–1.0)",
+        description=(
+            "Probability of the positive class, on the scale this module "
+            "reports — prevalence-corrected for diabetes, the model's own "
+            "scale for heart. Compare it against inference_threshold, never "
+            "against 0.5."
+        ),
         ge=0.0,
         le=1.0
     )
@@ -156,7 +200,40 @@ class ExplainResponse(BaseModel):
     )
     base_value: float = Field(
         ...,
-        description="Base (expected) value from the SHAP explainer"
+        description=(
+            "Base (expected) value from the SHAP explainer, in log-odds on the "
+            "same scale as `confidence`"
+        )
+    )
+    base_value_raw: Optional[float] = Field(
+        None,
+        description=(
+            "`base_value` before the prior shift, i.e. on the model's own "
+            "training prior. Absent for modules with no correction."
+        )
+    )
+    shap_scale: Optional[str] = Field(
+        None,
+        description="Scale of base_value and the SHAP sum, e.g. 'corrected_log_odds'"
+    )
+    shap_reconstructed_probability_corrected: Optional[float] = Field(
+        None,
+        description=(
+            "sigmoid(base_value + sum(shap_values)) — the probability the "
+            "explanation alone implies"
+        ),
+        ge=0.0,
+        le=1.0
+    )
+    shap_additivity_gap: Optional[float] = Field(
+        None,
+        description=(
+            "|reconstruction - confidence|. Non-zero by construction for a "
+            "stacking ensemble: the SHAP values are averaged over the base "
+            "models while the probability comes from the meta-learner above "
+            "them. Reported rather than hidden."
+        ),
+        ge=0.0
     )
     ensemble_variance: Optional[float] = Field(
         None,

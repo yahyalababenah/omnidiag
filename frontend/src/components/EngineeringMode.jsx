@@ -292,9 +292,8 @@ export default function EngineeringMode() {
       {showReportModal && result && shapData && (
         <ClinicalReportModal
           disease={selectedDisease}
-          probability={result.confidence}
+          probabilityCorrected={result.confidence}
           label={result.diagnosis}
-          confidenceBand={result.confidence >= 0.7 ? 'HIGH' : result.confidence >= 0.4 ? 'MODERATE' : 'LOW'}
           shapValues={shapData.chart_data}
           features={lastFormData}
           onClose={() => setShowReportModal(false)}

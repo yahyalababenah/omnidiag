@@ -398,7 +398,19 @@ function AnnotationQueueTable({ token }) {
                           pred.diagnosis === 'Positive' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                         }`}>{pred.diagnosis ?? '—'}</span>
                       </td>
-                      <td className="py-2 px-2 font-mono">{pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : '—'}</td>
+                      <td className="py-2 px-2 font-mono">
+                        {pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : '—'}
+                        {/* Probabilities from different diseases sit on
+                            different scales, and rows written before the
+                            prevalence correction sit on a different one again.
+                            The row says which, rather than leaving the reader
+                            to assume they are comparable. */}
+                        {pred.probability_scale
+                          ? pred.probability_scale === 'raw' && (
+                              <span className="ml-1 text-[10px] text-amber-600">raw</span>
+                            )
+                          : <span className="ml-1 text-[10px] text-gray-400" title="scale not recorded">?</span>}
+                      </td>
                       <td className="py-2 px-2 font-mono">{item.entropy != null ? item.entropy.toFixed(3) : '—'}</td>
                       <td className="py-2 px-2 text-gray-400">
                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : '—'}
@@ -725,9 +737,14 @@ export default function AdminDashboard() {
               value={stats.total_patients.toLocaleString()}
               color="text-teal-600"
             />
+            {/* Averaged across every disease and every release, over
+                probabilities that are not on a common scale — a corrected
+                diabetes value and a raw heart value do not belong in the same
+                mean. Labelled as the rough indicator it is until the backend
+                splits it by disease and probability_scale. */}
             <StatCard
               icon={TrendingUp}
-              label="Avg Risk Probability"
+              label="Avg Risk Probability (mixed scales)"
               value={pct(stats.avg_confidence)}
               color="text-green-600"
             />
