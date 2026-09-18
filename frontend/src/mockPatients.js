@@ -5,20 +5,33 @@
  * Each patient has realistic vitals/data matching the disease's schema fields,
  * plus clinical meta-fields (history, medications, admittingComplaint).
  *
- * Diabetes profiles (4 total — the A/B/C/D demo set, regenerated 2026-09-11
- * after the ensemble-model-mismatch fix; verified live against the deployed
- * Space's EnsembleModelLoader.predict(), so the printed probabilities below
- * are actual production output, not estimates):
- *   D-001 Noor Sabbagh (NEGATIVE, 9.6%)         — Case A: no real risk factors, healthy baseline
- *   D-002 Karim Yaghi (POSITIVE, 43.2%)         — Case B: one risk factor (HighBP) + fair self-rated health
- *   D-003 Samir Abu-Ghazaleh (POSITIVE, 75.8%)  — Case C: severe but fully mutable risk profile
- *                                                  (obesity, hypertension, hyperlipidemia, active
- *                                                  smoking, sedentary, fair GenHlth, DiffWalk)
- *   D-004 Hala Mansour (POSITIVE, 33.8%)        — Case D: hypertension only, otherwise clean —
- *                                                  deliberately borderline, comfortably above the 0.275
- *                                                  clinical threshold (not flush against it — LightGBM's
- *                                                  output varies slightly by inference environment, so a
- *                                                  case placed right at the edge could flip sides)
+ * Diabetes profiles (4 total — the A/B/C/D demo set). Probabilities below were
+ * re-measured 2026-09-18 by calling EnsembleModelLoader.predict() locally on
+ * exactly these inputs, with configs/diabetes.yaml as committed:
+ * inference_threshold 0.059776 on the deployment prior (raw equivalent
+ * 0.280855), prevalence_train 0.50 → prevalence_deploy 0.14. If
+ * prevalence_deploy changes, every "shown" value below changes with it; the
+ * raw values and every Positive/Negative decision do not.
+ *
+ * Two scales, both listed — the UI shows the CORRECTED one:
+ *                                   raw     shown (corrected)  decision
+ *   D-001 Noor Sabbagh            0.0791   1.4%               NEGATIVE — Case A: no real risk factors
+ *   D-002 Karim Yaghi             0.4352  11.1%               POSITIVE — Case B: HighBP + fair GenHlth
+ *   D-003 Samir Abu-Ghazaleh      0.8498  48.0%               POSITIVE — Case C: severe, fully mutable
+ *                                                                        (obesity, hypertension, hyperlipidemia,
+ *                                                                        smoking, sedentary, fair GenHlth, DiffWalk)
+ *   D-004 Hala Mansour            0.3509   8.1%               POSITIVE — Case D: hypertension only —
+ *                                                                        deliberately borderline
+ *
+ * A Positive at 8–11% is correct, not a bug: the corrected probabilities
+ * sit on a ~14% base rate and the decision threshold is 5.98%, not 50%.
+ *
+ * The earlier figures in this file (9.6 / 43.2 / 75.8 / 33.8%) were raw-scale
+ * values measured on the live Space on 2026-09-11 against the old 0.275
+ * threshold. They are superseded on two counts: the UI no longer shows the
+ * raw scale, and the raw values themselves moved (Case C: 75.8% → 85.0% raw).
+ * These numbers were measured locally, not on the Space; LightGBM output can
+ * shift slightly between inference environments.
  *
  * Case C note: HeartDiseaseorAttack and Stroke are deliberately 0 (Negative).
  * Both are IMMUTABLE_FEATURES in counterfactual_generator.py — the What-If
@@ -33,11 +46,13 @@
  * Case C stability caveat: the number of valid counterfactuals returned for
  * this patient has been observed to vary between 1 and 3 across different
  * container builds of the live Space, with the *baseline* confidence
- * (75.8%) identical bit-for-bit every time. The cause is inference jitter
+ * identical bit-for-bit every time. The cause is inference jitter
  * (floating-point, likely multi-threaded XGBoost/LightGBM/RandomForest) that
  * is not controlled by CounterfactualGenerator's fixed random_state=42 — a
- * borderline candidate can land a hair on either side of the 0.275 decision
- * threshold depending on the container instance, even for identical input.
+ * borderline candidate can land a hair on either side of the decision
+ * threshold (0.059776 corrected / 0.280855 raw) depending on the container
+ * instance, even for identical input. Re-checked locally 2026-09-18: two
+ * uncached calls for Case C returned 2 and 3 valid scenarios.
  * This patient was pushed as low-severity as practical to minimize that
  * risk, but it cannot be eliminated by patient-data tuning alone; a true
  * fix would require either ensembling/averaging repeated model calls inside
@@ -117,7 +132,7 @@ const mockPatients = {
   ],
 
   diabetes: [
-    // ── Case A — clear negative baseline (verified live on Space: 9.6%, Negative) ──
+    // ── Case A — clear negative baseline (raw 0.0791 · shown 1.4% · Negative) ──
     // No real risk factors: no hypertension, no high cholesterol, normal BMI,
     // good self-rated health, active, non-smoker. Regenerated 2026-09-11 after
     // the ensemble-model-mismatch fix (see mockPatients.js history).
@@ -154,7 +169,7 @@ const mockPatients = {
         Income: 7,
       },
     },
-    // ── Case B — moderate positive (verified live on Space: 43.2%, Positive) ──
+    // ── Case B — moderate positive (raw 0.4352 · shown 11.1% · Positive, 1.9× threshold) ──
     // One real risk factor (hypertension) plus only fair self-rated health and
     // a couple of recent unwell days — a "watch and treat" case rather than an
     // alarming one. No cholesterol issue and otherwise active.
@@ -191,7 +206,7 @@ const mockPatients = {
         Income: 6,
       },
     },
-    // ── Case C — strong positive (verified live on Space: 75.8%, Positive) ──
+    // ── Case C — strong positive (raw 0.8498 · shown 48.0% · Positive, HIGH band) ──
     // Severity comes entirely from mutable risk factors: obesity (BMI 33),
     // hypertension, hyperlipidemia, active smoking, sedentary lifestyle,
     // fair self-rated general health, and difficulty walking. No prior
@@ -204,9 +219,10 @@ const mockPatients = {
     // the next container rebuild, with the baseline confidence identical
     // bit-for-bit both times — see the "Case C stability caveat" at the top
     // of this file. This BMI-33 profile was pushed as low-severity as
-    // practical to sit further from the 0.275 threshold, but per that
+    // practical to sit further from the decision threshold, but per that
     // caveat, the same 1-to-3 variance cannot be ruled out here either —
-    // it was observed to give 3/3 on its one live test.
+    // locally on 2026-09-18 it gave 2/3 and 3/3 on two uncached calls.
+    // (The draft percentages above are historical raw-scale values.)
     // Age band 9 = 60–64 (BRFSS coding).
     {
       id: 'D-003',
@@ -243,10 +259,12 @@ const mockPatients = {
         Income: 4,
       },
     },
-    // ── Case D — deliberately borderline (verified live on Space: 33.8%, Positive) ──
+    // ── Case D — deliberately borderline (raw 0.3509 · shown 8.1% · Positive) ──
     // Hypertension only, everything else clean: no high cholesterol, active,
-    // good diet, normal-to-mildly-elevated BMI. Lands comfortably above the
-    // 0.275 clinical threshold (margin ≈ +0.06) rather than flush against it —
+    // good diet, normal-to-mildly-elevated BMI. Lands above the decision
+    // threshold with a margin of +0.070 raw (0.3509 vs 0.2809) = +0.021
+    // corrected (0.0809 vs 0.0598, i.e. 1.35× the threshold) rather than flush
+    // against it —
     // LightGBM's output shifts a few points between inference environments,
     // so a case placed right at the edge could flip Positive/Negative on
     // redeploy. Pairs with Case A to show "one risk factor is sometimes

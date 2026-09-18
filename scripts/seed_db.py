@@ -157,7 +157,55 @@ CAD_PATIENTS = [
     },
 ]
 
-# Diabetes patients (from frontend/src/mockPatients.js diabetes entries)
+
+# ── Real model output for seeded diabetes rows ────────────────────────────────
+_DIABETES_LOADER = None
+
+
+def _score_diabetes(input_features: dict) -> dict:
+    """
+    Score one seeded diabetes patient with the shipped ensemble.
+
+    Returns prediction, confidence (prevalence-corrected, exactly as /predict
+    returns it), diagnosis and the probability_scale to stamp on the row.
+
+    Deliberately has no fallback: if the model cannot be loaded, seeding
+    fails loudly instead of inventing a number. A fabricated probability in
+    a clinical demo database is worse than no row.
+    """
+    global _DIABETES_LOADER
+    if _DIABETES_LOADER is None:
+        import yaml
+        from backend.ensemble_loader import EnsembleModelLoader
+
+        cfg_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "configs", "diabetes.yaml",
+        )
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            _DIABETES_LOADER = EnsembleModelLoader(yaml.safe_load(f))
+
+    from backend.probability_scale import scale_of_result
+
+    result = _DIABETES_LOADER.predict(input_features)
+    return {
+        "prediction": int(result["prediction"]),
+        "confidence": float(result["confidence"]),
+        "diagnosis": result["diagnosis"],
+        "probability_scale": scale_of_result(result).value,
+    }
+
+# Diabetes patients.
+#
+# Only the INPUTS are fixed here. The model output stored for each patient is
+# produced at seed time by EnsembleModelLoader.predict() — the same code path
+# /api/v4/diabetes/predict uses — so a seeded row always matches what the
+# running model would say for that patient, on the scale it reports.
+#
+# These used to be hand-written (0.87 and 0.93). Those were raw-prior-looking
+# numbers with no scale marker; under the prevalence-corrected contract the
+# same two patients score ~0.3–0.5, and a demo database seeded with 0.9x
+# values contradicted every live prediction beside it.
 DM_PATIENTS = [
     {
         "mrn": "DM-001",
@@ -190,9 +238,9 @@ DM_PATIENTS = [
                 "Education": 3,
                 "Income": 4,
             },
-            "prediction": 1,
-            "confidence": 0.87,
-            "diagnosis": "Positive",
+            # prediction / confidence / diagnosis are NOT written here: they
+            # are computed by the real model at seed time — see
+            # _score_diabetes() below.
         },
     },
     {
@@ -226,9 +274,9 @@ DM_PATIENTS = [
                 "Education": 2,
                 "Income": 3,
             },
-            "prediction": 1,
-            "confidence": 0.93,
-            "diagnosis": "Positive",
+            # prediction / confidence / diagnosis are NOT written here: they
+            # are computed by the real model at seed time — see
+            # _score_diabetes() below.
         },
     },
 ]
@@ -380,22 +428,28 @@ async def seed_database(db_url: str) -> None:
                     session.add(patient)
                     await session.flush()
 
-                    # Create prediction
+                    # Create prediction from the real model, not a literal
                     pred = pat_data["prediction"]
+                    scored = _score_diabetes(pred["input_features"])
                     prediction = Prediction(
                         id=str(uuid.uuid4()),
                         patient_id=patient_id,
                         disease=pred["disease"],
                         input_features=pred["input_features"],
-                        prediction=pred["prediction"],
-                        confidence=pred["confidence"],
-                        diagnosis=pred["diagnosis"],
+                        prediction=scored["prediction"],
+                        confidence=scored["confidence"],
+                        probability_scale=scored["probability_scale"],
+                        diagnosis=scored["diagnosis"],
                         created_by=doctor_id,
                     )
                     session.add(prediction)
                     stats["patients"] += 1
                     stats["predictions"] += 1
-                    print(f"  ➕ Created DM patient: {pat_data['full_name']} ({pat_data['mrn']})")
+                    print(
+                        f"  ➕ Created DM patient: {pat_data['full_name']} ({pat_data['mrn']}) "
+                        f"— model: {scored['diagnosis']}, "
+                        f"{scored['confidence']:.1%} ({scored['probability_scale']})"
+                    )
                 else:
                     print(f"  ✓ DM patient already exists: {pat_data['full_name']}")
 
