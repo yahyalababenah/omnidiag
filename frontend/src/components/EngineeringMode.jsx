@@ -261,6 +261,7 @@ export default function EngineeringMode() {
                     baselineProbability={counterfactualsBaseline}
                     loading={counterfactualsLoading}
                     prediction={result?.prediction}
+                    patientData={lastFormData ?? null}
                   />
                 </div>
 

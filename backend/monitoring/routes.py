@@ -35,6 +35,12 @@ class DriftStatusResponse(BaseModel):
     last_run: Optional[str]
     report: Optional[Dict[str, Any]]
     message: str
+    # How the sampled rows split by predictions.probability_scale. Keys are
+    # 'corrected', 'raw' and 'unknown' (NULL — written before the column
+    # existed). Only rows on `confidence_scale` contribute a confidence value;
+    # the rest contribute their input features only. None when not computed.
+    rows_by_probability_scale: Optional[Dict[str, int]] = None
+    confidence_scale: Optional[str] = None
 
 
 # ── GET /admin/drift/{disease}/status ─────────────────────────────────────────
@@ -104,12 +110,35 @@ async def run_drift(
             detail={"error": f"Need at least 10 predictions for {disease}, found {len(rows)}", "code": "INSUFFICIENT_DATA"},
         )
 
-    # Build DataFrame from stored input_features
+    # Build DataFrame from stored input_features.
+    #
+    # Input features are scale-free, so every sampled row contributes them.
+    # `confidence` is not: a window can hold raw-prior rows written before the
+    # prevalence correction, corrected rows written after it, and NULL rows
+    # whose scale was never recorded. Pooling them would register the
+    # correction itself as drift. So confidence is kept only for rows on the
+    # scale this module currently reports, and set to NaN — explicitly, not
+    # by accident — for every other row, including NULL.
+    from configs.config_loader import load_config
+    from backend.probability_scale import scale_of_disease_config
+
+    # The scale this disease reports is a property of its config (both
+    # prevalence priors declared -> corrected). Read the YAML directly rather
+    # than importing backend.main, which would re-run app start-up if the
+    # server was launched under a different module name.
+    try:
+        disease_config = load_config(disease)
+    except Exception:
+        disease_config = None
+    current_scale = scale_of_disease_config(disease_config).value
+    scale_counts: Dict[str, int] = {"corrected": 0, "raw": 0, "unknown": 0}
     records = []
     for p in rows:
+        row_scale = p.probability_scale if p.probability_scale is not None else "unknown"
+        scale_counts[row_scale] = scale_counts.get(row_scale, 0) + 1
         row = dict(p.input_features or {})
         row["prediction"] = p.prediction
-        row["confidence"] = p.confidence
+        row["confidence"] = p.confidence if row_scale == current_scale else float("nan")
         records.append(row)
 
     current_df = pd.DataFrame(records)
@@ -130,6 +159,8 @@ async def run_drift(
         last_run=monitor.last_run.isoformat() if monitor.last_run else None,
         report=report,
         message="Drift report computed successfully.",
+        rows_by_probability_scale=scale_counts,
+        confidence_scale=current_scale,
     )
 
 

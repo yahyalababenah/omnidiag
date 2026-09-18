@@ -224,6 +224,7 @@ export default function ClinicalEmrMode() {
           shapText={shapData?.text_explanation}
           counterfactuals={counterfactualsData}
           counterfactualsBaseline={counterfactualsBaseline}
+          patientData={selectedPatient?.data ?? null}
           shapImageUrl={imgUrl}
           reportDate={new Date().toLocaleDateString('en-GB')}
         />
@@ -632,6 +633,7 @@ export default function ClinicalEmrMode() {
                       baselineProbability={counterfactualsBaseline}
                       loading={counterfactualsLoading}
                       prediction={result?.prediction}
+                      patientData={selectedPatient?.data ?? null}
                     />
                   </div>
 

@@ -388,7 +388,20 @@ function AnnotationQueueTable({ token }) {
               </thead>
               <tbody>
                 {items.map(item => {
-                  const pred = item.prediction ?? {}
+                  // GET /review/queue returns flat rows (disease,
+                  // model_prediction, confidence, probability_scale,
+                  // uncertainty_score). This table used to read a nested
+                  // `item.prediction` object that the endpoint never sends,
+                  // so every cell rendered "—". The nested shape is still
+                  // accepted if a future endpoint provides it.
+                  const pred = item.prediction ?? {
+                    disease: item.disease,
+                    diagnosis: item.model_prediction == null
+                      ? null
+                      : (item.model_prediction === 1 ? 'Positive' : 'Negative'),
+                    confidence: item.confidence,
+                    probability_scale: item.probability_scale,
+                  }
                   const busy = annotating[item.id] !== undefined
                   return (
                     <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -405,13 +418,16 @@ function AnnotationQueueTable({ token }) {
                             prevalence correction sit on a different one again.
                             The row says which, rather than leaving the reader
                             to assume they are comparable. */}
-                        {pred.probability_scale
+                        {pred.probability_scale != null
                           ? pred.probability_scale === 'raw' && (
-                              <span className="ml-1 text-[10px] text-amber-600">raw</span>
+                              // Neutral, not a warning: 'raw' is the only
+                              // scale heart has. It only signals a problem on
+                              // a module that reports corrected values.
+                              <span className="ml-1 text-[10px] text-gray-400">raw</span>
                             )
                           : <span className="ml-1 text-[10px] text-gray-400" title="scale not recorded">?</span>}
                       </td>
-                      <td className="py-2 px-2 font-mono">{item.entropy != null ? item.entropy.toFixed(3) : '—'}</td>
+                      <td className="py-2 px-2 font-mono">{(item.entropy ?? item.uncertainty_score) != null ? (item.entropy ?? item.uncertainty_score).toFixed(3) : '—'}</td>
                       <td className="py-2 px-2 text-gray-400">
                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : '—'}
                       </td>
@@ -738,13 +754,12 @@ export default function AdminDashboard() {
               color="text-teal-600"
             />
             {/* Averaged across every disease and every release, over
-                probabilities that are not on a common scale — a corrected
-                diabetes value and a raw heart value do not belong in the same
-                mean. Labelled as the rough indicator it is until the backend
-                splits it by disease and probability_scale. */}
+                probabilities that are not on a common scale. Kept for
+                continuity; the per-disease, per-scale table below is the
+                figure to read. */}
             <StatCard
               icon={TrendingUp}
-              label="Avg Risk Probability (mixed scales)"
+              label="Avg Risk Probability (all rows, mixed scales)"
               value={pct(stats.avg_confidence)}
               color="text-green-600"
             />
@@ -761,6 +776,41 @@ export default function AdminDashboard() {
               color="text-amber-600"
             />
           </div>
+
+          {/* The meaningful version of the average: one row per disease and
+              probability scale. 'unknown' rows predate the scale column and
+              are shown as their own group, never merged into a known one. */}
+          {Array.isArray(stats.avg_confidence_by_scale) && stats.avg_confidence_by_scale.length > 0 && (
+            <div className="card">
+              <div className="card-header">
+                <h3 className="text-sm font-semibold text-gray-900">Avg Risk Probability by Disease and Scale</h3>
+              </div>
+              <div className="card-body overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="py-1 px-2">Disease</th>
+                      <th className="py-1 px-2">Scale</th>
+                      <th className="py-1 px-2">Predictions</th>
+                      <th className="py-1 px-2">Avg probability</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.avg_confidence_by_scale.map((row) => (
+                      <tr key={`${row.disease}-${row.probability_scale}`} className="border-t border-gray-100">
+                        <td className="py-1 px-2 capitalize">{row.disease.replace(/_/g, ' ')}</td>
+                        <td className={`py-1 px-2 ${row.probability_scale === 'unknown' ? 'text-amber-600' : ''}`}>
+                          {row.probability_scale === 'unknown' ? 'not recorded' : row.probability_scale}
+                        </td>
+                        <td className="py-1 px-2 font-mono">{row.count}</td>
+                        <td className="py-1 px-2 font-mono">{pct(row.avg_confidence)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Charts row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

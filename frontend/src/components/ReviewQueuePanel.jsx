@@ -51,7 +51,7 @@ function ReviewCard({ item, onAnnotate, onSkip }) {
           {/* The queue holds rows from several releases. A probability without
               its scale is not a number a reviewer can act on, so an untagged
               row says so instead of quietly looking like the tagged ones. */}
-          {item.probability_scale ? (
+          {item.probability_scale != null ? (
             item.decision_threshold != null && (
               <p className="text-[10px] text-gray-400">
                 threshold {(item.decision_threshold * 100).toFixed(1)}%
@@ -69,7 +69,7 @@ function ReviewCard({ item, onAnnotate, onSkip }) {
           Uncertainty (entropy around the decision threshold)
         </p>
         <UncertaintyBar score={item.uncertainty_score} />
-        {!item.uncertainty_scale && (
+        {item.uncertainty_scale == null && (
           <p className="text-[10px] text-amber-600 mt-0.5">
             Scored by an earlier release, centred on 50% rather than this
             module&apos;s threshold — not comparable with the rows above.

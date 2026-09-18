@@ -113,3 +113,29 @@ def classify_band(probability_corrected: float, risk_bands: Mapping[str, float])
     if moderate is not None and probability_corrected >= moderate:
         return "MODERATE"
     return "LOW"
+
+
+def scale_of_result(result: Mapping) -> Scale:
+    """
+    The scale a loader's predict()/explain() result is stated on.
+
+    A module that applied the prevalence correction says so with
+    `prevalence_correction_applied: True`; its probabilities are CORRECTED.
+    A module that did not (heart_disease) reports the model's own output,
+    which is RAW by definition — there is no other scale for it to be on.
+    Stamping heart rows as "corrected" would claim a correction that never
+    happened.
+    """
+    return Scale.CORRECTED if result.get("prevalence_correction_applied") is True else Scale.RAW
+
+
+def scale_of_disease_config(disease_config: Mapping | None) -> Scale:
+    """
+    The scale a disease reports, read from its config: CORRECTED when both
+    prevalence priors are declared (EnsembleModelLoader then refuses to run
+    without applying the correction), RAW otherwise.
+    """
+    model_cfg = (disease_config or {}).get("model", {}) or {}
+    if {"prevalence_train", "prevalence_deploy"} <= set(model_cfg):
+        return Scale.CORRECTED
+    return Scale.RAW

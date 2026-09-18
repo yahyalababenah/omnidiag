@@ -336,11 +336,26 @@ class DailyCount(BaseModel):
     count: int
 
 
+class ScaleAverage(BaseModel):
+    disease: str
+    # 'corrected' | 'raw' | 'unknown'. 'unknown' is a NULL probability_scale:
+    # a row written before the column existed. It is reported as its own
+    # group, never folded into a known one.
+    probability_scale: str
+    count: int
+    avg_confidence: float
+
+
 class AdminStats(BaseModel):
     total_predictions: int
     total_users: int
     total_patients: int
+    # Legacy: the mean over every row of every disease and every release.
+    # Those probabilities are not on a common scale, so this number has no
+    # clinical meaning. Kept so existing clients do not break; use
+    # avg_confidence_by_scale instead.
     avg_confidence: float
+    avg_confidence_by_scale: List[ScaleAverage] = []
     positive_rate: float
     avg_latency_ms: float
     predictions_by_disease: List[DiseaseCount]
@@ -368,9 +383,35 @@ async def get_stats(
     # Total patients
     total_patients = (await db.execute(select(func.count()).select_from(Patient))).scalar_one()
 
-    # Avg confidence
+    # Avg confidence (legacy, mixed scales — see AdminStats)
     avg_conf_row = (await db.execute(select(func.avg(Prediction.confidence)))).scalar_one()
     avg_conf = float(avg_conf_row or 0.0)
+
+    # Avg confidence per disease AND per probability scale. NULL is mapped to
+    # the literal 'unknown' in SQL (COALESCE), so it forms its own group rather
+    # than being silently dropped by GROUP BY semantics or merged into another.
+    scale_label = func.coalesce(Prediction.probability_scale, "unknown")
+    scale_rows = (
+        await db.execute(
+            select(
+                Prediction.disease,
+                scale_label.label("scale"),
+                func.count().label("count"),
+                func.avg(Prediction.confidence).label("avg"),
+            )
+            .group_by(Prediction.disease, scale_label)
+            .order_by(Prediction.disease, scale_label)
+        )
+    ).all()
+    avg_confidence_by_scale = [
+        ScaleAverage(
+            disease=r.disease,
+            probability_scale=r.scale,
+            count=r.count,
+            avg_confidence=round(float(r.avg or 0.0), 4),
+        )
+        for r in scale_rows
+    ]
 
     # Positive rate
     pos_count = (
@@ -442,6 +483,7 @@ async def get_stats(
         total_users=total_users,
         total_patients=total_patients,
         avg_confidence=round(avg_conf, 4),
+        avg_confidence_by_scale=avg_confidence_by_scale,
         positive_rate=round(positive_rate, 4),
         avg_latency_ms=round(avg_latency, 1),
         predictions_by_disease=predictions_by_disease,

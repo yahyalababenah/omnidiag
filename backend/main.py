@@ -43,14 +43,14 @@ from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Respo
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.router import OmniDiagRouter
-from backend.schemas import get_schema_for_disease, ExplainResponse
+from backend.schemas import get_schema_for_disease, ExplainResponse, PredictResponse
 from backend.auth.routes import router as auth_router
 from backend.admin.routes import router as admin_router
 from backend.patients.routes import router as patients_router
@@ -59,7 +59,7 @@ from backend.auth.dependencies import get_current_active_user, get_optional_user
 from backend.cache import (init_cache, cache_get, cache_set, predict_cache_key,
                            schema_cache_key, counterfactuals_cache_key,
                            cached_payload_matches_scale)
-from backend.probability_scale import Scale
+from backend.probability_scale import scale_of_disease_config, scale_of_result
 from backend.database import get_db, engine, AsyncSessionLocal, Base
 from backend.db_models.prediction import Prediction
 from backend.db_models.user import User
@@ -92,7 +92,6 @@ try:
     from backend.active_learning.routes import router as review_router
     from backend.active_learning.sampler import (
         DEFAULT_DECISION_THRESHOLD,
-        UNCERTAINTY_SCALE,
         should_queue_for_review,
         prediction_entropy,
     )
@@ -102,7 +101,6 @@ except Exception as _e:
     review_router = None
     _HAS_AL = False
     DEFAULT_DECISION_THRESHOLD = 0.5
-    UNCERTAINTY_SCALE = "corrected"
     def should_queue_for_review(_p, decision_threshold=0.5): return False
     def prediction_entropy(_p, decision_threshold=0.5): return 0.0
 
@@ -372,7 +370,12 @@ def _validate_patient_input(disease: str, patient: dict) -> dict:
         ) from exc
 
 
-@app.post("/api/v4/{disease}/predict", tags=["Clinical Diagnosis"])
+@app.post(
+    "/api/v4/{disease}/predict",
+    tags=["Clinical Diagnosis"],
+    response_model=PredictResponse,
+    response_model_exclude_unset=True,
+)
 @limiter.limit(LIMIT_CLINICAL)
 async def predict_disease(
     request: Request,
@@ -445,6 +448,10 @@ async def predict_disease(
                 decision_threshold = float(
                     result.get("inference_threshold", DEFAULT_DECISION_THRESHOLD)
                 )
+                # Which scale this module reports: corrected for diabetes, the
+                # model's own (raw) scale for heart. Read from the result, not
+                # assumed — heart has no correction to claim.
+                reported_scale = scale_of_result(result).value
                 record = Prediction(
                     id=str(_uuid.uuid4()),
                     patient_id=patient_id,
@@ -452,7 +459,7 @@ async def predict_disease(
                     input_features=patient_data,
                     prediction=int(result.get("prediction", 0)),
                     confidence=confidence_corrected,
-                    probability_scale=Scale.CORRECTED.value,
+                    probability_scale=reported_scale,
                     diagnosis=result.get("diagnosis"),
                     created_by=current_user.id,
                 )
@@ -472,7 +479,7 @@ async def predict_disease(
                         uncertainty_score=prediction_entropy(
                             confidence_corrected, decision_threshold=decision_threshold
                         ),
-                        uncertainty_scale=UNCERTAINTY_SCALE,
+                        uncertainty_scale=reported_scale,
                         decision_threshold=decision_threshold,
                     )
                     db.add(rq)
@@ -520,9 +527,13 @@ async def explain_disease(
         # Persist prediction + SHAP data only for authenticated users
         if current_user:
             try:
-                # /explain mirrors /predict's probability, so it is on the
-                # same (corrected) scale and is stamped the same way.
+                # /explain mirrors /predict's probability. Its result does not
+                # carry prevalence_correction_applied, so the scale comes from
+                # the disease config — the same source the loader obeys.
                 confidence_corrected = float(result.get("confidence", 0.0))
+                reported_scale = scale_of_disease_config(
+                    router.disease_configs.get(disease)
+                ).value
                 record = Prediction(
                     id=str(_uuid.uuid4()),
                     patient_id=patient_id,
@@ -530,7 +541,7 @@ async def explain_disease(
                     input_features=patient_data,
                     prediction=int(result.get("prediction", 0)),
                     confidence=confidence_corrected,
-                    probability_scale=Scale.CORRECTED.value,
+                    probability_scale=reported_scale,
                     diagnosis=result.get("diagnosis"),
                     shap_chart_data=result.get("chart_data"),
                     created_by=current_user.id,
@@ -734,7 +745,16 @@ class ReportRequest(BaseModel):
 
     disease: str
     probability_corrected: float | None = None
-    probability: float | None = None          # deprecated alias
+    probability: float | None = Field(
+        None,
+        deprecated=True,
+        description=(
+            "DEPRECATED — the pre-correction name for probability_corrected. It "
+            "carries no scale information. Accepted only so HTTP clients built "
+            "before the prevalence correction keep working; the value is "
+            "treated as probability_corrected. New clients must not send it."
+        ),
+    )
     label: str
     confidence_band: str | None = None        # advisory; server recomputes
     shap_values: List[Dict[str, Any]]

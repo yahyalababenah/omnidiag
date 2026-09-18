@@ -1,4 +1,5 @@
 import { Zap, Lightbulb, TrendingDown, CheckCircle2, Loader2 } from 'lucide-react';
+import { normaliseScenario } from '../utils/counterfactuals';
 import MedicalTooltip from './MedicalTooltip';
 
 /**
@@ -24,7 +25,7 @@ import MedicalTooltip from './MedicalTooltip';
  * `baselineProbability` (the request's `baseline_probability`) is required to turn a scenario's
  * `probability` into a risk-reduction percentage; pass it whenever available.
  */
-export default function WhatIfScenarioCard({ counterfactuals, loading, prediction, baselineProbability }) {
+export default function WhatIfScenarioCard({ counterfactuals, loading, prediction, baselineProbability, patientData = null }) {
   /* ── Mock placeholder data (fallback when API unavailable) ── */
   const mockScenarios = [
     {
@@ -117,7 +118,12 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
      counterfactuals.length > 0 → real backend data
      ════════════════════════════════════════ */
   const isMock = counterfactuals === null;
-  const scenarios = isMock ? mockScenarios : counterfactuals;
+  // Real scenarios are normalised to one shape: diabetes sends `changes` as
+  // an object and no scenario_id, which used to route it into the mock
+  // branch below and render "If undefined drops from undefined".
+  const scenarios = isMock
+    ? mockScenarios
+    : counterfactuals.map((s, i) => normaliseScenario(s, i, patientData));
 
   /**
    * Post-intervention probability, on the scale the API returned it.
@@ -338,7 +344,7 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
           <div className="flex items-center gap-2 mb-1.5">
             <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-xs font-medium text-gray-600">
-              Cumulative Risk Reduction Potential
+              Best Single-Scenario Risk Reduction
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
@@ -348,7 +354,7 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
             />
           </div>
           <p className="text-[10px] text-gray-400 mt-1">
-            Addressing all suggested factors could reduce overall risk by up to{' '}
+            The most effective scenario above reduces relative risk by up to{' '}
             <strong>{totalReduction}%</strong>
           </p>
         </div>

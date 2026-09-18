@@ -22,6 +22,7 @@ import {
   Image,
   Font,
 } from '@react-pdf/renderer'
+import { normaliseScenario } from '../utils/counterfactuals'
 
 // ── Colour palette (matches Tailwind clinical theme) ──────────────────────────
 const C = {
@@ -175,6 +176,7 @@ export default function PDFReport({
   shapText,
   counterfactuals,
   counterfactualsBaseline,
+  patientData = null,
   shapImageUrl,
   doctorName,
   clinicName,
@@ -197,7 +199,10 @@ export default function PDFReport({
   // report. The backend's own relative reduction is preferred over recomputing
   // here, because subtracting two probabilities gives percentage points, which
   // is a different number from the one this row is labelled with.
-  const cfs = (counterfactuals ?? []).slice(0, 3).map((cf) => {
+  const cfs = (counterfactuals ?? []).slice(0, 3).map((raw, i) => {
+    // Same normaliser as the What-If card: diabetes `changes` is an object,
+    // and calling .map() on it threw and aborted the whole PDF export.
+    const cf = normaliseScenario(raw, i, patientData)
     const after =
       cf.new_probability_corrected ?? cf.new_probability ?? cf.probability ?? null
     let reduction = null

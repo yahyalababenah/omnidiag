@@ -96,37 +96,14 @@ def _format_features(features: Dict[str, Any]) -> str:
     return "\n".join(lines[:20])  # cap to avoid prompt bloat
 
 
-def _resolve_probability(
-    probability_corrected: Optional[float], probability: Optional[float]
-) -> float:
-    """
-    Accept either the explicit name or the legacy scaleless one.
-
-    `probability=` predates the prevalence correction and says nothing about
-    which scale its value is on. It is still accepted so existing callers keep
-    working, but it is deprecated: pass `probability_corrected=`.
-    """
-    if probability_corrected is not None:
-        return float(probability_corrected)
-    if probability is not None:
-        log.debug(
-            "report_generator: `probability=` is deprecated and carries no scale; "
-            "pass `probability_corrected=` instead"
-        )
-        return float(probability)
-    raise TypeError("probability_corrected is required")
-
-
 def _rule_based_report(
     disease_display: str,
-    probability_corrected: Optional[float] = None,
-    label: str = "",
+    probability_corrected: float,
+    label: str,
     shap_values: Optional[List[Dict[str, Any]]] = None,
     features: Optional[Dict[str, Any]] = None,
     risk_bands: Optional[Mapping[str, float]] = None,
-    probability: Optional[float] = None,          # deprecated alias
 ) -> str:
-    probability_corrected = _resolve_probability(probability_corrected, probability)
     shap_values = shap_values or []
     features = features or {}
     top = sorted(shap_values, key=lambda x: abs(x.get("shap_value", 0)), reverse=True)[:3]
@@ -155,15 +132,14 @@ def _rule_based_report(
 
 async def generate_report(
     disease_display: str,
-    probability_corrected: Optional[float] = None,
-    label: str = "",
+    probability_corrected: float,
+    label: str,
     confidence_band: Optional[str] = None,
     shap_values: Optional[List[Dict[str, Any]]] = None,
     features: Optional[Dict[str, Any]] = None,
     model: str = "deepseek-chat",
     risk_bands: Optional[Mapping[str, float]] = None,
     decision_threshold: Optional[float] = None,
-    probability: Optional[float] = None,          # deprecated alias
 ) -> Dict[str, Any]:
     """
     Generate a structured clinical report.
@@ -187,7 +163,7 @@ async def generate_report(
     """
     import time
 
-    probability_corrected = _resolve_probability(probability_corrected, probability)
+    probability_corrected = float(probability_corrected)
     shap_values = shap_values or []
     features = features or {}
     bands = risk_bands or DEFAULT_RISK_BANDS

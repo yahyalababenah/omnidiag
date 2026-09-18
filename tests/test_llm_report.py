@@ -31,7 +31,7 @@ class TestRuleBasedFallback:
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Coronary Artery Disease",
-                probability=0.75,
+                probability_corrected=0.75,
                 label="Positive",
                 confidence_band="CERTAIN",
                 shap_values=_SHAP_VALUES,
@@ -45,7 +45,7 @@ class TestRuleBasedFallback:
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Coronary Artery Disease Risk",
-                probability=0.75,
+                probability_corrected=0.75,
                 label="Positive",
                 confidence_band="CERTAIN",
                 shap_values=_SHAP_VALUES,
@@ -58,7 +58,7 @@ class TestRuleBasedFallback:
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
-                probability=0.82,
+                probability_corrected=0.82,
                 label="Positive",
                 confidence_band="CERTAIN",
                 shap_values=_SHAP_VALUES,
@@ -72,7 +72,7 @@ class TestRuleBasedFallback:
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
-                probability=0.82,
+                probability_corrected=0.82,
                 label="Positive",
                 confidence_band="CERTAIN",
                 shap_values=_SHAP_VALUES,
@@ -86,7 +86,7 @@ class TestRuleBasedFallback:
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
-                probability=0.2,
+                probability_corrected=0.2,
                 label="Negative",
                 confidence_band="CONFIDENT",
                 shap_values=_SHAP_VALUES,
@@ -118,7 +118,7 @@ class TestMockedAPICall:
             with patch("openai.AsyncOpenAI", MockAsyncOpenAI):
                 result = await generate_report(
                     disease_display="Heart Disease",
-                    probability=0.75,
+                    probability_corrected=0.75,
                     label="Positive",
                     confidence_band="CERTAIN",
                     shap_values=_SHAP_VALUES,
@@ -136,7 +136,7 @@ class TestMockedAPICall:
             with patch("openai.AsyncOpenAI", side_effect=Exception("API failure")):
                 result = await generate_report(
                     disease_display="Diabetes",
-                    probability=0.5,
+                    probability_corrected=0.5,
                     label="Positive",
                     confidence_band="UNCERTAIN",
                     shap_values=_SHAP_VALUES,
@@ -181,7 +181,7 @@ class TestFormatShap:
         """L-4f: _rule_based_report can be called directly and returns a non-empty string."""
         result = _rule_based_report(
             disease_display="Diabetes",
-            probability=0.65,
+            probability_corrected=0.65,
             label="Positive",
             shap_values=_SHAP_VALUES,
             features=_FEATURES,
@@ -189,3 +189,65 @@ class TestFormatShap:
         assert isinstance(result, str)
         assert len(result) > 50
         assert "Diabetes" in result
+
+
+# ── Corrected-scale bands (diabetes) ──────────────────────────────────────────
+# Diabetes probabilities are on the deployment prior (~14%), so its bands are
+# the corrected twins of the raw 0.70 / 0.40 cut-points. Literal 0.70 / 0.40
+# made HIGH unreachable and filed thousands of Positive patients under LOW.
+_DIABETES_BANDS = {"high": 0.2752808988764045, "moderate": 0.09790209790209792}
+
+
+class TestCorrectedScaleBands:
+    async def test_diabetes_positive_is_high_on_corrected_bands(self):
+        """L-5a: 0.48 corrected (raw 0.85) is HIGH, not MODERATE."""
+        with patch.object(rg, "_get_api_key", lambda: ""):
+            result = await generate_report(
+                disease_display="Diabetes",
+                probability_corrected=0.4795,
+                label="Positive",
+                shap_values=_SHAP_VALUES,
+                features=_FEATURES,
+                risk_bands=_DIABETES_BANDS,
+                decision_threshold=0.059776,
+            )
+        assert result["risk_band"] == "HIGH"
+        assert "Urgent specialist referral" in result["report"]
+
+    async def test_diabetes_moderate_band(self):
+        """L-5b: 0.111 corrected (raw 0.435) is MODERATE, not LOW."""
+        with patch.object(rg, "_get_api_key", lambda: ""):
+            result = await generate_report(
+                disease_display="Diabetes",
+                probability_corrected=0.1114,
+                label="Positive",
+                risk_bands=_DIABETES_BANDS,
+            )
+        assert result["risk_band"] == "MODERATE"
+
+    async def test_caller_band_is_advisory(self):
+        """L-5c: a contradicting caller-supplied band is discarded."""
+        with patch.object(rg, "_get_api_key", lambda: ""):
+            result = await generate_report(
+                disease_display="Diabetes",
+                probability_corrected=0.4795,
+                label="Positive",
+                confidence_band="LOW",
+                risk_bands=_DIABETES_BANDS,
+            )
+        assert result["risk_band"] == "HIGH"
+
+    async def test_heart_default_bands_unchanged(self):
+        """L-5d: no bands supplied -> the historical 0.70 / 0.40 cut-points."""
+        with patch.object(rg, "_get_api_key", lambda: ""):
+            result = await generate_report(
+                disease_display="Heart", probability_corrected=0.55, label="Positive",
+            )
+        assert result["risk_band"] == "MODERATE"
+
+    async def test_legacy_probability_keyword_is_gone(self):
+        """L-5e: the scaleless `probability=` alias no longer exists internally."""
+        with pytest.raises(TypeError):
+            await generate_report(
+                disease_display="Diabetes", probability=0.5, label="Positive",
+            )

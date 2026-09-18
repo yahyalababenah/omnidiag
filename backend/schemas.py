@@ -162,6 +162,74 @@ class Counterfactual(BaseModel):
     )
 
 
+class PredictResponse(BaseModel):
+    """
+    Response model for POST /api/v4/{disease}/predict.
+
+    Two shapes share this model:
+
+    * heart_disease returns only prediction / confidence / diagnosis, on the
+      model's own scale with an argmax 0.5 cut-point.
+    * diabetes additionally returns the prevalence-correction audit fields.
+      Its `confidence` is on the DEPLOYMENT prior and must be compared with
+      `inference_threshold` (same scale), never with 0.5.
+
+    The route uses response_model_exclude_unset=True, so a field a module
+    does not send is absent from the JSON rather than present as null —
+    heart's response stays exactly the three keys it has always had.
+
+    Naming contract (backend/probability_scale.py): an unsuffixed probability
+    or threshold is on the scale the module reports (corrected for diabetes);
+    a `_raw` suffix means the model's own training-prior scale.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    prediction: int = Field(..., description="1 = Positive, 0 = Negative")
+    confidence: float = Field(
+        ...,
+        description=(
+            "Probability of the positive class on the reported scale — "
+            "prevalence-corrected for diabetes. Same value as probability_corrected."
+        ),
+        ge=0.0,
+        le=1.0,
+    )
+    diagnosis: str = Field(..., description="'Positive' or 'Negative'")
+
+    probability_raw: Optional[float] = Field(
+        None, description="Ensemble output on the training prior (50/50 resample)", ge=0.0, le=1.0
+    )
+    probability_corrected: Optional[float] = Field(
+        None, description="Bayes prior-shift corrected probability; equals confidence", ge=0.0, le=1.0
+    )
+    prevalence_correction_applied: Optional[bool] = Field(
+        None, description="True whenever the two fields above differ in meaning"
+    )
+    prevalence_train: Optional[float] = Field(None, description="Class prior of the training sample")
+    prevalence_deploy: Optional[float] = Field(None, description="Class prior of the deployment population")
+    inference_threshold: Optional[float] = Field(
+        None, description="Decision threshold on the same scale as confidence"
+    )
+    inference_threshold_raw: Optional[float] = Field(
+        None, description="The same threshold on the training-prior scale, for auditing"
+    )
+    risk_bands: Optional[Dict[str, float]] = Field(
+        None, description="Display bands (high / moderate) on the same scale as confidence"
+    )
+    risk_bands_raw: Optional[Dict[str, float]] = Field(
+        None, description="The same bands on the training-prior scale"
+    )
+    model_contributions: Optional[Dict[str, float]] = Field(
+        None, description="Per-base-model probability, training-prior scale (uncorrected)"
+    )
+    ensemble_type: Optional[str] = Field(None, description="'stacking' or 'voting'")
+    ensemble_variance: Optional[float] = Field(
+        None, description="Std of base-model probabilities (training-prior scale)", ge=0.0
+    )
+    model_agreement: Optional[str] = Field(None, description="'high' | 'moderate' | 'low'")
+
+
 class ExplainResponse(BaseModel):
     """
     Response model for the SHAP explanation endpoint.

@@ -56,10 +56,6 @@ _CERTAIN_MARGIN = 0.85
 _CONFIDENT_MARGIN = 0.70
 _BORDERLINE_MARGIN = 0.60
 
-# The scale every score produced here is stated on, recorded alongside the
-# stored uncertainty_score so a later reader can tell.
-UNCERTAINTY_SCALE = "corrected"
-
 
 def centre_on_threshold(probability: float, decision_threshold: float) -> float:
     """

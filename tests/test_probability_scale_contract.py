@@ -27,7 +27,13 @@ from typing import List, NamedTuple
 
 import pytest
 
-from backend.probability_scale import Scale, ScaledProbability, classify_band
+from backend.probability_scale import (
+    Scale,
+    ScaledProbability,
+    classify_band,
+    scale_of_disease_config,
+    scale_of_result,
+)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -42,6 +48,11 @@ SCANNED_MODULES = (
     "backend/active_learning/sampler.py",
     "backend/llm/report_generator.py",
     "backend/main.py",
+    "backend/cache.py",
+    "backend/monitoring/metrics.py",
+    "backend/monitoring/routes.py",
+    "backend/admin/routes.py",
+    "backend/active_learning/routes.py",
 )
 
 # Identifiers that denote a probability. Substring match, plus a few exact
@@ -359,3 +370,33 @@ class TestClassifyBand:
 
     def test_missing_bands_fall_back_to_low(self):
         assert classify_band(0.99, {}) == "LOW"
+
+
+class TestScaleOfResult:
+    """Stored rows must be stamped with the scale that was actually used."""
+
+    def test_diabetes_result_is_corrected(self):
+        assert scale_of_result({"confidence": 0.1, "prevalence_correction_applied": True}) is Scale.CORRECTED
+
+    def test_heart_result_is_raw(self):
+        # Heart applies no correction; calling its output "corrected" would
+        # claim a transformation that never happened.
+        assert scale_of_result({"confidence": 0.36, "prediction": 0, "diagnosis": "Negative"}) is Scale.RAW
+
+    def test_truthy_but_not_true_is_not_enough(self):
+        assert scale_of_result({"prevalence_correction_applied": "yes"}) is Scale.RAW
+
+    def test_config_with_both_priors_is_corrected(self):
+        cfg = {"model": {"prevalence_train": 0.5, "prevalence_deploy": 0.14}}
+        assert scale_of_disease_config(cfg) is Scale.CORRECTED
+
+    def test_config_without_priors_is_raw(self):
+        assert scale_of_disease_config({"model": {}}) is Scale.RAW
+        assert scale_of_disease_config(None) is Scale.RAW
+
+    def test_shipped_configs(self):
+        import yaml
+        with open(os.path.join(ROOT, "configs", "diabetes.yaml")) as f:
+            assert scale_of_disease_config(yaml.safe_load(f)) is Scale.CORRECTED
+        with open(os.path.join(ROOT, "configs", "heart_disease.yaml")) as f:
+            assert scale_of_disease_config(yaml.safe_load(f)) is Scale.RAW
