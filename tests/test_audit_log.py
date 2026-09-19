@@ -2,13 +2,15 @@
 Integration Tests — AuditMiddleware (I-7 through I-11)
 Verifies that every API request is recorded in the audit_logs table.
 
-The AuditMiddleware uses AsyncSessionLocal from backend.database, which points to
-the production DB. We patch it to use TestSessionLocal so the middleware writes
-to the same in-memory SQLite that fixtures use.
+The AuditMiddleware used to open AsyncSessionLocal from backend.database directly,
+which bypassed the get_db override and wrote to the real database, so this module
+patched it locally. Every OTHER test module was left writing to omnidiag_dev.db
+(WEAKNESS_REGISTER.md P-13). The middleware now resolves its session through
+backend.database.app_session, which honours app.dependency_overrides[get_db], so
+no patch is needed and every module is isolated the same way.
 """
 
 import pytest
-from unittest.mock import patch
 from sqlalchemy import select
 
 from backend.db_models.audit_log import AuditLog
@@ -24,10 +26,9 @@ HEART_PAYLOAD = {
 
 
 @pytest.fixture(autouse=True)
-def patch_middleware_session(db_tables):
-    """Route AuditMiddleware DB writes to the test in-memory SQLite database."""
-    with patch("backend.middleware.audit.AsyncSessionLocal", TestSessionLocal):
-        yield
+def audit_tables(db_tables):
+    """Ensure the test tables exist; the middleware reaches them via the get_db override."""
+    yield
 
 
 class TestAuditMiddlewareLogsRequests:

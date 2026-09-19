@@ -73,5 +73,5 @@ class Prediction(Base):
         return (
             f"<Prediction(id={self.id}, disease='{self.disease}', "
             f"prediction={self.prediction}, confidence={self.confidence:.3f} "
-            f"[{self.probability_scale or 'scale unknown'}])>"
+            f"[{self.probability_scale if self.probability_scale is not None else 'scale unknown'}])>"
         )

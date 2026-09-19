@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { CheckCircle, XCircle, SkipForward, Loader2, AlertCircle, Brain, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import DiseaseContext from '../context/DiseaseContext';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.space';
 
@@ -21,6 +22,13 @@ function UncertaintyBar({ score }) {
 
 function ReviewCard({ item, onAnnotate, onSkip }) {
   const [busy, setBusy] = useState(false);
+  // Read the context directly (not useDisease()) so the card degrades
+  // gracefully instead of throwing if it is ever rendered outside the provider.
+  const diseaseCtx = useContext(DiseaseContext);
+  const moduleThreshold =
+    diseaseCtx?.availableDiseases?.find((d) => d.name === item.disease)?.inference_threshold ?? null;
+  // No configured threshold means the module uses argmax (0.5).
+  const legacyScoreComparable = moduleThreshold == null || moduleThreshold === 0.5;
 
   async function handleAction(action) {
     setBusy(true);
@@ -70,10 +78,22 @@ function ReviewCard({ item, onAnnotate, onSkip }) {
         </p>
         <UncertaintyBar score={item.uncertainty_score} />
         {item.uncertainty_scale == null && (
-          <p className="text-[10px] text-amber-600 mt-0.5">
-            Scored by an earlier release, centred on 50% rather than this
-            module&apos;s threshold — not comparable with the rows above.
-          </p>
+          // Rows scored before uncertainty_scale existed used entropy centred
+          // on 50%. Whether that matters depends on the module: it IS the
+          // decision threshold for an argmax module (heart), so those scores
+          // are still comparable; it is not for diabetes (threshold ~6%).
+          legacyScoreComparable ? (
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              Scored before the scale was recorded, centred on 50% — this
+              module&apos;s decision threshold, so still comparable.
+            </p>
+          ) : (
+            <p className="text-[10px] text-amber-600 mt-0.5">
+              Scored before the scale was recorded, centred on 50% rather than
+              this module&apos;s {moduleThreshold != null ? `${(moduleThreshold * 100).toFixed(1)}% ` : ''}
+              threshold — not comparable with newer rows.
+            </p>
+          )
         )}
       </div>
 

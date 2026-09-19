@@ -10,6 +10,18 @@ Strategy:
   - Each test function gets a clean database via function-scoped fixtures
 """
 
+import os
+
+# ── Test isolation: set BEFORE anything imports backend.* ────────────────────
+# backend/main.py calls load_dotenv(), and .env points DATABASE_URL at the
+# developer's real omnidiag_dev.db. Any code path that opened a session
+# without going through get_db (the audit middleware did) therefore wrote to
+# that file on every test run. Setting the variable here first wins, because
+# load_dotenv() does not override an existing value. This is the second line
+# of defence; the first is backend.database.app_session honouring the get_db
+# override. See WEAKNESS_REGISTER.md P-13.
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+
 import asyncio
 import uuid
 from typing import AsyncGenerator

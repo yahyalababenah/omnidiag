@@ -36,7 +36,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from backend.database import AsyncSessionLocal
+from backend.database import app_session
 from backend.db_models.audit_log import AuditLog
 
 log = logging.getLogger("omnidiag.audit")
@@ -88,7 +88,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         # Best-effort DB write — never raise to the client
         try:
-            async with AsyncSessionLocal() as db:
+            # Resolved like Depends(get_db), so a test's DB override applies
+            # here too — see backend.database.app_session.
+            async with app_session(request.app) as db:
                 entry = AuditLog(
                     user_id=user_id,
                     endpoint=request.url.path,

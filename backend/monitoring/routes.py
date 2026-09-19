@@ -19,7 +19,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from backend.auth.rbac import require_role, ADMIN_ROLES
+from backend.database import get_db
 from backend.monitoring.drift import get_monitor
 from backend.monitoring.metrics import get_metrics_response
 from backend.monitoring.mlflow_tracker import list_recent_runs, log_model_info
@@ -79,8 +82,12 @@ async def run_drift(
     disease: str,
     body: DriftRunRequest = None,
     _: object = Depends(require_role(*ADMIN_ROLES)),
+    db: AsyncSession = Depends(get_db),
 ) -> DriftStatusResponse:
-    from backend.database import async_session_maker
+    # Previously imported `async_session_maker` from backend.database — a name
+    # that does not exist there (the factory is AsyncSessionLocal), so every
+    # call to this route raised ImportError. The session now comes from the
+    # standard dependency, which also makes it overridable in tests.
     from backend.db_models.prediction import Prediction
     from sqlalchemy import select
     import json as _json
@@ -94,15 +101,14 @@ async def run_drift(
 
     sample_size = (body.sample_size if body else 1000)
 
-    async with async_session_maker() as db:
-        rows = (
-            await db.execute(
-                select(Prediction)
-                .where(Prediction.disease == disease)
-                .order_by(Prediction.created_at.desc())
-                .limit(sample_size)
-            )
-        ).scalars().all()
+    rows = (
+        await db.execute(
+            select(Prediction)
+            .where(Prediction.disease == disease)
+            .order_by(Prediction.created_at.desc())
+            .limit(sample_size)
+        )
+    ).scalars().all()
 
     if len(rows) < 10:
         raise HTTPException(

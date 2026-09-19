@@ -16,6 +16,7 @@ Environment Variables:
 """
 
 import os
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -73,3 +74,27 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             yield session
         finally:
             await session.close()
+
+
+# ── Sessions outside Depends() ──────────────────────────────────────────────
+@asynccontextmanager
+async def app_session(app) -> AsyncGenerator[AsyncSession, None]:
+    """
+    An AsyncSession for code that runs outside FastAPI's dependency system —
+    middleware, startup hooks — resolved the SAME way a route's
+    `Depends(get_db)` would be, including `app.dependency_overrides[get_db]`.
+
+    Why this exists: the audit middleware used to open `AsyncSessionLocal()`
+    directly. That bypassed the override the test suite installs, so every
+    `pytest` run appended audit rows to whatever DATABASE_URL pointed at —
+    in local development, the real `omnidiag_dev.db` (7,888 rows had built up
+    there). Going through this helper, a test run writes to the test engine
+    and production behaves exactly as before.
+    """
+    provider = app.dependency_overrides.get(get_db, get_db)
+    agen = provider()
+    session = await agen.__anext__()
+    try:
+        yield session
+    finally:
+        await agen.aclose()
