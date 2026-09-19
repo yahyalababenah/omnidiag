@@ -1,0 +1,11 @@
+Diabetes stacking ensemble — held-out test set (n=14139, prevalence 50.00%)
+threshold (raw, training prior)      : 0.275000
+threshold (deployment prior, pi=0.14): 0.058157
+source of threshold                  : 0.275 (selected on y_test)
+
+                 pred_neg   pred_pos
+actual_neg           3866       3204
+actual_pos            597       6472
+
+sensitivity 0.9155   specificity 0.5468
+clinical cost 2*FN + FP = 4398

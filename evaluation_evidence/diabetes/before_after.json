@@ -1,0 +1,52 @@
+{
+  "before": {
+    "threshold_used_raw": 0.275,
+    "threshold_shown_to_user": 0.275,
+    "sensitivity": 0.9155467534304711,
+    "specificity": 0.5468175388967468,
+    "ppv_test_50": 0.6688714344770567,
+    "ppv_at_14": 0.2474864140007102,
+    "npv_at_14": 0.9754744146777091,
+    "flagged_at_deploy": 0.5179134620290637,
+    "cost_per_1000_test": 311.0545300233397,
+    "brier_shown_prob_at_14": 0.17526628915440093,
+    "ece_shown_prob_at_14": 0.23918725354488451,
+    "mean_shown_prob_at_14": 0.37918725354488453,
+    "roc_auc": 0.830515830719341
+  },
+  "after": {
+    "threshold_used_raw": 0.2808542713567839,
+    "threshold_shown_to_user": 0.059776,
+    "sensitivity": 0.9131418871127458,
+    "specificity": 0.5541725601131542,
+    "ppv_test_50": 0.6719059019464974,
+    "ppv_at_14": 0.2500528087900903,
+    "npv_at_14": 0.9751198522938238,
+    "flagged_at_deploy": 0.5112514624984719,
+    "cost_per_1000_test": 309.78145554848294,
+    "brier_shown_prob_at_14": 0.09737795972378095,
+    "ece_shown_prob_at_14": 0.0081947618548104,
+    "mean_shown_prob_at_14": 0.142394360084455,
+    "roc_auc": 0.830515830719341
+  },
+  "delta": {
+    "threshold_used_raw": 0.005854271356783902,
+    "threshold_shown_to_user": -0.21522400000000003,
+    "sensitivity": -0.002404866317725296,
+    "specificity": 0.007355021216407409,
+    "ppv_test_50": 0.0030344674694406937,
+    "ppv_at_14": 0.0025663947893800887,
+    "npv_at_14": -0.00035456238388531514,
+    "flagged_at_deploy": -0.006661999530591878,
+    "cost_per_1000_test": -1.2730744748567417,
+    "brier_shown_prob_at_14": -0.07788832943061998,
+    "ece_shown_prob_at_14": -0.2309924916900741,
+    "mean_shown_prob_at_14": -0.23679289346042953,
+    "roc_auc": 0.0
+  },
+  "notes": {
+    "before": "threshold 0.275 chosen on y_test; raw (50/50-prior) probability displayed",
+    "after": "threshold chosen on training OOF; probability and threshold on 14% prior",
+    "decisions_changed_by_correction_alone_on_test": 0
+  }
+}

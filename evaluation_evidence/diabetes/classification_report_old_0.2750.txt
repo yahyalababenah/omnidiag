@@ -1,0 +1,21 @@
+threshold 0.275 (selected on y_test)
+
+A) Held-out test set as sampled (50/50):
+              precision    recall  f1-score   support
+
+ No diabetes     0.8662    0.5468    0.6704      7070
+    Diabetes     0.6689    0.9155    0.7730      7069
+
+    accuracy                         0.7312     14139
+   macro avg     0.7676    0.7312    0.7217     14139
+weighted avg     0.7676    0.7312    0.7217     14139
+
+B) Same rows re-weighted to deployment prevalence 14% (importance weights; recall per class is unchanged, precision is not):
+              precision    recall  f1-score   support
+
+ No diabetes     0.9755    0.5468    0.7008    7070.0
+    Diabetes     0.2475    0.9155    0.3896 1150.930232558183
+
+    accuracy                         0.5984 8220.930232558183
+   macro avg     0.6115    0.7312    0.5452 8220.930232558183
+weighted avg     0.8736    0.5984    0.6572 8220.930232558183

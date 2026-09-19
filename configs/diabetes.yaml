@@ -84,8 +84,26 @@ features:
 model:
   type: "ensemble"                    # Signals EnsembleModelLoader in router
   explainer_type: "tree"              # All base models use TreeExplainer
-  inference_threshold: 0.275          # Clinical-optimised (FN penalty=2x) — 91.7% sensitivity at 54.6% specificity
+  # Stated on the DEPLOYMENT prior (prevalence_deploy), because predict() compares
+  # it with the prevalence-corrected probability. Raw (50/50-prior) equivalent:
+  # 0.280854, selected on training out-of-fold predictions with Cost = 2*FN + FP
+  # (was 0.275, selected on y_test). Test set: 91.3% sensitivity, 55.4% specificity.
+  # Evidence: evaluation_evidence/diabetes/threshold_decision_log.md
+  inference_threshold: 0.059776
   weights_path: "models/diabetes/omni_diag_xgb_optimized.pkl"
+  # Prior-shift (Bayes) correction — see backend/prevalence_correction.py.
+  # The training file is the pre-balanced 50/50 BRFSS variant; the real BRFSS
+  # 2015 diabetes prevalence is ~14%. predict() maps every probability from
+  # prevalence_train to prevalence_deploy before comparing and returning it.
+  prevalence_train: 0.50
+  prevalence_deploy: 0.14
+  # Display bands for the risk badge (HIGH / MODERATE / LOW), stated on the
+  # RAW model scale so the same patients fall in the same band as before the
+  # prevalence correction. predict() maps them to the deployment prior and
+  # returns both scales; the UI reads them from the response.
+  risk_bands:
+    high: 0.70
+    moderate: 0.40
   fallback_weights_path: "models/diabetes/voting_ensemble.pkl"
   preprocessors_path: "models/diabetes/preprocessors/"
   best_params:

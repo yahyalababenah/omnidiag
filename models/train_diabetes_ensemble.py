@@ -697,14 +697,14 @@ def update_config_inference_threshold(
     # Replace the inference_threshold value line, preserving the comment
     content = re.sub(
         r'(inference_threshold:\s*)[0-9]+\.[0-9]+',
-        rf'\g<1>{optimal_threshold:.4f}',
+        rf'\g<1>{optimal_threshold:.6f}',
         content,
     )
 
     with open(config_path, "w") as f:
         f.write(content)
 
-    log.info(f"Updated config inference_threshold → {optimal_threshold:.4f} in {config_path}")
+    log.info(f"Updated config inference_threshold → {optimal_threshold:.6f} in {config_path}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -927,15 +927,29 @@ def main():
     log.info("Step 6: Clinical threshold optimisation (FN 2× cost)")
     log.info("=" * 60)
 
-    # Get stacking ensemble probabilities for threshold tuning
-    stacking_proba = predict_stacking_proba(X_test_fe, base_models, meta_learner)
+    # The threshold is a model decision, so it is chosen on training data
+    # only. X_meta already holds the base models' out-of-fold probabilities
+    # (same StratifiedKFold as generate_out_of_fold_predictions); a clone of
+    # the meta-learner is cross-validated over it so that every stacking
+    # probability used here comes from a model that never saw that row.
+    # Selecting on y_test would leak the test labels into the decision rule.
+    from sklearn.base import clone
+    from sklearn.model_selection import StratifiedKFold, cross_val_predict
+
+    threshold_cv = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    oof_stacking_proba = cross_val_predict(
+        clone(meta_learner), X_meta, y_train, cv=threshold_cv, method="predict_proba"
+    )[:, 1]
 
     threshold_result = find_optimal_clinical_threshold(
-        y_true=y_test,
-        y_proba=stacking_proba,
+        y_true=y_train,
+        y_proba=oof_stacking_proba,
         fn_penalty_multiplier=2.0,
     )
     optimal_threshold = threshold_result["optimal_threshold"]
+
+    # Test-set probabilities: evaluation and the false-negative export only.
+    stacking_proba = predict_stacking_proba(X_test_fe, base_models, meta_learner)
 
     # Log stacking metrics at the new clinical threshold for comparison
     y_pred_optimal = (stacking_proba >= optimal_threshold).astype(int)
@@ -967,12 +981,27 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     # Save Artifacts + Update Config
     # ═══════════════════════════════════════════════════════════════════════
+    # configs/diabetes.yaml states inference_threshold on the deployment
+    # prior, because EnsembleModelLoader.predict() compares it against the
+    # prevalence-corrected probability. Map it the same way before writing.
+    from backend.prevalence_correction import apply_prevalence_correction
+
+    model_cfg = config.get("model", {})
+    deployed_threshold = float(apply_prevalence_correction(
+        optimal_threshold,
+        model_cfg["prevalence_train"],
+        model_cfg["prevalence_deploy"],
+    ))
+    log.info(f"  Threshold on deployment prior: {deployed_threshold:.6f}")
+
     all_metrics = {
         "single_xgboost": single_metrics,
         "stacking_ensemble": stacking_metrics,
         "voting_ensemble": voting_metrics,
         "clinical_threshold": {
             "optimal_threshold": optimal_threshold,
+            "selected_on": "training out-of-fold predictions",
+            "deployed_threshold": deployed_threshold,
             "fn_penalty_multiplier": 2.0,
             "minimum_cost": threshold_result["minimum_cost"],
             "metrics_at_optimal": threshold_result["metrics_at_optimal"],
@@ -1000,7 +1029,7 @@ def main():
         single_xgb,
         all_metrics,
         config,
-        inference_threshold=optimal_threshold,
+        inference_threshold=deployed_threshold,
     )
 
     log.info("\n" + "=" * 60)

@@ -70,7 +70,7 @@ This is **separate from** and **in addition to** the third token (`hf_KueNwzRHce
 `AUDIT_REPORT.md` C-22 found live in `.git/config`. **Three credentials total.**
 
 > Whether the two committed tokens were ever actually revoked is **UNVERIFIED** — confirming it
-> means calling the GitHub/HF APIs with them, which I will not do. See Decision D-1.
+> means calling the GitHub/HF APIs with them, which I will not do. See Decision H-1.
 
 ## Check B — diabetes `/counterfactuals` raw shape vs heart vs the component
 
@@ -173,7 +173,7 @@ Timing on a **freshly started process with an empty cache** (`scratch/check_c_co
 | `README.md:155` | Retrain limitation | ❌ D20 — names the wrong three files, understates severity |
 | **Proposal §8.1** | The metrics table + "every figure reproducible" | ❌ D1, D4–D7, D9 |
 | `plans/OMNIDIAG_TECHNICAL_DOCS.md` | 73 KB of detail | ❌ D4–D6, D9, D11, D12, wrong repo org, 58.70% spec ×3 |
-| **`/docs` (Swagger)** | Title "OmniDiag Multi-Disease Diagnostic API", **version 4.0.0**, **description in Arabic only** | ⚠️ version 4.0.0 vs module 5.0.0 vs artifact 5.1.0; Arabic-only description — see Decision D-5 |
+| **`/docs` (Swagger)** | Title "OmniDiag Multi-Disease Diagnostic API", **version 4.0.0**, **description in Arabic only** | ⚠️ version 4.0.0 vs module 5.0.0 vs artifact 5.1.0; Arabic-only description — see Decision H-5 |
 | `GET /` | `{"version":"4.0.0"}` | ⚠️ same three-way version drift |
 | `GET /api/v4/diseases` | `heart_disease version=5.0.0`, **`supports_counterfactuals=True`** | ❌ contradicts `router.py:166-167` hint text claiming heart has no CF generator |
 | Admin dashboard | `label="Avg Risk Probability"` (`AdminDashboard.jsx:730`) | ✅ **already correct** — defense gap #10 is stale; only the backing field is still named `avg_confidence` |
@@ -195,7 +195,7 @@ Timing on a **freshly started process with an empty cache** (`scratch/check_c_co
 | **W-01** | **Two live credentials committed to git history, pushed to 7 refs including the public HF Space.** `experiment_files/production_audit_and_action_plan.md:35,47` (blob `47b2324`) | Check A. GitHub PAT `ghp_vkVLzf…` + HF token `hf_aOYuxa…`. Reachable from `origin/main`, `origin/deploy/v2-platform`, `hf/main`, +4. Third token live in `.git/config` (AUDIT C-22) | **Docs / Technical 20** — and real-world security | S1 | **OPEN** | decision-needed → code | 2h revoke · 0.5–1d history rewrite |
 | **W-02** | **Proposal §8.1 cites `models/heart_disease/metrics.json` as the source for every figure. That file contains SVM metrics.** | Check D1 + AUDIT C-1. File = `{"roc_auc_full_fit":0.957,"best_model":"svm","best_cv_roc_auc":0.919}`. 0 of 7 heart figures present. Defense gap #2 🔴 | **Evidence 5 / Q&A 5 / Technical 20** | S1 | **OPEN** | docs-only + delete artifact | 1h |
 | **W-03** | **Heart sensitivity 80.46% / specificity 83.13% / threshold 0.420 are unreproducible.** Proposal §8.1; `DOCS:412-414,965-967` | AUDIT C-10/11/12 + `evaluation_evidence/heart_disease_report.txt`. All 4 orientation×threshold variants tested: production = **71.11% / 85.53%**, argmax 0.5. `grep 0.42` → zero threshold hits. `frontend/src/constants/thresholds.js:18-26` documents argmax in writing. Defense gap #3 🔴 | **Evidence 5 / Q&A 5 / Technical 20** | S1 | **OPEN** | decision-needed (restate vs implement) | 2h restate · 1d implement+revalidate |
-| **W-04** | **Diabetes accuracy 75.18% is measured at 0.5 while the product runs at 0.275.** `configs/diabetes.yaml:87`, applied `ensemble_loader.py:328` | AUDIT C-13/C-6 + `evaluation_evidence/diabetes_report.txt`. 73.12% @ 0.275. Arithmetic tell: (91.7+54.6)/2 = 73.17 ≠ 75.18 | **Evidence 5 / Q&A 5** | S1 | **OPEN** | docs-only | 1h |
+| **W-04** | **Diabetes accuracy 75.18% is measured at 0.5 while the product runs at 0.275.** `configs/diabetes.yaml:87`, applied `ensemble_loader.py:328` | AUDIT C-13/C-6 + `evaluation_evidence/diabetes_report.txt`. 73.12% @ 0.275. Arithmetic tell: (91.7+54.6)/2 = 73.17 ≠ 75.18. **2026-09-17 update:** the threshold is no longer 0.275 (see H-1 in Part 5). At the new raw threshold 0.2809 (deployed 0.059776) accuracy is **73.36%** [72.64, 74.09]; source `evaluation_evidence/diabetes/final_metrics_table.md` | **Evidence 5 / Q&A 5** | S1 | **OPEN** | docs-only | 1h |
 | **W-05** | **Diabetes What-If renders `undefined`; PDF export throws.** `WhatIfScenarioCard.jsx:166,171`; `PDFReport.jsx:193-195` | Check B (raw JSON both paths). `scenario_id` missing on diabetes → falls to mock branch. `(cf.changes ?? []).map()` on an object → `TypeError` | **Demo 25** | S1 | **PARTIALLY-FIXED** (heart ✅ `bc1b5b4` 2026-09-10; diabetes ❌ never verified) | code | 3h + 1h test |
 | **W-06** | **Demo Case C: 0 counterfactuals, 85.0% vs documented 75.8%.** `frontend/src/mockPatients.js:8-16,194` | AUDIT C-20/C-21. Live: `no_valid_counterfactuals`, 0 scenarios after 9.3 s → UI shows heart-disease mock data + "Coming Soon" on a diabetes patient | **Demo 25** | S1 | **REGRESSED** (commits `dd7095e`/`698974b` tuned it to 0.78–0.85 / 3-of-3; neither holds here) | decision-needed → code/data | 2–4h |
 | **W-07** | **Federated learning cannot aggregate.** `federated/client.py:67-75` returns `[pickle.dumps(model)]`; `aggregator.py:47` uses Flower `FedAvg` | Session finding, verified. FedAvg element-wise-averages `List[np.ndarray]`; it receives one opaque pickle blob. XGBoost trees cannot be averaged — correct approach is SecureBoost. `add_dp_noise()` (`aggregator.py:96-123`) is **never called** and clips "gradients" that do not exist on this path. Defense gap #1 🔴 + س31 "most dangerous question" | **Technical 20 / Q&A 5** | S1 | **OPEN** | decision-needed (reframe as PoC vs build) | 2h reframe · ≫19d to build |
@@ -254,14 +254,14 @@ Timing on a **freshly started process with an empty cache** (`scratch/check_c_co
 | # | ID | The question a judge will actually ask | Do we have an answer today? |
 |---|---|---|---|
 | 1 | **W-02** | *"Your proposal says every figure is reproducible from `models/heart_disease/metrics.json`. I opened it — it says `best_model: svm`, ROC-AUC 0.957. Explain."* | ❌ **NO.** There is no honest answer that preserves the sentence. Must be corrected before submission. The only defensible reply is: wrong file cited, here is `models/metrics.json`, and here is the reproduction script. |
-| 2 | **W-03** | *"Show me where threshold 0.420 is applied in the code."* | ❌ **NO.** It is applied nowhere. The UI displays 50.0%. Requires Decision D-2 first. |
-| 3 | **W-01** | *"Your repo history contains a GitHub PAT and an HF token. Were they revoked?"* | ⚠️ **PARTIAL.** We can say "found and rotated" **only after** D-1. Right now we cannot even confirm revocation. |
-| 4 | **W-07** | *"How does the federated part actually work?"* (defense doc marks س31 the single most dangerous question) | ❌ **NO.** Flower `FedAvg` cannot average a pickled XGBoost model; the DP function is never called. Needs D-4: reframe as an explicit PoC. |
+| 2 | **W-03** | *"Show me where threshold 0.420 is applied in the code."* | ❌ **NO.** It is applied nowhere. The UI displays 50.0%. Requires Decision H-2 first. |
+| 3 | **W-01** | *"Your repo history contains a GitHub PAT and an HF token. Were they revoked?"* | ⚠️ **PARTIAL.** We can say "found and rotated" **only after** H-1. Right now we cannot even confirm revocation. |
+| 4 | **W-07** | *"How does the federated part actually work?"* (defense doc marks س31 the single most dangerous question) | ❌ **NO.** Flower `FedAvg` cannot average a pickled XGBoost model; the DP function is never called. Needs H-4: reframe as an explicit PoC. |
 | 5 | **W-05 / W-06** | *"Run the diabetes What-If on your severe demo patient."* | ❌ **NO.** Case C returns 0 scenarios after 9.3 s, then the UI shows heart-disease mock values and "Coming Soon". This is a live demo failure, not a document problem. |
-| 6 | **W-12** | *"Was your scaler fit before or after the train/test split?"* | ⚠️ **PARTIAL.** Diabetes: strong answer with evidence. Heart: fit on all 605 rows — needs D-3 (disclose vs re-run). |
+| 6 | **W-12** | *"Was your scaler fit before or after the train/test split?"* | ⚠️ **PARTIAL.** Diabetes: strong answer with evidence. Heart: fit on all 605 rows — needs H-3 (disclose vs re-run). |
 | 7 | **W-04** | *"75.18% accuracy with 91.70% sensitivity and 54.63% specificity on a balanced set — those don't reconcile."* | ✅ **YES**, once restated. 73.1% @ 0.275 is measured and defensible as a screening trade-off. Pure docs fix. |
 | 8 | **W-11** | *"Why did you remove `ca` and `thal`?"* (defense س26 — your strongest answer) | ✅ **YES** — the س26 answer is excellent (Kaufman leakage + TRIPOD). ⚠️ **But** `metadata.json` still ships both feature names and `best_model:"svm"`, which hands the judge a contradiction mid-answer. Delete the file and the answer is clean. |
-| 9 | **W-09** | *"You claim hot reload with no restart, and an HPA of 2–10 replicas. Which pod gets the new model?"* | ❌ **NO.** One pod. Needs a scoping sentence (D-6). |
+| 9 | **W-09** | *"You claim hot reload with no restart, and an HPA of 2–10 replicas. Which pod gets the new model?"* | ❌ **NO.** One pod. Needs a scoping sentence (H-6). |
 | 10 | **W-08** | *"What happens when I click Retrain?"* | ❌ **NO** — and worse than documented. It targets a live base model, and the README describes the opposite. |
 
 **Answers that are already strong — lead with these:** config-driven router with zero hard-coded diseases (D21, live-demoable); `ca`/`thal` removal reasoning (س26, once W-11 is deleted); the 0.275 cost-function threshold (س20, once the 87.3% number in W-15 is corrected); the Optuna-overfitting lesson (س18); SHAP label-inversion correctness, proved by additivity to 1e-9 (`AUDIT_REPORT.md` AUDIT 7).
@@ -270,17 +270,22 @@ Timing on a **freshly started process with an empty cache** (`scratch/check_c_co
 
 # PART 3 — DECISIONS REQUIRED FROM A HUMAN (these block tomorrow's fixes)
 
+> **IDs renamed 2026-09-17:** these decisions are `H-1 … H-9` (formerly `D-1 … D-9`).
+> `D-1 … D-8` now belong exclusively to the diabetes limitations in Part 5.
+> Unrelated: `D-1 … D-5` in `tests/test_database.py` and `plans/testing_checklist.md`
+> are database-test IDs and were left alone.
+
 | ID | Decision | Why it blocks | Options |
 |---|---|---|---|
-| **D-1** | **Credential response.** Were `ghp_vkVLzf…` and `hf_aOYuxa…` ever actually revoked? And do we rewrite history on 7 pushed refs (incl. the public HF Space) or accept the exposure? | I will not test the tokens. History rewrite breaks every clone and is irreversible — cannot be done on my judgment. Blocks W-01. | (a) Rotate all 3 + rewrite history + force-push · (b) Rotate + leave history, document it · (c) Rotate only |
-| **D-2** | **Heart metrics: restate or implement?** Publish the true 71.1%/85.5% @ argmax, or implement a real 0.420 threshold, revalidate and republish? | Determines whether W-03 is a 2h docs edit or a 1d code+revalidation task. Cascades into the proposal, DOCS, and the defense doc. | (a) Restate (honest, fast, defensible) · (b) Implement 0.420 and re-measure everything · (c) Implement a *derived* clinical threshold and justify it |
-| **D-3** | **Heart leakage: disclose or re-run?** | Re-running `clean_data.py` fit-on-train-only changes every heart number in every document, including ones that currently reproduce. Nineteen days is enough, but only if started now. | (a) Disclose as a stated limitation · (b) Re-run, retrain, re-report all heart figures |
-| **D-4** | **Federated learning: how do we present it?** | Cannot be made to work in 19 days (needs SecureBoost). Determines the §10.4 rewrite and the س31 answer. | (a) Explicit "architectural proof-of-concept, not functional aggregation" · (b) Remove from the proposal · (c) Demo the transport layer only, state the aggregation gap |
-| **D-5** | **Demo Case C.** | W-06 is the most visible demo failure and the fix is a data/tuning judgment, not a code bug. | (a) Re-tune the patient until 3/3 generate · (b) Raise `n_samples` for the demo path · (c) Replace Case C with a patient that reliably generates · (d) Accept 0 and script the narration |
-| **D-6** | **Scope claim for K8s / HPA / hot reload.** | W-09 + W-25. Either scope the claim honestly or build multi-pod invalidation (≫19d). | (a) "Single-instance deployment; multi-replica invalidation is future work" · (b) Build it |
-| **D-7** | **Model weights for the judges.** | W-22. Affects whether a clone can run at all. | (a) LFS on the demo branch · (b) USB / local machine only · (c) Documented download step |
-| **D-8** | **Swagger `/docs` description is Arabic-only** (`main.py:178`). | Judge-visible surface; depends on the language of the evaluation. | (a) Bilingual · (b) English · (c) Leave |
-| **D-9** | **The two uncommitted files** (`backend/auth/routes.py`, `scripts/simulate_federated.py`). | W-44. Unknown whether they are wanted before the freeze. | (a) Commit · (b) Revert · (c) Leave and note |
+| **H-1** | **Credential response.** Were `ghp_vkVLzf…` and `hf_aOYuxa…` ever actually revoked? And do we rewrite history on 7 pushed refs (incl. the public HF Space) or accept the exposure? | I will not test the tokens. History rewrite breaks every clone and is irreversible — cannot be done on my judgment. Blocks W-01. | (a) Rotate all 3 + rewrite history + force-push · (b) Rotate + leave history, document it · (c) Rotate only |
+| **H-2** | **Heart metrics: restate or implement?** Publish the true 71.1%/85.5% @ argmax, or implement a real 0.420 threshold, revalidate and republish? | Determines whether W-03 is a 2h docs edit or a 1d code+revalidation task. Cascades into the proposal, DOCS, and the defense doc. | (a) Restate (honest, fast, defensible) · (b) Implement 0.420 and re-measure everything · (c) Implement a *derived* clinical threshold and justify it |
+| **H-3** | **Heart leakage: disclose or re-run?** | Re-running `clean_data.py` fit-on-train-only changes every heart number in every document, including ones that currently reproduce. Nineteen days is enough, but only if started now. | (a) Disclose as a stated limitation · (b) Re-run, retrain, re-report all heart figures |
+| **H-4** | **Federated learning: how do we present it?** | Cannot be made to work in 19 days (needs SecureBoost). Determines the §10.4 rewrite and the س31 answer. | (a) Explicit "architectural proof-of-concept, not functional aggregation" · (b) Remove from the proposal · (c) Demo the transport layer only, state the aggregation gap |
+| **H-5** | **Demo Case C.** | W-06 is the most visible demo failure and the fix is a data/tuning judgment, not a code bug. | (a) Re-tune the patient until 3/3 generate · (b) Raise `n_samples` for the demo path · (c) Replace Case C with a patient that reliably generates · (d) Accept 0 and script the narration |
+| **H-6** | **Scope claim for K8s / HPA / hot reload.** | W-09 + W-25. Either scope the claim honestly or build multi-pod invalidation (≫19d). | (a) "Single-instance deployment; multi-replica invalidation is future work" · (b) Build it |
+| **H-7** | **Model weights for the judges.** | W-22. Affects whether a clone can run at all. | (a) LFS on the demo branch · (b) USB / local machine only · (c) Documented download step |
+| **H-8** | **Swagger `/docs` description is Arabic-only** (`main.py:178`). | Judge-visible surface; depends on the language of the evaluation. | (a) Bilingual · (b) English · (c) Leave |
+| **H-9** | **The two uncommitted files** (`backend/auth/routes.py`, `scripts/simulate_federated.py`). | W-44. Unknown whether they are wanted before the freeze. | (a) Commit · (b) Revert · (c) Leave and note |
 
 ---
 
@@ -306,7 +311,58 @@ Verified done. Do not spend the 19 days on these.
 | **`.env` never committed** | AUDIT git hygiene | ✅ **VERIFIED** | Not tracked; `.gitignore:184`. The real `DEEPSEEK_API_KEY` is local-only. ⚠️ Two *other* credentials **were** committed → W-01 |
 | **README contains no performance claims** | AUDIT 5 | ✅ **VERIFIED** | Zero metric numbers. Its API-shape tables are wrong (W-23), but no metrics to defend |
 | **Heart accuracy 80.17% + ROC-AUC 0.856** | Proposal §8.1 | ✅ **REPRODUCED EXACTLY** | `evaluation_evidence/heart_disease_report.txt` — subject to W-12 |
-| **Diabetes ROC-AUC 0.831 / sens 91.70% / spec 54.63%** | Proposal §8.1 | ✅ **REPRODUCED** (0.8305 / 91.55% / 54.68%) | `evaluation_evidence/diabetes_report.txt` |
+| **Diabetes ROC-AUC 0.831 / sens 91.70% / spec 54.63%** | Proposal §8.1 | ✅ **REPRODUCED** (0.8305 / 91.55% / 54.68%) — ⚠️ *2026-09-17:* sens/spec are **at 0.275**, which is no longer shipped; at the OOF threshold they are **91.31% / 55.42%** (H-1, Part 5) | `evaluation_evidence/diabetes_report.txt`; current: `evaluation_evidence/diabetes/final_metrics_table.md` |
+
+---
+
+# PART 5 — DIABETES MODULE LIMITATIONS (added 2026-09-17)
+
+> **ID note:** `D-1 … D-8` below are the *diabetes limitation* IDs. The Part 3 human decisions were
+> renamed to `H-1 … H-9` on 2026-09-17, so the prefix collision is gone.
+>
+> **Number source:** every figure here comes from
+> `evaluation_evidence/diabetes/final_metrics_table.md` (shipped stacking ensemble, held-out test
+> n = 14,139, bootstrap 2,000 resamples, seed 42, percentile 95% CI) or from
+> `evaluation_evidence/diabetes/oof_threshold.json`. Regenerate with
+> `scratch/diabetes_oof_threshold.py` then `scratch/generate_diabetes_evidence.py`.
+>
+> **Correction to earlier figures:** `scratch/audit_diabetes.py` and `scratch/prevalence_experiment.py`
+> measured a *proxy* XGBoost (300 trees, depth 6, unscaled input), not the shipped ensemble. Their
+> numbers (OOF threshold 0.3203, 0.7% cost gap, 1.5-pt sensitivity gap, Brier 0.176 → 0.098) are
+> superseded below by measurements on the shipped models. Direction agrees; magnitudes differ.
+
+| ID | What | Measured | Why not fixed | What would fix it | Sev | Status | Evidence |
+|---|---|---|---|---|---|---|---|
+| **D-1** | **Threshold was selected on the test set.** `models/train_diabetes_ensemble.py` passed `y_true=y_test` to `find_optimal_clinical_threshold`; 0.275 was shipped in `configs/diabetes.yaml`. | Raw threshold **0.275 → 0.2809** (training OOF, 5-fold stratified, seed 42). On test: cost 2·FN+FP **4398 → 4380 (−0.41%)**, sensitivity **91.55% → 91.31% (−0.24 pt)**, specificity **54.68% → 55.42% (+0.74 pt)**. 0.275 is not reproducible today: re-deriving on `y_test` with the shipped models gives **0.3203**. The OOF cost curve is flat near the minimum (grid point 0.2759 costs 17,494 vs 17,477, +0.1%). | — | — | S2 | **FIXED** (not committed) | `threshold_decision_log.md`, `threshold_cost_curve_oof.png`, `oof_threshold.json`, `confusion_matrix_{old_0.2750,new_0.2809}.*` |
+| **D-2** | **Trained on a 50/50 resample; real BRFSS prevalence ≈ 14%.** Raw probabilities shown to the clinician were on the 50% prior. | At 14% prevalence (test set importance-weighted): Brier **0.1753 [0.1707, 0.1798] → 0.0974 [0.0959, 0.0989]**; ECE **0.239 → 0.0082**; mean displayed probability **0.379 → 0.142** (true 0.140). Decisions changed by the correction on test: **0 of 14,139**. | No retraining allowed in this pass; a Bayes prior-shift correction (`backend/prevalence_correction.py`) fixes the scale without touching the model. | Retrain on the full natural-prevalence file (D-8), then drop the correction. Also: the correction is only as good as `prevalence_deploy` — 0.14 is BRFSS-2015 (US); the deployment population's prevalence should be sourced and set in config. The 14% evaluation is re-weighted, not a real 14% cohort. | S1 | **MITIGATED** (correction, not retrain) | `calibration_curve.png`, `calibration.json`, `before_after.{json,png}` |
+| **D-3** | **PPV at real prevalence is low.** A mathematical property of screening at Se 91% / Sp 55%, not a defect: **PPV = Se·π / (Se·π + (1−Sp)(1−π))**. | PPV **67.2% [66.3, 68.1]** on the 50/50 test set → **25.0% [24.5, 25.5]** at π = 14% (old threshold: 66.9% → **24.7%**). Per 1,000 screened at 14%: **511 referred, 128 true cases, 383 needless referrals, 12 missed**. NPV at 14%: **97.5%**. **Hidden consequence:** a threshold picked with 2:1 costs on balanced data is, at π = 14%, the Bayes-optimal threshold for an FN:FP cost ratio of **≈ 15.7 : 1** (1/0.0598 − 1), not 2 : 1. | Changing it trades away sensitivity; that is a clinical decision, not an engineering one. | (a) Position as a *rule-out / triage* tool (NPV 97.5%) with mandatory HbA1c confirmation; (b) decide the real FN:FP ratio at deployment prevalence and re-select the threshold on corrected OOF probabilities. **Decision needed.** | S1 | **OPEN — decision-needed** | `ppv_collapse_table.{md,csv}`, `pr_curve.png` |
+| **D-4** | **Identical feature vectors across the split.** All 21 features are binary/coarse ordinal, so exact matches arise by chance as well as by duplication. | **564 / 14,139 = 3.99%** of test rows also appear in train. ROC-AUC **0.8305 [0.8238, 0.8371] → 0.8256 [0.8187, 0.8324]** on de-duplicated rows (**Δ 0.0049**). | Effect is inside the CI; dropping duplicates changes the split that every published figure uses. | Group-aware split on the feature vector (or de-duplicate before splitting) and re-report. | S3 | **OPEN — disclosed** | `final_metrics_table.md` (`roc_auc_dedup`, `test_rows_duplicated_in_train_pct`) |
+| **D-5** | **No external validation for diabetes.** Heart has a second cohort (Tehran); diabetes is evaluated only on a split of the same BRFSS file. | Not measurable — there is no second dataset in the repo. | Candidate is NHANES (lab-confirmed HbA1c), but harmonising its variables to the 21 BRFSS items is outside the time window before 2026-10-04. | Map NHANES questionnaire items to BRFSS codings, evaluate transported AUC + calibration at NHANES prevalence. | S2 | **OPEN — out of scope** | — |
+| **D-6** | **Stacking was never shown to beat a single XGBoost.** | Indicative only: training OOF ROC-AUC **XGBoost 0.8304** vs **stacking 0.8306** (Δ 0.0002); LightGBM 0.8275, RF 0.8279. No paired test, no CI on the difference. | Needs a paired comparison on identical folds; not part of this pass. | Paired bootstrap / DeLong on test for stacking vs XGBoost alone; if not significant, prefer the single model (RF is ~98 MB and dominates latency, W-10/W-29). | S2 | **OPEN** | `oof_threshold.json` (`oof_auc_base`, `oof_auc_stacking`) |
+| **D-7** | **The five engineered diabetes features were never ablated** (`BMI_Age_Interaction`, `Health_Index`, `Lifestyle_Score`, `SES_Composite`, `Diabetes_Clinical_Risk`). | Not measured. | Ablation requires refitting models, which this pass forbids. | Drop-one-feature OOF AUC on identical folds with a paired bootstrap; remove any feature that does not move AUC. | S3 | **OPEN** | — |
+| **D-8** | **Trained on the balanced 70,692-row file while the full 253,680-row file exists.** | Training rows used: **56,553** (80% of 70,692). The full file is **not in the repo** (`data/diabetes/raw/` holds only the 50/50 file). | Retraining forbidden in this pass; file not present locally. | Obtain the full Kaggle/CDC file, train at natural prevalence with `scale_pos_weight` or class-weighted loss, re-select the threshold on OOF, and remove the D-2 correction. | S2 | **OPEN** | `final_metrics_table.md` (`n_train`, `n_test`) |
+
+### D-3 — open policy decision (not resolved)
+
+The cost function `Cost = 2·FN + 1·FP` was chosen on the **balanced 50/50 scale**. Once probabilities
+are moved to the 14% deployment prior, the deployed cut-point (0.059776) is the Bayes-optimal
+threshold for an implied cost ratio of **FN : FP ≈ 15.7 : 1** — not the 2 : 1 that was intended and
+documented. Arithmetic: a cut-point *t* on calibrated probabilities is optimal when
+`c_FN / c_FP = (1 − t) / t`, and `(1 − 0.059776) / 0.059776 = 15.73`.
+
+Reading it the other way: an honest 2 : 1 preference at 14% prevalence would put the cut-point at
+`t = 1/3` on the corrected scale, i.e. a raw threshold near 0.71 — a completely different operating
+point, with far fewer referrals and far more missed cases.
+
+**This is a clinical-policy decision and it has not been made.** Nothing in the code assumes an
+answer: the current behaviour is the 50/50-scale 2 : 1 choice carried over unchanged, so sensitivity
+stays at 91.3% and the threshold move in D-1 is the only change to who gets flagged. The open
+question for the clinical owner is: *what is the true cost of a missed diabetic relative to one
+unnecessary HbA1c test, and at which prevalence is that ratio stated?* The answer changes the
+threshold, every metric derived from it, and the Part 5 numbers above.
+
+**Part 5 counts:** FIXED 1 · MITIGATED 1 · OPEN 6 (1 decision-needed, 1 out of scope).
+These 8 rows are **not** included in the Counts table below, which describes Parts 1–4 as built on 2026-09-15.
 
 ---
 
@@ -330,6 +386,15 @@ No application code, config, model artifact, or document was modified; no commit
 Files created this session: `WEAKNESS_REGISTER.md`, plus (from the prior audit) `AUDIT_REPORT.md`,
 `evaluation_evidence/`, `scratch/`. `backend/auth/routes.py` and `scripts/simulate_federated.py`
 were already modified before this work began and were left untouched.
+
+## Addendum 2026-09-17 — diabetes decision fixes
+
+The "Nothing was changed" statement above describes the 2026-09-15 session. On 2026-09-17 the
+diabetes module was changed (uncommitted): threshold re-selected on training OOF predictions
+(`models/train_diabetes_ensemble.py`, `configs/diabetes.yaml`), Bayes prevalence correction added
+(`backend/prevalence_correction.py`, `backend/ensemble_loader.py`), evidence regenerated under
+`evaluation_evidence/diabetes/`, and `tests/test_diabetes_calibration.py` added. See Part 5.
+Heart files were not touched.
 
 ---
 

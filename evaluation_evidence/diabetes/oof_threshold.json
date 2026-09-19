@@ -1,0 +1,44 @@
+{
+  "procedure": "cross_val_predict, StratifiedKFold(5, shuffle=True, random_state=42), clones of shipped base models + clone of shipped meta-learner; find_optimal_clinical_threshold unchanged (Cost = 2*FN + 1*FP, np.linspace(0.01, 0.99, 200))",
+  "n_train": 56553,
+  "n_test": 14139,
+  "oof_auc_stacking": 0.8305613257119926,
+  "oof_auc_base": {
+    "xgboost": 0.8303567701970331,
+    "lightgbm": 0.8275050377304053,
+    "random_forest": 0.827892157927791
+  },
+  "threshold_old_raw": 0.275,
+  "threshold_old_reproduced_on_y_test": 0.32025125628140705,
+  "threshold_new_raw": 0.2808542713567839,
+  "threshold_new_raw_sensitivity_check_shipped_meta": 0.2808542713567839,
+  "oof_min_cost": 17477.0,
+  "prevalence_train": 0.5,
+  "prevalence_deploy": 0.14,
+  "threshold_old_corrected": 0.058157099697885205,
+  "threshold_new_corrected": 0.05977576639123845,
+  "test_at_old": {
+    "threshold_raw": 0.275,
+    "tn": 3866,
+    "fp": 3204,
+    "fn": 597,
+    "tp": 6472,
+    "sensitivity": 0.9155467534304711,
+    "specificity": 0.5468175388967468,
+    "cost": 4398.0
+  },
+  "test_at_new": {
+    "threshold_raw": 0.2808542713567839,
+    "tn": 3918,
+    "fp": 3152,
+    "fn": 614,
+    "tp": 6455,
+    "sensitivity": 0.9131418871127458,
+    "specificity": 0.5541725601131542,
+    "cost": 4380.0
+  },
+  "test_cost_change_pct": -0.4092769440654843,
+  "test_sensitivity_change_pp": -0.2404866317725296,
+  "test_specificity_change_pp": 0.7355021216407409,
+  "runtime_seconds": 90.8
+}
