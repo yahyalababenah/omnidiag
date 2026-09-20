@@ -440,3 +440,23 @@ Heart files were not touched.
 - **D-3** (implied FN:FP ≈ 15.7 : 1 at deployment prevalence) — unchanged and still the open clinical-policy decision. The threshold-relative review queue follows whatever threshold is configured.
 
 **Part 6 counts (15 rows):** OPEN 9 (of which 1 manual check, 1 scheduled) · PARTIALLY FIXED 1 · ACCEPTED 1 · BY DESIGN 1 · FIXED 3. Not included in the Counts table above.
+
+---
+
+# PART 7 — HEART MODEL REPLACEMENT (heart_full_tuned.pkl): NEW FINDINGS (added 2026-09-20)
+
+> **Context.** The heart module was moved from a 3-file manual-preprocessing loader
+> (XGBoost weights + separate `label_encoders.pkl` + `standard_scaler.pkl`) to
+> `models/heart_disease/heart_full_tuned.pkl`, a single self-contained sklearn
+> `Pipeline` bundle (Optuna-tuned XGBoost, threshold 0.3695, 920 patients across
+> 4 UCI sites). This finding surfaced while cross-checking that model's HPO
+> reproducibility and is recorded here rather than fixed, per this pass's
+> no-retrain rule.
+>
+> **ID prefix:** `HM-` (heart model). Independent of `W-`, `H-`, `D-`, `P-`.
+
+| ID | What | Measured / evidence | Why not fixed | What would fix it | Sev | Status |
+|---|---|---|---|---|---|---|
+| **HM-1** | **حساسية نتائج البحث لإصدار XGBoost.** | تشغيل نفس نوتبوك ضبط المعاملات بنفس البذرة تحت xgboost 3.2.0 بدل 3.4.1 أنتج معاملات مختلفة (350/depth 7/gamma 4.85 بدل 500/depth 4/gamma 3.22) وعتبة إنتاج مختلفة (0.4581 بدل 0.3695) وحساسية أقل على كوهورت طهران بـ5.6 نقطة. السبب: Optuna تبحث تكيّفياً، فأي تغيّر في سلوك النموذج يغيّر مسار البحث كاملاً. تحقق مضاد: sklearn 1.6.1 مقابل 1.9.0 بنفس إصدار xgboost أعطى نتائج متطابقة تماماً — فالحساسية من xgboost لا sklearn. | Not a code defect — inherent to adaptive HPO (Optuna); no fix without re-running the search under whatever xgboost version ships. Retraining is out of scope for this pass. | الأثر: أي ترقية لـxgboost تستوجب إعادة تشغيل البحث واستخراج العتبة. تحسين مقترح: استخدام `Booster.save_model` (JSON) بدل pickle لأن الأخير يصدر تحذير توافق إصدار عند التحميل. | S3 | **OPEN — documented, not fixed** |
+
+**Part 7 counts (1 row):** OPEN 1. Not included in the Counts table above.

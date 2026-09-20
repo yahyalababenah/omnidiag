@@ -31,10 +31,16 @@ log = logging.getLogger("omnidiag.llm")
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 # Fallback display bands for a disease that configures none. These are the
-# same numbers as DEFAULT_RISK_BANDS in frontend/src/constants/thresholds.js
-# and are correct for heart_disease, whose probabilities are on the model's
-# own scale with an argmax 0.5 cut-point. A disease WITH configured bands
-# (diabetes) always passes them in; this constant is never its band source.
+# same numbers as DEFAULT_RISK_BANDS in frontend/src/constants/thresholds.js.
+# heart_disease is the only disease that falls back to this constant (it
+# configures no risk_bands in configs/heart_disease.yaml) — but its actual
+# decision threshold is 0.3695 (models/heart_disease/heart_full_tuned.pkl,
+# read at runtime in backend/model_loader.py), NOT the 0.5 argmax cut-point
+# these numbers used to assume. That leaves a real gap: a patient with
+# probability in [0.3695, 0.4) is classified Positive by predict() but still
+# displays as the LOW band here, since 0.4 is the "moderate" cut-point.
+# A disease WITH configured bands (diabetes) always passes them in; this
+# constant is never its band source.
 DEFAULT_RISK_BANDS: Dict[str, float] = {"high": 0.7, "moderate": 0.4}
 
 
