@@ -1,0 +1,13 @@
+{
+  "ChestPainType":0.9687070251,
+  "Oldpeak":0.5508180261,
+  "ExerciseAngina":0.523728013,
+  "Sex":0.4069629908,
+  "Cholesterol":0.4039019942,
+  "Age":0.365711987,
+  "MaxHR":0.3569279909,
+  "FastingBS":0.2655740082,
+  "RestingBP":0.2195580006,
+  "ST_Slope":0.1349319965,
+  "RestingECG":0.0784529969
+}

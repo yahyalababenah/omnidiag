@@ -1,0 +1,163 @@
+{
+  "pooled_cv": {
+    "threshold": 0.3104,
+    "accuracy": 79.78,
+    "roc_auc": 87.37,
+    "sensitivity": 92.14,
+    "specificity": 64.48,
+    "ci": {
+      "accuracy": [
+        77.17,
+        82.39
+      ],
+      "roc_auc": [
+        84.95,
+        89.67
+      ],
+      "sensitivity": [
+        89.6,
+        94.46
+      ],
+      "specificity": [
+        59.9,
+        68.98
+      ]
+    }
+  },
+  "leave_one_site_out": {
+    "cleveland": {
+      "n": 303,
+      "prevalence": 45.9,
+      "threshold": 0.1676,
+      "accuracy": 66.67,
+      "roc_auc": 85.05,
+      "sensitivity": 95.68,
+      "specificity": 42.07,
+      "tn": 69,
+      "fp": 95,
+      "fn": 6,
+      "tp": 133,
+      "ci": {
+        "accuracy": [
+          61.39,
+          71.95
+        ],
+        "roc_auc": [
+          80.59,
+          89.2
+        ],
+        "sensitivity": [
+          92.0,
+          98.68
+        ],
+        "specificity": [
+          34.81,
+          49.69
+        ]
+      },
+      "controls": 164,
+      "cases": 139
+    },
+    "hungarian": {
+      "n": 294,
+      "prevalence": 36.1,
+      "threshold": 0.2809,
+      "accuracy": 69.73,
+      "roc_auc": 85.93,
+      "sensitivity": 94.34,
+      "specificity": 55.85,
+      "tn": 105,
+      "fp": 83,
+      "fn": 6,
+      "tp": 100,
+      "ci": {
+        "accuracy": [
+          64.63,
+          74.83
+        ],
+        "roc_auc": [
+          81.4,
+          89.96
+        ],
+        "sensitivity": [
+          89.42,
+          98.08
+        ],
+        "specificity": [
+          48.9,
+          62.5
+        ]
+      },
+      "controls": 188,
+      "cases": 106
+    },
+    "switzerland": {
+      "n": 123,
+      "prevalence": 93.5,
+      "threshold": 0.3695,
+      "accuracy": 76.42,
+      "roc_auc": 80.76,
+      "sensitivity": 77.39,
+      "specificity": 62.5,
+      "tn": 5,
+      "fp": 3,
+      "fn": 26,
+      "tp": 89,
+      "ci": {
+        "accuracy": [
+          69.11,
+          83.74
+        ],
+        "roc_auc": [
+          60.11,
+          98.35
+        ],
+        "sensitivity": [
+          69.49,
+          84.75
+        ],
+        "specificity": [
+          22.22,
+          100.0
+        ]
+      },
+      "controls": 8,
+      "cases": 115
+    },
+    "long_beach_va": {
+      "n": 200,
+      "prevalence": 74.5,
+      "threshold": 0.1824,
+      "accuracy": 77.0,
+      "roc_auc": 71.51,
+      "sensitivity": 98.66,
+      "specificity": 13.73,
+      "tn": 7,
+      "fp": 44,
+      "fn": 2,
+      "tp": 147,
+      "ci": {
+        "accuracy": [
+          71.0,
+          82.01
+        ],
+        "roc_auc": [
+          63.24,
+          80.02
+        ],
+        "sensitivity": [
+          96.58,
+          100.0
+        ],
+        "specificity": [
+          4.92,
+          23.81
+        ]
+      },
+      "controls": 51,
+      "cases": 149
+    }
+  },
+  "loso_mean_auc": 0.8081,
+  "generalisation_gap": 0.0656
+}

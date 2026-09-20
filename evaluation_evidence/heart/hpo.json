@@ -1,0 +1,48 @@
+{
+  "n_trials": 60,
+  "objective": "mean ROC-AUC, inner 5-fold CV",
+  "best_params": {
+    "n_estimators": 500,
+    "max_depth": 4,
+    "learning_rate": 0.028928994165742683,
+    "subsample": 0.8077672166682721,
+    "colsample_bytree": 0.44881626783908657,
+    "min_child_weight": 4,
+    "gamma": 3.2247939623734005,
+    "reg_alpha": 4.970097824015917e-07,
+    "reg_lambda": 0.05334501049618681,
+    "scale_pos_weight": 1.565386715651742
+  },
+  "best_inner_cv_auc": 0.8886,
+  "comparison": [
+    {
+      "model": "xgboost defaults",
+      "pooled_cv": 0.8499,
+      "loso_mean": 0.799,
+      "loso_min": 0.6925,
+      "optimism": 0.0508
+    },
+    {
+      "model": "current config (898/5/0.0136)",
+      "pooled_cv": 0.8737,
+      "loso_mean": 0.8081,
+      "loso_min": 0.7151,
+      "optimism": 0.0656
+    },
+    {
+      "model": "Optuna best",
+      "pooled_cv": 0.8886,
+      "loso_mean": 0.8134,
+      "loso_min": 0.7515,
+      "optimism": 0.0752
+    }
+  ],
+  "nested_loso": {
+    "cleveland": 0.8598,
+    "hungarian": 0.8725,
+    "switzerland": 0.7804,
+    "long_beach_va": 0.7393
+  },
+  "nested_loso_mean": 0.813,
+  "note": "Nested = hyperparameter search re-run inside each LOSO fold. This is the only estimate where the held-out hospital was never involved in choosing the hyperparameters."
+}

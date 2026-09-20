@@ -1,0 +1,95 @@
+{
+  "generated_by": "OmniDiag heart notebook",
+  "training_data": {
+    "source": "UCI Heart Disease, 4 original site files",
+    "n": 920,
+    "sites": {
+      "cleveland": 303,
+      "hungarian": 294,
+      "switzerland": 123,
+      "long_beach_va": 200
+    },
+    "note": "ca and thal excluded: invasive, absent from production"
+  },
+  "external_data": {
+    "source": "Z-Alizadeh Sani (Tehran)",
+    "n": 303,
+    "used_for": "validation only, never training"
+  },
+  "headline": {
+    "internal_pooled_cv": {
+      "roc_auc": 87.37,
+      "ci95": [
+        84.95,
+        89.67
+      ],
+      "caveat": "sites mixed across folds; optimistic"
+    },
+    "leave_one_site_out": {
+      "mean_roc_auc": 80.81,
+      "range": [
+        71.51,
+        85.93
+      ],
+      "interpretation": "transfer to an unseen hospital"
+    },
+    "external_tehran": {
+      "roc_auc": 72.17,
+      "ci95": [
+        64.98,
+        78.53
+      ],
+      "features": 7,
+      "interpretation": "transfer to a different country"
+    },
+    "generalisation_gap": 6.56
+  },
+  "operating_point": {
+    "threshold": 0.3104,
+    "selected_on": "out-of-fold predictions of training data",
+    "cost_function": "2.0*FN + 1.0*FP",
+    "accuracy": {
+      "value": 79.78,
+      "ci95": [
+        77.17,
+        82.39
+      ]
+    },
+    "sensitivity": {
+      "value": 92.14,
+      "ci95": [
+        89.6,
+        94.46
+      ]
+    },
+    "specificity": {
+      "value": 64.48,
+      "ci95": [
+        59.9,
+        68.98
+      ]
+    },
+    "confusion": {
+      "tn": 265,
+      "fp": 146,
+      "fn": 40,
+      "tp": 469
+    }
+  },
+  "evidence_files": [
+    "evidence/cohorts.json",
+    "evidence/external_validation.json",
+    "evidence/loso.json",
+    "evidence/shap_importance.json",
+    "evidence/threshold_log.json",
+    "evidence/threshold_log_reduced.json",
+    "figures/auc_by_site.png",
+    "figures/calibration.png",
+    "figures/confusion_matrices.png",
+    "figures/roc_by_site.png",
+    "figures/shap_summary.png",
+    "figures/threshold_sweep.png",
+    "models/heart_full.pkl",
+    "models/heart_reduced.pkl"
+  ]
+}

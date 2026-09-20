@@ -32,3 +32,19 @@ apply. Kept for provenance only. Do NOT cite any number from them.
 
   See docs/DIABETES_AUDIT_REPORT.md and
   evaluation_evidence/diabetes/ for the measured replacements.
+
+## omnidiag_diabetes_artifacts (archived 2026-09-20)
+
+Snapshot from 30 May / 1 June 2026, superseded by this session's work.
+Its configs/diabetes.yaml carries inference_threshold: 0.2750 — the value
+selected on the TEST set — and has no prevalence_train, prevalence_deploy
+or risk_bands keys. ensemble_metrics.json reports the same 0.275 as
+clinical_threshold.
+
+The live configuration is configs/diabetes.yaml at the repo root:
+inference_threshold 0.059776 (raw equivalent 0.280854, selected on training
+out-of-fold predictions), with Bayes prior-shift correction applied in
+backend/prevalence_correction.py.
+
+Model weights here are also pre-correction. Do not restore any file from
+this folder without re-running the evidence scripts.

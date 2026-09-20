@@ -1,0 +1,132 @@
+{
+  "hyperparameters": {
+    "source": "Optuna",
+    "params": {
+      "n_estimators": 500,
+      "max_depth": 4,
+      "learning_rate": 0.028928994165742683,
+      "subsample": 0.8077672166682721,
+      "colsample_bytree": 0.44881626783908657,
+      "min_child_weight": 4,
+      "gamma": 3.2247939623734005,
+      "reg_alpha": 4.970097824015917e-07,
+      "reg_lambda": 0.05334501049618681,
+      "scale_pos_weight": 1.565386715651742,
+      "random_state": 42
+    },
+    "objective": "ROC-AUC (not accuracy)",
+    "honest_estimate_nested_loso": 0.813,
+    "contaminated_pooled_cv": 0.8886
+  },
+  "threshold": {
+    "shipped": 0.3695,
+    "shipped_reduced": 0.4237,
+    "rule": "cost = 2.0*FN + 1.0*FP",
+    "selected_on": "out-of-fold predictions of training data",
+    "rules_compared": [
+      {
+        "rule": "sensitivity >= 90%",
+        "thr_mean": 0.496,
+        "thr_spread": 0.167,
+        "loso_sens": 88.9,
+        "loso_spec": 56.1,
+        "loso_FN": 56,
+        "loso_FP": 148,
+        "loso_cost": 260,
+        "tehran_sens": 35.2,
+        "tehran_spec": 86.2,
+        "tehran_FN": 140
+      },
+      {
+        "rule": "default 0.50",
+        "thr_mean": 0.5,
+        "thr_spread": 0.0,
+        "loso_sens": 88.5,
+        "loso_spec": 54.9,
+        "loso_FN": 58,
+        "loso_FP": 164,
+        "loso_cost": 280,
+        "tehran_sens": 36.6,
+        "tehran_spec": 86.2,
+        "tehran_FN": 137
+      },
+      {
+        "rule": "cost FN x3",
+        "thr_mean": 0.323,
+        "thr_spread": 0.098,
+        "loso_sens": 95.9,
+        "loso_spec": 38.0,
+        "loso_FN": 20,
+        "loso_FP": 240,
+        "loso_cost": 280,
+        "tehran_sens": 55.1,
+        "tehran_spec": 81.6,
+        "tehran_FN": 97
+      },
+      {
+        "rule": "cost FN x2  (chosen)",
+        "thr_mean": 0.427,
+        "thr_spread": 0.103,
+        "loso_sens": 91.7,
+        "loso_spec": 48.2,
+        "loso_FN": 41,
+        "loso_FP": 199,
+        "loso_cost": 281,
+        "tehran_sens": 55.1,
+        "tehran_spec": 81.6,
+        "tehran_FN": 97
+      },
+      {
+        "rule": "max F1",
+        "thr_mean": 0.51,
+        "thr_spread": 0.118,
+        "loso_sens": 88.3,
+        "loso_spec": 55.1,
+        "loso_FN": 60,
+        "loso_FP": 164,
+        "loso_cost": 284,
+        "tehran_sens": 55.1,
+        "tehran_spec": 81.6,
+        "tehran_FN": 97
+      },
+      {
+        "rule": "Youden J (max sens+spec)",
+        "thr_mean": 0.631,
+        "thr_spread": 0.242,
+        "loso_sens": 79.8,
+        "loso_spec": 65.1,
+        "loso_FN": 99,
+        "loso_FP": 102,
+        "loso_cost": 300,
+        "tehran_sens": 14.4,
+        "tehran_spec": 92.0,
+        "tehran_FN": 185
+      },
+      {
+        "rule": "prevalence matched",
+        "thr_mean": 0.641,
+        "thr_spread": 0.121,
+        "loso_sens": 78.9,
+        "loso_spec": 65.0,
+        "loso_FN": 105,
+        "loso_FP": 102,
+        "loso_cost": 312,
+        "tehran_sens": 13.9,
+        "tehran_spec": 92.0,
+        "tehran_FN": 186
+      }
+    ],
+    "instability_across_training_sets": 0.103,
+    "caveat": "Threshold is cohort-dependent; recalibrate per deployment site."
+  },
+  "files": [
+    "evidence/hpo.json",
+    "evidence/threshold_rule_rationale.json",
+    "evidence/threshold_rules.json",
+    "figures/hpo_importance.png",
+    "figures/hpo_summary.png",
+    "figures/threshold_rules.png",
+    "models/heart_full_tuned.pkl",
+    "models/heart_reduced_tuned.pkl"
+  ]
+}

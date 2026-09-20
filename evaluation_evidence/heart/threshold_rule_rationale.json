@@ -1,0 +1,9 @@
+{
+  "default 0.50": "no selection; what the frontend shows today",
+  "Youden J (max sens+spec)": "symmetric: a miss and a false alarm cost the same",
+  "max F1": "favours precision; ignores clinical asymmetry",
+  "cost FN x2  (chosen)": "a missed patient costs twice a false alarm",
+  "cost FN x3": "more aggressive triage",
+  "sensitivity >= 90%": "fix the miss rate, maximise specificity under it",
+  "prevalence matched": "predict positives at the observed base rate"
+}
