@@ -203,13 +203,19 @@ HEART_CASES = {
         "ExerciseAngina": "N", "Oldpeak": 0.0, "ST_Slope": "Up",
     },
 }
-# Golden heart outputs, captured 2026-09-17 from OmniDiagRouter.predict on
-# deploy/v2-platform (heart code, config and weights untouched by the
-# diabetes change). Any drift here means the diabetes work leaked.
+# Golden heart outputs, RECAPTURED 2026-09-20 from OmniDiagRouter.predict on
+# deploy/v2-platform after the heart_full_tuned.pkl Pipeline replacement
+# (see backend/model_loader.py commit "feat(heart): load heart_full_tuned.pkl
+# as a self-contained sklearn Pipeline"). This is a DELIBERATE break of the
+# previous safety net, not drift: the heart model itself changed (new
+# Pipeline, new training data, new threshold 0.3695 instead of argmax 0.5),
+# so its outputs on these exact patients are expected to differ from every
+# prior capture. From this commit on, any further drift here again means
+# something leaked into heart that shouldn't have.
 HEART_GOLDEN = {
-    "asymptomatic_flat": {"prediction": 1, "confidence": 0.8238145112991333, "diagnosis": "Positive"},
-    "typical_up_slope": {"prediction": 0, "confidence": 0.24342429637908936, "diagnosis": "Negative"},
-    "young_female": {"prediction": 0, "confidence": 0.11514991521835327, "diagnosis": "Negative"},
+    "asymptomatic_flat": {"prediction": 1, "confidence": 0.9833390712738037, "diagnosis": "Positive"},
+    "typical_up_slope": {"prediction": 0, "confidence": 0.33861273527145386, "diagnosis": "Negative"},
+    "young_female": {"prediction": 0, "confidence": 0.039755821228027344, "diagnosis": "Negative"},
 }
 
 CORRECTION_KEYS = {
@@ -336,11 +342,17 @@ class TestDiabetesPredictApi:
 
     @pytest.mark.parametrize("case", sorted(HEART_CASES))
     async def test_heart_response_has_no_correction_fields(self, live_client, case):
+        # Heart still applies no prevalence correction (unaffected by the
+        # Pipeline replacement), but now states its own decision threshold
+        # like diabetes does — CORRECTION_KEYS (prevalence/risk-band fields)
+        # must still be absent; inference_threshold is the one field heart
+        # gained.
         resp = await _post_predict(live_client, "heart_disease", HEART_CASES[case])
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert CORRECTION_KEYS.isdisjoint(data), CORRECTION_KEYS & set(data)
-        assert set(data) == {"prediction", "confidence", "diagnosis"}
+        assert set(data) == {"prediction", "confidence", "diagnosis", "inference_threshold"}
+        assert data["inference_threshold"] == pytest.approx(0.3695)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -360,6 +372,32 @@ class TestHeartNonRegression:
         from backend.ensemble_loader import EnsembleModelLoader
 
         assert not isinstance(real_router._get_loader("heart_disease"), EnsembleModelLoader)
+
+    def test_threshold_is_read_from_the_model_file_not_a_constant(self, real_router):
+        # bundle["threshold"] must be the number the .pkl actually carries,
+        # and predict() must consult it at call time -- not a 0.5 argmax or
+        # any other literal baked into model_loader.py. Proven by mutating
+        # the loaded bundle's threshold in place and watching the decision
+        # for the same patient/probability flip both ways.
+        loader = real_router._get_loader("heart_disease")
+        bundle = loader.model  # forces load
+        assert bundle["threshold"] == pytest.approx(0.3695)
+
+        patient = HEART_CASES["typical_up_slope"]
+        proba = HEART_GOLDEN["typical_up_slope"]["confidence"]  # 0.3386...
+        original_threshold = bundle["threshold"]
+        try:
+            bundle["threshold"] = proba + 0.05
+            result_above = loader.predict(dict(patient))
+            assert result_above["prediction"] == 0
+            assert result_above["inference_threshold"] == pytest.approx(proba + 0.05)
+
+            bundle["threshold"] = proba - 0.05
+            result_below = loader.predict(dict(patient))
+            assert result_below["prediction"] == 1
+            assert result_below["inference_threshold"] == pytest.approx(proba - 0.05)
+        finally:
+            bundle["threshold"] = original_threshold  # real_router is module-scoped
 
 
 # ═════════════════════════════════════════════════════════════════════════════
