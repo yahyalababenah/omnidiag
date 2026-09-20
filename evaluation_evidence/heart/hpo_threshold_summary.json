@@ -121,6 +121,7 @@
   },
   "files": [
     "evidence/hpo.json",
+    "evidence/hpo_threshold_summary.json",
     "evidence/threshold_rule_rationale.json",
     "evidence/threshold_rules.json",
     "figures/hpo_importance.png",

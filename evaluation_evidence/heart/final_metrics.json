@@ -36,8 +36,8 @@
     "external_tehran": {
       "roc_auc": 72.17,
       "ci95": [
-        64.98,
-        78.53
+        65.09,
+        78.76
       ],
       "features": 7,
       "interpretation": "transfer to a different country"
@@ -79,6 +79,7 @@
   "evidence_files": [
     "evidence/cohorts.json",
     "evidence/external_validation.json",
+    "evidence/final_metrics.json",
     "evidence/loso.json",
     "evidence/shap_importance.json",
     "evidence/threshold_log.json",
