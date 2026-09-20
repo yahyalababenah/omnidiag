@@ -27,18 +27,14 @@ COPY . .
 # Download model weights + preprocessors at BUILD time so they're baked into
 # the image. Zero download delay at startup — port 7860 responds instantly.
 #
-# Why preprocessors are separate:
-#   *.pkl files are gitignored (too large for git history), so COPY . . doesn't
-#   include them. label_encoders.pkl and standard_scaler.pkl are required by
-#   ModelLoader._apply_preprocessors() to encode categorical fields (Sex, ChestPainType,
-#   RestingECG, ExerciseAngina, ST_Slope) and scale numerical features before inference.
-#   Without them, any predict/explain call raises a KeyError / ValueError → HTTP 500.
-RUN mkdir -p models/heart_disease/preprocessors models/diabetes/preprocessors && \
+# heart_disease is a single self-contained bundle (dict: pipeline, features,
+# threshold, ...) — the Pipeline's ColumnTransformer does its own
+# encoding/scaling/imputation, so there is no separate label_encoders.pkl /
+# standard_scaler.pkl to fetch for it (unlike diabetes, below).
+RUN mkdir -p models/heart_disease models/diabetes/preprocessors && \
     HF="https://huggingface.co/yahyoha/omnidiag-models/resolve/main" && \
     echo "=== heart_disease ===" && \
-    curl -fsSL "${HF}/omni_diag_xgb_optimized.pkl"   -o models/heart_disease/omni_diag_xgb_optimized.pkl && \
-    curl -fsSL "${HF}/label_encoders.pkl"             -o models/heart_disease/preprocessors/label_encoders.pkl && \
-    curl -fsSL "${HF}/standard_scaler.pkl"            -o models/heart_disease/preprocessors/standard_scaler.pkl && \
+    curl -fsSL "${HF}/heart_full_tuned.pkl"   -o models/heart_disease/heart_full_tuned.pkl && \
     echo "=== diabetes ===" && \
     curl -fsSL "${HF}/diabetes/omni_diag_xgb_optimized.pkl"       -o models/diabetes/omni_diag_xgb_optimized.pkl && \
     curl -fsSL "${HF}/diabetes/omni_diag_lgb_optimized.pkl"       -o models/diabetes/omni_diag_lgb_optimized.pkl && \
