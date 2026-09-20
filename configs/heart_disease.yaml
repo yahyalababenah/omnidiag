@@ -10,9 +10,9 @@
 disease:
   name: "heart_disease"
   display_name: "Coronary Artery Disease Risk"
-  description: "Non-invasive CAD risk triage using XGBoost with SHAP explainability — 12 clinical features + 5 engineered biomarkers"
+  description: "Non-invasive CAD risk triage using an XGBoost Pipeline (IterativeImputer + StandardScaler + OrdinalEncoder, no engineered biomarkers) with SHAP explainability — 11 raw clinical features, trained on 920 patients across 4 UCI sites"
   target_column: "HeartDisease"
-  version: "5.0.0"
+  version: "6.0.0"
 
 # ---------------------------------------------------------------------------
 # Data paths — all relative to project root
@@ -31,11 +31,14 @@ data:
   medical_file: "data_medical.csv"
 
 # ---------------------------------------------------------------------------
-# Feature engineering configuration
+# Feature configuration — descriptive only. All encoding/scaling/imputation
+# runs inside the Pipeline stored in the weights file itself
+# (models/heart_disease/heart_full_tuned.pkl → bundle["pipeline"]); backend/
+# model_loader.py applies no manual preprocessing and does no feature
+# engineering. These lists exist for reference and match
+# bundle["categorical"] / bundle["numeric"].
 # ---------------------------------------------------------------------------
 features:
-  module: "features.heart_disease_features"
-  class: "HeartDiseaseFeatureEngineer"
   categorical_columns:
     - "Sex"
     - "ChestPainType"
@@ -48,33 +51,7 @@ features:
     - "Cholesterol"
     - "MaxHR"
     - "Oldpeak"
-  imputation_features:
-    - "Age"
-    - "Sex_Num"
-    - "RestingBP"
-    - "MaxHR"
-    - "Cholesterol"
-  heuristic_features:
-    - name: "Age_BP_Interaction"
-      formula: "Age * RestingBP"
-      description: "Multiplicative interaction between age and resting blood pressure"
-    - name: "HR_Age_Ratio"
-      formula: "MaxHR / Age"
-      description: "Ratio of maximum heart rate to age (fitness indicator)"
-    - name: "Chol_Age_Ratio"
-      formula: "Cholesterol / Age"
-      description: "Ratio of cholesterol to age (risk normalization)"
-  clinical_features:
-    - name: "Clinical_Risk_Score"
-      formula: "exp(Age * 0.048 + RestingBP * 0.015 + Cholesterol * 0.002)"
-      description: "Logarithmic risk index based on medical literature weights"
-  medical_features:
-    - name: "RPP"
-      formula: "RestingBP * MaxHR"
-      description: "Rate-Pressure Product — myocardial oxygen consumption indicator (global cardiology standard)"
-    - name: "Exercise_Risk_Index"
-      formula: "Oldpeak * ExerciseAngina (encoded)"
-      description: "Composite marker: ST depression × exercise-induced angina — high value strongly suggests CAD"
+    - "FastingBS"
 
 # ---------------------------------------------------------------------------
 # Model configuration
@@ -83,15 +60,24 @@ model:
   type: "xgboost"                    # Model architecture: xgboost | tabnet | deep_learning
   explainer_type: "tree"             # SHAP explainer: tree (TreeExplainer) | deep (DeepExplainer)
   counterfactuals: true              # Enable What-If scenario generation
-  weights_path: "models/heart_disease/omni_diag_xgb_optimized.pkl"
-  fallback_weights_path: "models/heart_disease/omni_diag_xgb_optimized.pkl"
-  preprocessors_path: "models/heart_disease/preprocessors/"
+  weights_path: "models/heart_disease/heart_full_tuned.pkl"
+  fallback_weights_path: "models/heart_disease/heart_full_tuned.pkl"
+  # Full sklearn Pipeline bundle (dict: pipeline, features, threshold, ...) —
+  # imputation/scaling/ordinal-encoding run inside the Pipeline itself, so
+  # there is no separate preprocessors_path to load.
+  inference_threshold: 0.3695        # From the bundle itself; mirrored here for
+                                      # the /diseases metadata endpoint (router.py)
   best_params:
-    n_estimators: 898
-    max_depth: 5
-    learning_rate: 0.013594126498405943
-    subsample: 0.963733407970185
-    colsample_bytree: 0.5454718650965412
+    n_estimators: 500
+    max_depth: 4
+    learning_rate: 0.028928994165742683
+    subsample: 0.8077672166682721
+    colsample_bytree: 0.44881626783908657
+    min_child_weight: 4
+    gamma: 3.2247939623734005
+    reg_alpha: 4.970097824015917e-07
+    reg_lambda: 0.05334501049618681
+    scale_pos_weight: 1.565386715651742
     eval_metric: "logloss"
     random_state: 42
 
@@ -99,11 +85,11 @@ model:
 # Training configuration
 # ---------------------------------------------------------------------------
 training:
-  test_size: 0.2
   random_state: 42
-  optimization_trials: 300
   optimization_direction: "maximize"
-  optimization_metric: "accuracy"
+  optimization_metric: "roc_auc"          # Optuna objective (see evaluation_evidence/heart/hpo_threshold_summary.json)
+  validation_scheme: "leave-one-site-out" # LOSO ROC-AUC 81.30% (nested); external Tehran cohort 72.17%
+  threshold_selection_rule: "cost = 2.0*FN + 1.0*FP on out-of-fold training predictions"
 
 # ---------------------------------------------------------------------------
 # SHAP explainer configuration

@@ -15,9 +15,7 @@ import logging
 import traceback
 import joblib
 import pandas as pd
-import numpy as np
 import shap
-import importlib
 from typing import Optional, Dict, Any, List
 
 from backend.shap_service import generate_shap_explanation
@@ -29,19 +27,12 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 class ModelLoader:
     """
     Lazy loader for a single disease's model artifacts.
-    
+
     Attributes:
         config: The disease configuration dictionary.
-        _model: Cached model object (loaded on first access).
+        _model: Cached model bundle dict (loaded on first access).
         _explainer: Cached SHAP explainer (loaded on first access).
-        _preprocessors: Cached preprocessor objects (loaded on first access).
     """
-
-    # The heart disease training CSV has inverted labels:
-    # HeartDisease=0 means "has disease", HeartDisease=1 means "healthy".
-    # Single source of truth for that correction — used by both predict() and
-    # explain() so the decision and its SHAP explanation can never drift apart.
-    _LABELS_INVERTED = True
 
     def __init__(self, config: dict):
         """
@@ -52,20 +43,25 @@ class ModelLoader:
                     Must contain 'model' key with 'weights_path' and 'explainer_type'.
         """
         self.config = config
-        self._model: Optional[object] = None
+        self._model: Optional[Dict[str, Any]] = None
         self._explainer: Optional[object] = None
-        self._preprocessors: Optional[Dict[str, object]] = None
         self._feature_names: Optional[List[str]] = None
         self._project_root = _PROJECT_ROOT
-        self._feature_engineer: Optional[object] = None
     
     # ------------------------------------------------------------------
     # Properties with lazy loading
     # ------------------------------------------------------------------
     
     @property
-    def model(self) -> object:
-        """Lazy-load and cache the trained model."""
+    def model(self) -> Dict[str, Any]:
+        """
+        Lazy-load and cache the model bundle.
+
+        The weights file is a dict — {"pipeline": sklearn Pipeline,
+        "features": [...], "threshold": float, ...} — not a bare estimator.
+        The Pipeline's ColumnTransformer does all encoding/scaling/imputation
+        internally, so there is no separate preprocessors file to load.
+        """
         if self._model is None:
             weights_path = self._resolve_weights_path()
             log.debug(f"Loading model weights from: {weights_path}")
@@ -73,7 +69,7 @@ class ModelLoader:
             if os.path.exists(weights_path):
                 log.debug(f"File size: {os.path.getsize(weights_path)} bytes")
             self._model = joblib.load(weights_path)
-            log.debug(f"Model loaded successfully. Type: {type(self._model).__name__}")
+            log.debug(f"Model loaded successfully. Keys: {list(self._model.keys())}")
 
             # XGBoost 3.x compatibility patch: base_score may be stored as a
             # bracket-wrapped string (e.g. '[5.85041E-1]') in the model's raw
@@ -88,7 +84,8 @@ class ModelLoader:
             import types as _types
 
             try:
-                booster = self._model.get_booster()
+                clf = self._model["pipeline"].named_steps["clf"]
+                booster = clf.get_booster()
                 cfg = json.loads(booster.save_config())
                 raw = cfg["learner"]["learner_model_param"]["base_score"]
                 if isinstance(raw, str) and raw.startswith("[") and raw.endswith("]"):
@@ -151,6 +148,10 @@ class ModelLoader:
     def explainer(self) -> object:
         """Lazy-load and cache the SHAP explainer.
 
+        TreeExplainer wraps the XGBClassifier step alone — it cannot explain
+        a full sklearn Pipeline. The ColumnTransformer step runs separately
+        in explain() to produce the numeric matrix TreeExplainer needs.
+
         The model's ``base_score`` is already patched at load time (see
         ``model`` property) so ``TreeExplainer`` should never encounter the
         XGBoost 3.x bracket-wrapped string format.
@@ -158,7 +159,8 @@ class ModelLoader:
         if self._explainer is None:
             explainer_type = self.config.get("model", {}).get("explainer_type", "tree")
             if explainer_type == "tree":
-                self._explainer = shap.TreeExplainer(self.model)
+                clf = self.model["pipeline"].named_steps["clf"]
+                self._explainer = shap.TreeExplainer(clf)
             elif explainer_type == "deep":
                 self._explainer = shap.DeepExplainer(self.model)
             else:
@@ -168,107 +170,7 @@ class ModelLoader:
                     f"Supported: 'tree', 'deep'."
                 )
         return self._explainer
-    
-    @property
-    def preprocessors(self) -> Dict[str, object]:
-        """Lazy-load and cache preprocessors (label encoders, scaler)."""
-        if self._preprocessors is None:
-            preprocessors_path = self.config.get("model", {}).get("preprocessors_path", "")
-            # Resolve relative to project root
-            if preprocessors_path and not os.path.isabs(preprocessors_path):
-                preprocessors_path = os.path.join(self._project_root, preprocessors_path)
-            self._preprocessors = {}
-            if preprocessors_path and os.path.isdir(preprocessors_path):
-                for filename in os.listdir(preprocessors_path):
-                    if filename.endswith(".pkl"):
-                        filepath = os.path.join(preprocessors_path, filename)
-                        key = filename.replace(".pkl", "")
-                        self._preprocessors[key] = joblib.load(filepath)
-        return self._preprocessors
-    
-    # ------------------------------------------------------------------
-    # Feature engineering
-    # ------------------------------------------------------------------
-    
-    def _get_feature_engineer(self):
-        """
-        Lazy-load the feature engineer class specified in the config.
-        
-        Returns:
-            An instance of the feature engineer (subclass of BaseFeatureEngineer).
-        """
-        if self._feature_engineer is None:
-            module_path = self.config.get("features", {}).get("module", "")
-            class_name = self.config.get("features", {}).get("class", "")
-            if module_path and class_name:
-                try:
-                    module = importlib.import_module(module_path)
-                    engineer_class = getattr(module, class_name)
-                    self._feature_engineer = engineer_class(self.config)
-                except (ImportError, AttributeError) as e:
-                    raise ImportError(
-                        f"Could not load feature engineer '{class_name}' from "
-                        f"'{module_path}': {e}"
-                    )
-        return self._feature_engineer
-    
-    def _engineer_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Apply feature engineering to a DataFrame.
-        
-        Runs two feature engineering pipelines in dependency order:
-            1. Heuristic (Statistical): Age_BP_Interaction, HR_Age_Ratio, Chol_Age_Ratio
-            2. Medical (Cardiology): RPP, Exercise_Risk_Index
-        
-        Note: Age_Bins and Global_Risk_Score were tested (v5.1 beta) but did NOT
-        improve accuracy — removed per A/B diagnostic (diagnose_v5_drop.py).
-        
-        Args:
-            df: Raw patient DataFrame (12 base features).
-        
-        Returns:
-            DataFrame with engineered features appended (up to 16 total features).
-        """
-        engineer = self._get_feature_engineer()
-        if engineer:
-            df = engineer.engineer_heuristic(df)     # Age_BP_Interaction, HR_Age_Ratio, Chol_Age_Ratio
-            df = engineer.engineer_medical(df)       # RPP, Exercise_Risk_Index
-        return df
-    
-    # ------------------------------------------------------------------
-    # Preprocessing helpers
-    # ------------------------------------------------------------------
-    
-    def _apply_preprocessors(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Apply label encoders to categorical columns and scaler to numeric columns.
-        
-        Args:
-            df: Raw DataFrame with string categoricals and raw numeric values.
-        
-        Returns:
-            DataFrame with encoded categoricals and scaled numerics.
-        """
-        df = df.copy()
-        preprocessors = self.preprocessors
-        
-        # Apply label encoders to categorical columns
-        label_encoders = preprocessors.get("label_encoders", {})
-        if isinstance(label_encoders, dict):
-            for col, encoder in label_encoders.items():
-                if col in df.columns:
-                    df[col] = encoder.transform(df[col].astype(str))
-        
-        # Apply standard scaler to numeric columns
-        scaler = preprocessors.get("standard_scaler")
-        if scaler is not None:
-            numeric_cols = self.config.get("features", {}).get("numerical_columns", [])
-            numeric_cols_present = [c for c in numeric_cols if c in df.columns]
-            if numeric_cols_present:
-                df[numeric_cols_present] = scaler.transform(df[numeric_cols_present])
-        
-        return df
-    
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -277,14 +179,11 @@ class ModelLoader:
         """
         Run prediction on a single patient's data.
 
-        Pipeline order must match the training pipeline exactly:
-          1. Apply label encoders + StandardScaler (preprocessing)
-          2. Engineer features FROM the already-scaled/encoded values
-
-        This matches how final_ready_data.csv was built (encode → scale → save),
-        and how the training script loaded it before calling engineer_*_features().
-        Reversing the order causes ~5% accuracy loss because engineered features
-        like Age_BP_Interaction are computed at completely different magnitudes.
+        The Pipeline (imputation, scaling, ordinal-encoding) runs internally
+        via ``pipeline.predict_proba`` — the caller passes raw feature values
+        and nothing is preprocessed here. The decision is the probability of
+        class 1 (disease) compared against the model's own threshold, not
+        sklearn's argmax(0.5).
 
         Args:
             patient_data: Dictionary of feature_name -> value.
@@ -294,37 +193,35 @@ class ModelLoader:
                 - prediction: int (0 = Negative, 1 = Positive)
                 - confidence: float (probability of positive class)
                 - diagnosis: str ("Positive" or "Negative")
+                - inference_threshold: float (decision cut-point, model's own scale)
         """
-        df = pd.DataFrame([patient_data])
-        df = self._apply_preprocessors(df)   # encode → scale first
-        df = self._engineer_features(df)     # then engineer from scaled values
-        raw_pred = int(self.model.predict(df)[0])
-        raw_proba = self.model.predict_proba(df)[0]
-        # The heart disease training CSV has inverted labels:
-        # HeartDisease=0 means "has disease", HeartDisease=1 means "healthy".
-        # Verified via feature correlations (Oldpeak, Age, MaxHR are all sign-flipped
-        # vs clinical expectations). We correct here so the API returns clinical truth.
-        has_disease = (raw_pred == 0) if self._LABELS_INVERTED else (raw_pred == 1)
-        confidence = float(raw_proba[0] if self._LABELS_INVERTED else raw_proba[1])
+        bundle = self.model
+        features = bundle["features"]
+        threshold = float(bundle["threshold"])
+        df = pd.DataFrame([patient_data])[features]
+        proba = float(bundle["pipeline"].predict_proba(df)[0, 1])
+        has_disease = proba >= threshold
         return {
             "prediction": 1 if has_disease else 0,
-            "confidence": confidence,
-            "diagnosis": "Positive" if has_disease else "Negative"
+            "confidence": proba,
+            "diagnosis": "Positive" if has_disease else "Negative",
+            "inference_threshold": threshold,
         }
-    
-    
+
     def explain(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Run SHAP explanation on a single patient's data.
-        
-        Applies feature engineering FIRST on raw data, then preprocessing
-        (label encoding + scaling), then SHAP explanation. Returns structured
-        chart data and a human-readable textual explanation — no images or
-        matplotlib.
-        
+
+        The ColumnTransformer step runs on the raw input to produce the
+        numeric matrix TreeExplainer needs; feature names are read from the
+        model bundle so they line up with that matrix's column order (no
+        one-hot expansion — OrdinalEncoder keeps one column per feature).
+        Returns structured chart data and a human-readable textual
+        explanation — no images or matplotlib.
+
         Args:
             patient_data: Dictionary of feature_name -> value.
-        
+
         Returns:
             Dictionary with keys:
                 - chart_data: List of {"feature": str, "shap_value": float}
@@ -334,52 +231,29 @@ class ModelLoader:
                 - base_value: Base (expected) value from the explainer.
         """
         try:
-            df = pd.DataFrame([patient_data])
+            bundle = self.model
+            features = bundle["features"]
+            threshold = float(bundle["threshold"])
+            df = pd.DataFrame([patient_data])[features]
             log.debug(f"Explain: raw data columns={list(df.columns)}")
-            df = self._apply_preprocessors(df)   # encode → scale first (matches training pipeline)
-            log.debug(f"Explain: after preprocessors columns={list(df.columns)}, shape={df.shape}")
-            df = self._engineer_features(df)     # then engineer from scaled values
-            log.debug(f"Explain: after engineering columns={list(df.columns)}, shape={df.shape}")
-            
-            # Cast any object dtype columns to category for SHAP TreeExplainer compatibility
-            for col in df.columns:
-                if df[col].dtype == 'object':
-                    df[col] = df[col].astype('category')
-                    log.debug(f"Cast column '{col}' from object to category for SHAP compatibility")
+
+            transformed = bundle["pipeline"].named_steps["prep"].transform(df)
+            log.debug(f"Explain: transformed shape={transformed.shape}")
 
             log.debug("Creating SHAP explainer...")
             explainer = self.explainer
             log.debug(f"SHAP explainer ready: {type(explainer).__name__}")
-            
+
             log.debug("Computing SHAP values...")
-            shap_values = explainer(df)
+            shap_values = explainer(transformed)
             log.debug(f"SHAP values computed, shape={shap_values.values.shape}")
-            
-            feature_names = list(df.columns)
 
-            # TreeExplainer explains the log-odds of class=1, which — because the
-            # training labels are inverted (see _LABELS_INVERTED) — is the "healthy"
-            # class. Left raw, every sign reads backwards: the strongest disease
-            # markers would be reported as risk-reducing. Flip the whole array here,
-            # before generate_shap_explanation() builds chart_data and the wording,
-            # so the explanation sits on the same axis as `confidence` (P(disease)).
-            #
-            # base_values must be negated too, otherwise additivity breaks:
-            #   sum(-phi) + (-base) = -(sum(phi) + base)
-            # keeps sigmoid(...) equal to the reported confidence. This is why
-            # base_value is reported as a negative number for this module.
-            if self._LABELS_INVERTED:
-                shap_values.values = -shap_values.values
-                shap_values.base_values = -shap_values.base_values
+            result = generate_shap_explanation(shap_values, features)
 
-            result = generate_shap_explanation(shap_values, feature_names)
-
-            # Attach prediction + confidence (same inversion fix as predict())
-            raw_pred = int(self.model.predict(df)[0])
-            raw_proba = self.model.predict_proba(df)[0]
-            has_disease = (raw_pred == 0)
+            proba = float(bundle["pipeline"].predict_proba(df)[0, 1])
+            has_disease = proba >= threshold
             result["prediction"] = 1 if has_disease else 0
-            result["confidence"] = float(raw_proba[0])
+            result["confidence"] = proba
             result["diagnosis"] = "Positive" if has_disease else "Negative"
 
             log.debug("SHAP explanation generated successfully")
@@ -403,21 +277,14 @@ class ModelLoader:
         self._feature_names = None
 
     def get_feature_names(self) -> List[str]:
-        """Return the feature names expected by the model."""
+        """Return the feature names expected by the model.
+
+        Read directly from the model bundle's own ``features`` list — the
+        booster carries no feature names (the Pipeline fits it on a bare
+        numpy array from the ColumnTransformer, not a named DataFrame).
+        """
         if self._feature_names is None:
-            # Try booster feature names first
-            try:
-                booster = self.model.get_booster()
-                if booster.feature_names and all(n != '' for n in booster.feature_names):
-                    self._feature_names = list(booster.feature_names)
-            except Exception:
-                pass
-            # Fallback: try sklearn's feature_names_in_
-            if self._feature_names is None:
-                try:
-                    self._feature_names = list(self.model.feature_names_in_)
-                except (AttributeError, Exception):
-                    self._feature_names = []
+            self._feature_names = list(self.model.get("features", []))
         return self._feature_names
     
     def generate_counterfactuals(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
