@@ -373,6 +373,52 @@ class TestHeartNonRegression:
 
         assert not isinstance(real_router._get_loader("heart_disease"), EnsembleModelLoader)
 
+    @pytest.mark.parametrize("bad_oldpeak", ["inf", "-inf", "nan"], ids=["inf", "-inf", "nan"])
+    async def test_batch_isolates_a_row_with_inf_or_nan_oldpeak(self, live_client, doctor_token, bad_oldpeak):
+        """
+        Regression guard for HM-3 (WEAKNESS_REGISTER.md): before Oldpeak got
+        ge/le bounds, a single row with Oldpeak=inf passed pydantic
+        validation, reached ModelLoader.predict_batch()'s single vectorized
+        predict_proba() call, and crashed it for the WHOLE validated group
+        (StandardScaler/check_array reject the entire matrix on one such
+        value) -- confirmed by direct test before the fix. The three rows
+        below sit in one /batch request with a good row on each side of the
+        bad one, so a regression that lets inf/nan back in would show up as
+        the two good rows failing too, not just the bad one.
+        """
+        good = dict(HEART_CASES["typical_up_slope"])
+        bad = dict(good)
+        bad["Oldpeak"] = bad_oldpeak
+
+        header = ",".join(good.keys())
+        good_row = ",".join(str(v) for v in good.values())
+        bad_row = ",".join(str(v) for v in bad.values())
+        csv_bytes = "\n".join([header, good_row, bad_row, good_row]).encode("utf-8")
+
+        resp = await live_client.post(
+            "/api/v4/heart_disease/batch",
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+
+        assert data["total"] == 3
+        assert data["succeeded"] == 2, data
+        assert data["failed"] == 1, data
+
+        by_row = {r["row"]: r for r in data["results"]}
+        assert by_row[1]["status"] == "ok"
+        assert by_row[2]["status"] == "error"
+        assert "Oldpeak" in by_row[2]["error"]
+        assert by_row[3]["status"] == "ok"
+        # The two good rows are identical patients -- same result, and it
+        # matches the non-regression golden value for this exact patient.
+        golden = HEART_GOLDEN["typical_up_slope"]
+        for row in (1, 3):
+            assert by_row[row]["prediction"] == golden["prediction"]
+            assert by_row[row]["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
+
     def test_threshold_is_read_from_the_model_file_not_a_constant(self, real_router):
         # bundle["threshold"] must be the number the .pkl actually carries,
         # and predict() must consult it at call time -- not a 0.5 argmax or

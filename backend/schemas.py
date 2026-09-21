@@ -51,7 +51,13 @@ class HeartDiseaseInput(BaseModel):
     RestingECG: Literal['Normal', 'ST', 'LVH'] = Field(..., description="Resting ECG: 'Normal', 'ST', or 'LVH' (or encoded 0-2)")
     MaxHR: int = Field(..., description="Maximum heart rate achieved", ge=60, le=220)
     ExerciseAngina: Literal['Y', 'N'] = Field(..., description="Exercise-induced angina: 'Y' or 'N' (or encoded 0/1)")
-    Oldpeak: float = Field(..., description="ST depression induced by exercise relative to rest")
+    # Bounds verified against the real training data (data/heart_disease/processed/
+    # uci_heart_by_site.csv, 920 rows, 4 UCI sites): observed range is -2.6 to 6.2.
+    # ge/le with a margin above/below that range also rejects inf and nan outright
+    # (any comparison against nan is False in Python, so nan fails both bounds) --
+    # this was the only numeric field on this schema with no bounds at all; Age,
+    # RestingBP, Cholesterol, FastingBS and MaxHR were already constrained.
+    Oldpeak: float = Field(..., description="ST depression induced by exercise relative to rest", ge=-3.0, le=10.0)
     ST_Slope: Literal['Up', 'Flat', 'Down'] = Field(..., description="ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)")
 
     model_config = ConfigDict(json_schema_extra={

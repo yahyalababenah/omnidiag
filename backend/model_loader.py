@@ -227,10 +227,17 @@ class ModelLoader:
 
         Args:
             patients_data: List of feature_name -> value dicts, one per
-                patient. Raises the same way predict() would if any patient
-                is missing a required feature -- there is no per-patient
-                isolation inside this call; the caller decides how to
-                handle a whole-batch failure.
+                patient. This call itself provides no per-patient isolation
+                -- a single row that reaches here with an inf/nan/invalid
+                value can fail the whole group (StandardScaler/check_array
+                reject the entire matrix on one such value; confirmed by
+                direct test, see WEAKNESS_REGISTER.md HM-3). The caller
+                (backend/main.py::batch_predict) is expected to validate
+                every patient with the disease's pydantic schema first, so
+                that no value reaching this call can trigger that failure
+                -- see HeartDiseaseInput.Oldpeak in backend/schemas.py,
+                the field that was previously unbounded and let inf/nan
+                through.
 
         Returns:
             List of result dicts (same shape as predict()'s return value),
