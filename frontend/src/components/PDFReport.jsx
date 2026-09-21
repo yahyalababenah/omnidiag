@@ -23,6 +23,7 @@ import {
   Font,
 } from '@react-pdf/renderer'
 import { normaliseScenario } from '../utils/counterfactuals'
+import { SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening'
 
 // ── Colour palette (matches Tailwind clinical theme) ──────────────────────────
 const C = {
@@ -187,7 +188,7 @@ export default function PDFReport({
   // Same scale as `confidence` — both come from the /predict response.
   const threshold =
     typeof result?.inference_threshold === 'number' ? result.inference_threshold : null
-  const diagnosisLabel = result?.diagnosis ?? (isPositive ? 'Positive' : 'Negative')
+  const diagnosisLabel = isPositive ? SCREENING_ELEVATED : SCREENING_BELOW
   const badgeStyle = isPositive
     ? { ...styles.badge, backgroundColor: '#fee2e2', color: C.positive }
     : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
@@ -264,9 +265,9 @@ export default function PDFReport({
           )}
         </View>
 
-        {/* ── Diagnosis Summary ── */}
+        {/* ── Screening Summary ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>AI Diagnosis Summary</Text>
+          <Text style={styles.sectionTitle}>AI Screening Summary</Text>
           <View style={styles.badgeRow}>
             <Text style={badgeStyle}>{diagnosisLabel}</Text>
             <View>

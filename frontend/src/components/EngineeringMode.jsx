@@ -13,6 +13,7 @@ import { useDisease } from '../context/DiseaseContext';
 import DynamicClinicalForm from './DynamicClinicalForm';
 import ShapBarChart from './ShapBarChart';
 import WhatIfScenarioCard from './WhatIfScenarioCard';
+import { SCREENING_LABEL, SCREENING_ELEVATED, SCREENING_BELOW, isElevated } from '../utils/screening';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
 import { getDisplayThreshold } from '../constants/thresholds';
@@ -26,6 +27,7 @@ export default function EngineeringMode() {
   const [shapData, setShapData] = useState(null);
   const [counterfactualsData, setCounterfactualsData] = useState(null);
   const [counterfactualsBaseline, setCounterfactualsBaseline] = useState(null);
+  const [counterfactualsBest, setCounterfactualsBest] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [lastFormData, setLastFormData] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -54,6 +56,7 @@ export default function EngineeringMode() {
     setShapData(null);
     setCounterfactualsData(null);
     setCounterfactualsBaseline(null);
+    setCounterfactualsBest(null);
     setLastFormData(formData);
 
     try {
@@ -75,13 +78,16 @@ export default function EngineeringMode() {
         const cfResponse = await api.counterfactuals(selectedDisease, formData);
         setCounterfactualsData(cfResponse?.counterfactuals ?? null);
         setCounterfactualsBaseline(cfResponse?.baseline_probability ?? null);
+        setCounterfactualsBest(cfResponse?.best_achievable ?? null);
       } catch {
         setCounterfactualsData(null);
         setCounterfactualsBaseline(null);
+        setCounterfactualsBest(null);
       }
     } else {
       setCounterfactualsData(null);
       setCounterfactualsBaseline(null);
+      setCounterfactualsBest(null);
     }
     setLoading(false);
     setCounterfactualsLoading(false);
@@ -187,13 +193,13 @@ export default function EngineeringMode() {
                 const thresholdPct = displayThreshold != null ? (displayThreshold * 100).toFixed(1) : null;
                 return (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Diagnosis</span>
-                    <span className={result.diagnosis === 'Positive' ? 'badge-positive' : 'badge-negative'}>
-                      {result.diagnosis === 'Positive' ? (
-                        <><AlertCircle className="w-3.5 h-3.5" /> Positive</>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-gray-600 shrink-0">{SCREENING_LABEL}</span>
+                    <span className={isElevated(result) ? 'badge-positive' : 'badge-negative'}>
+                      {isElevated(result) ? (
+                        <><AlertCircle className="w-3.5 h-3.5" /> {SCREENING_ELEVATED}</>
                       ) : (
-                        <><CheckCircle2 className="w-3.5 h-3.5" /> Negative</>
+                        <><CheckCircle2 className="w-3.5 h-3.5" /> {SCREENING_BELOW}</>
                       )}
                     </span>
                   </div>
@@ -259,6 +265,7 @@ export default function EngineeringMode() {
                   <WhatIfScenarioCard
                     counterfactuals={counterfactualsData}
                     baselineProbability={counterfactualsBaseline}
+                    bestAchievable={counterfactualsBest}
                     loading={counterfactualsLoading}
                     prediction={result?.prediction}
                     patientData={lastFormData ?? null}

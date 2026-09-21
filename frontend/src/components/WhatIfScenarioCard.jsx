@@ -1,4 +1,4 @@
-import { Zap, Lightbulb, TrendingDown, CheckCircle2, Loader2 } from 'lucide-react';
+import { Zap, Lightbulb, TrendingDown, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 import { normaliseScenario } from '../utils/counterfactuals';
 import MedicalTooltip from './MedicalTooltip';
 
@@ -24,8 +24,26 @@ import MedicalTooltip from './MedicalTooltip';
  *   { scenario_id, probability, changes: [{ feature, original_value, counterfactual_value, direction }] }
  * `baselineProbability` (the request's `baseline_probability`) is required to turn a scenario's
  * `probability` into a risk-reduction percentage; pass it whenever available.
+ *
+ * `bestAchievable` (the response's `best_achievable`) is set when NO allowed change crosses the
+ * threshold: every modifiable factor improved at once, flagged `crosses_threshold: false`. That
+ * case renders its own explicit state — never an empty card or an unexplained "0%".
  */
-export default function WhatIfScenarioCard({ counterfactuals, loading, prediction, baselineProbability, patientData = null }) {
+const SUBTITLE =
+  "Scenarios show how the model's estimate responds to modifiable factors. " +
+  'They are not a predicted treatment effect.';
+const NO_CROSSING_MESSAGE =
+  'Even with every modifiable factor improved, the estimated risk remains above the threshold. ' +
+  'The dominant factors are not modifiable. Referral is recommended.';
+
+export default function WhatIfScenarioCard({
+  counterfactuals,
+  loading,
+  prediction,
+  baselineProbability,
+  patientData = null,
+  bestAchievable = null,
+}) {
   /* ── Mock placeholder data (fallback when API unavailable) ── */
   const mockScenarios = [
     {
@@ -70,6 +88,78 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
           <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Computing counterfactual scenarios...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ════════════════════════════════════════
+     State 1b — Flagged patient, but no allowed change crosses the threshold
+     (backend returned an empty list, with or without best_achievable)
+     ════════════════════════════════════════ */
+  const noCrossing =
+    Array.isArray(counterfactuals) &&
+    counterfactuals.length === 0 &&
+    (bestAchievable || prediction === 1);
+  if (noCrossing) {
+    const best = bestAchievable ? normaliseScenario(bestAchievable, 0, patientData) : null;
+    const after = best
+      ? (typeof best.new_probability_corrected === 'number' ? best.new_probability_corrected
+        : typeof best.new_probability === 'number' ? best.new_probability
+        : best.probability)
+      : null;
+    const relative = best && typeof best.risk_reduction_relative_pct === 'number'
+      ? best.risk_reduction_relative_pct
+      : null;
+    const absolute = best && typeof best.risk_reduction_absolute_pp === 'number'
+      ? best.risk_reduction_absolute_pp
+      : null;
+    return (
+      <div className="card border border-amber-200 bg-amber-50/40">
+        <div className="card-header">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            What-If Scenarios
+          </h2>
+        </div>
+        <div className="card-body space-y-4">
+          <p className="text-xs text-gray-500 leading-relaxed">{SUBTITLE}</p>
+          <div className="p-4 rounded-lg border border-amber-200 bg-white">
+            <p className="text-sm font-medium text-amber-900">{NO_CROSSING_MESSAGE}</p>
+            {best ? (
+              <div className="mt-3">
+                <p className="text-xs text-gray-600">
+                  Best achievable with every modifiable factor improved:
+                </p>
+                <ul className="mt-1 text-sm text-gray-700 space-y-0.5">
+                  {best.changes.map((c) => (
+                    <li key={c.feature}>
+                      <MedicalTooltip term={c.feature}>
+                        <strong className="text-gray-900">{c.feature}</strong>
+                      </MedicalTooltip>{' '}
+                      {String(c.original_value)} {' → '} {String(c.counterfactual_value)}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-gray-600 mt-2">
+                  {typeof baselineProbability === 'number' && (
+                    <>Estimated risk {(baselineProbability * 100).toFixed(1)}%{' → '}</>
+                  )}
+                  {typeof after === 'number' && <strong>{(after * 100).toFixed(1)}%</strong>}
+                  {relative !== null && (
+                    <> — relative reduction {Math.round(relative)}%</>
+                  )}
+                  {absolute !== null && <> ({absolute.toFixed(1)} pts absolute)</>}
+                  {' '}— still above the threshold.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-600 mt-2">
+                No modifiable factor is available to change for this patient (none of the
+                modifiable inputs was supplied, or each is already at its target).
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -195,8 +285,7 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
 
       <div className="card-body space-y-4">
         <p className="text-xs text-gray-500 leading-relaxed">
-          Explore how modifying key risk factors could alter the predicted
-          outcome.
+          {SUBTITLE}
           {isMock &&
             ' Below are illustrative examples — backend DiCE engine integration pending.'}
         </p>
@@ -354,7 +443,9 @@ export default function WhatIfScenarioCard({ counterfactuals, loading, predictio
             />
           </div>
           <p className="text-[10px] text-gray-400 mt-1">
-            The most effective scenario above reduces relative risk by up to{' '}
+            {scenarios.length === 1
+              ? 'The scenario above reduces relative risk by '
+              : `The most effective of the ${scenarios.length} scenarios above reduces relative risk by up to `}
             <strong>{totalReduction}%</strong>
           </p>
         </div>

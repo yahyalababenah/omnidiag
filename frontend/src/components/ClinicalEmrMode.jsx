@@ -34,6 +34,13 @@ import ClinicalNotesInput from './ClinicalNotesInput';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
 import { getDisplayThreshold } from '../constants/thresholds';
+import { SCREENING_LABEL, SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening';
+import {
+  FAVOURABLE_BINARY,
+  NEUTRAL_FIELDS,
+  HIGHER_IS_BETTER,
+  RISK_CATEGORIES,
+} from '../constants/clinicalDirection';
 
 /**
  * Clinical EMR Mode — Doctor's View
@@ -65,6 +72,7 @@ export default function ClinicalEmrMode() {
   const [shapData, setShapData] = useState(null);
   const [counterfactualsData, setCounterfactualsData] = useState(null);
   const [counterfactualsBaseline, setCounterfactualsBaseline] = useState(null);
+  const [counterfactualsBest, setCounterfactualsBest] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -108,6 +116,7 @@ export default function ClinicalEmrMode() {
     setShapData(null);
     setCounterfactualsData(null);
     setCounterfactualsBaseline(null);
+    setCounterfactualsBest(null);
 
     try {
       const [pred, expl] = await Promise.all([
@@ -117,7 +126,7 @@ export default function ClinicalEmrMode() {
       setResult(pred);
       setShapData(expl);
     } catch (err) {
-      setError(err.message || 'Diagnosis failed. Is the backend running?');
+      setError(err.message || 'Screening failed. Is the backend running?');
     }
 
     // Counterfactuals: only supported by ensemble diseases (e.g. diabetes).
@@ -128,13 +137,16 @@ export default function ClinicalEmrMode() {
         const cfResponse = await api.counterfactuals(selectedDisease, patient.data);
         setCounterfactualsData(cfResponse?.counterfactuals ?? null);
         setCounterfactualsBaseline(cfResponse?.baseline_probability ?? null);
+        setCounterfactualsBest(cfResponse?.best_achievable ?? null);
       } catch {
         setCounterfactualsData(null);
         setCounterfactualsBaseline(null);
+        setCounterfactualsBest(null);
       }
     } else {
       setCounterfactualsData(null);
       setCounterfactualsBaseline(null);
+      setCounterfactualsBest(null);
     }
     setLoading(false);
     setCounterfactualsLoading(false);
@@ -162,17 +174,31 @@ export default function ClinicalEmrMode() {
     const meta = fieldMap.get(fieldName);
     if (!meta) return 'normal';
 
-    // Toggle/binary: 1 = risk factor present
-    if (meta.component === 'toggle') {
-      return value === 1 ? 'warning' : 'normal';
+    // Coloured by clinical direction per feature (constants/clinicalDirection.js),
+    // never by "value == 1": Fruits/Veggies/PhysActivity/AnyHealthcare = Yes
+    // are healthy and used to render red.
+    if (value === null || value === undefined || NEUTRAL_FIELDS.has(fieldName)) return 'normal';
+
+    // Binary 0/1 field with a known favourable value
+    if (fieldName in FAVOURABLE_BINARY) {
+      return Number(value) === FAVOURABLE_BINARY[fieldName] ? 'normal' : 'warning';
     }
+
+    // Categorical field with known risk values
+    if (fieldName in RISK_CATEGORIES) {
+      return RISK_CATEGORIES[fieldName].includes(value) ? 'warning' : 'normal';
+    }
+
+    // Any other toggle: no known direction, so no colour
+    if (meta.component === 'toggle') return 'normal';
 
     // Numeric: compare to min/max range
     if ((meta.type === 'number' || meta.type === 'integer') &&
         meta.validation.minimum !== undefined && meta.validation.maximum !== undefined) {
       const range = meta.validation.maximum - meta.validation.minimum;
       if (range > 0) {
-        const ratio = (value - meta.validation.minimum) / range;
+        let ratio = (value - meta.validation.minimum) / range;
+        if (HIGHER_IS_BETTER.has(fieldName)) ratio = 1 - ratio;
         // Upper quartile = elevated risk
         if (ratio > 0.75) return 'warning';
         if (ratio > 0.5) return 'elevated';
@@ -479,7 +505,7 @@ export default function ClinicalEmrMode() {
               <div className="card-header flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <Zap className="w-5 h-5 text-primary-600" />
-                  AI Diagnostic Panel
+                  AI Risk Screening
                 </h2>
                 {loading && (
                   <span className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -493,7 +519,7 @@ export default function ClinicalEmrMode() {
                   <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium text-red-800">Diagnosis Error</p>
+                      <p className="text-sm font-medium text-red-800">Screening Error</p>
                       <p className="text-sm text-red-600 mt-0.5">{error}</p>
                     </div>
                   </div>
@@ -503,7 +529,7 @@ export default function ClinicalEmrMode() {
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                     <Loader2 className="w-8 h-8 animate-spin mb-3" />
                     <p className="text-sm">
-                      {coldStart ? 'Waking up the diagnostic engine...' : 'Running AI diagnosis...'}
+                      {coldStart ? 'Waking up the diagnostic engine...' : 'Running AI risk screening...'}
                     </p>
                     {coldStart && (
                       <p className="text-xs text-amber-600 mt-2">
@@ -542,10 +568,11 @@ export default function ClinicalEmrMode() {
                           <CheckCircle2 className="w-8 h-8 text-green-500" />
                         )}
                         <div>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-500">
+                            {SCREENING_LABEL} — {diseaseLabel}
+                          </p>
                           <p className="text-lg font-bold" style={{ color: isPositive ? '#dc2626' : '#16a34a' }}>
-                            {isPositive
-                              ? `${diseaseLabel} Detected`
-                              : `No ${diseaseLabel} Detected`}
+                            {isPositive ? SCREENING_ELEVATED : SCREENING_BELOW}
                           </p>
                           <p className="text-sm text-gray-600">
                             {isPositive
@@ -578,7 +605,7 @@ export default function ClinicalEmrMode() {
 
                 {!result && !loading && !error && (
                   <div className="text-center text-gray-400 py-8 text-sm">
-                    Select a patient to begin AI diagnosis.
+                    Select a patient to begin AI risk screening.
                   </div>
                 )}
               </div>
@@ -624,7 +651,7 @@ export default function ClinicalEmrMode() {
                       onClick={() => runDiagnosis(selectedPatient)}
                       disabled={loading}
                       className="btn-secondary text-xs"
-                      title="Refresh diagnosis"
+                      title="Refresh screening"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                       Refresh
@@ -646,6 +673,7 @@ export default function ClinicalEmrMode() {
                     <WhatIfScenarioCard
                       counterfactuals={counterfactualsData}
                       baselineProbability={counterfactualsBaseline}
+                      bestAchievable={counterfactualsBest}
                       loading={counterfactualsLoading}
                       prediction={result?.prediction}
                       patientData={selectedPatient?.data ?? null}
@@ -668,8 +696,11 @@ export default function ClinicalEmrMode() {
                         </p>
                       </div>
 
-                      {/* ═══ Feature Spotlight: Diabetes_Clinical_Risk ═══ */}
-                      {(() => {
+                      {/* ═══ Feature Spotlight: Diabetes_Clinical_Risk ═══
+                          Only when this disease's model actually has the
+                          engineered feature — read from its own /explain
+                          feature list, not from the disease name. */}
+                      {shapData.chart_data?.some((c) => c.feature === 'Diabetes_Clinical_Risk') && (() => {
                         const topFeature = shapData.chart_data?.length > 0
                           ? shapData.chart_data.reduce((a, b) =>
                               Math.abs(a.shap_value) > Math.abs(b.shap_value) ? a : b

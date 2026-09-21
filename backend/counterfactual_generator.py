@@ -12,12 +12,17 @@ Algorithm (DiCE-inspired):
     4. Score by proximity (L1 distance) with diversity penalty
     5. Select top 3 most diverse counterfactuals
 
-Clinical constraints:
-    - BMI: 15.0–50.0 (cannot go below or above biologically plausible bounds)
-    - Binary features: only 0 or 1 (no fractional values)
-    - Ordinal features: must remain integer within their range
-    - Immutable features: Sex, Age, Education cannot be changed
-    - Engineered features: auto-computed from raw features
+Clinical constraints (mutability policy — DIABETES_POLICY below):
+    - Only BMI, PhysActivity, Fruits, Veggies and HvyAlcoholConsump may change,
+      each in ONE clinically beneficial direction (BMI: decrease only, floor
+      18.5). Everything else is immutable — including HighBP, HighChol,
+      Smoker, Stroke, HeartDiseaseorAttack and CholCheck, which in BRFSS 2015
+      record whether the patient was EVER told / EVER did something, so
+      "undoing" them is not an intervention.
+    - Engineered features: never perturbed; recomputed by pipeline_fn from
+      the changed base features.
+    - The policy is enforced twice: when candidates are sampled, and again
+      by policy_violations() on every scenario right before it is returned.
 
 Reference:
     - DiCE (Diverse Counterfactual Explanations): https://arxiv.org/abs/1905.07697
@@ -55,17 +60,38 @@ ENGINEERED_FEATURES: Set[str] = {
     "SES_Composite", "Diabetes_Clinical_Risk",
 }
 
-# Immutable features — cannot be changed in realistic counterfactuals
+# Mutability policy. Each entry is the ONLY way that feature may change:
+#   ("decrease", floor)  — continuous, may only go down, never below floor
+#   ("to", value)        — binary, may only move to `value`
+# A feature not listed here is immutable. policy_violations() enforces this.
+DIABETES_POLICY: Dict[str, Tuple[str, float]] = {
+    "BMI": ("decrease", 18.5),
+    "PhysActivity": ("to", 1),
+    "Fruits": ("to", 1),
+    "Veggies": ("to", 1),
+    "HvyAlcoholConsump": ("to", 0),
+}
+
+# Immutable features — never changed in a counterfactual. Listed explicitly
+# (it is exactly "everything not in DIABETES_POLICY") so the reason for each
+# is on record.
 IMMUTABLE_FEATURES: Set[str] = {
-    "Sex",           # Cannot change biological sex
-    "Age",           # Cannot reverse age
-    "Income",        # Socioeconomic — cannot realistically change
-    "Education",     # Socioeconomic — cannot realistically change
-    "NoDocbcCost",   # Cost/access barrier — systemic, not clinical
-    "AnyHealthcare", # Already has insurance — can't undo
-    "CholCheck",     # Already had cholesterol check — can't undo
+    "HighBP",        # BRFSS: EVER told by a health professional — history
+    "HighChol",      # BRFSS: EVER told by a health professional — history
+    "CholCheck",     # Already had a cholesterol check — can't undo
     "Stroke",        # Past medical history — can't undo
     "HeartDiseaseorAttack",  # Past medical history — can't undo
+    "Smoker",        # BRFSS: smoked >= 100 cigarettes in ENTIRE life — history
+    "DiffWalk",      # Mobility limitation — not a lever
+    "Age",           # Cannot reverse age
+    "Sex",           # Cannot change biological sex
+    "Education",     # Socioeconomic — cannot realistically change
+    "Income",        # Socioeconomic — cannot realistically change
+    "AnyHealthcare", # Access/insurance — systemic, not clinical
+    "NoDocbcCost",   # Cost/access barrier — systemic, not clinical
+    "GenHlth",       # Self-rated health — an outcome, not a lever
+    "MentHlth",      # Poor-health days — an outcome, not a lever
+    "PhysHlth",      # Poor-health days — an outcome, not a lever
 }
 
 # Clinical feasibility bounds
@@ -79,45 +105,75 @@ CLINICAL_BOUNDS: Dict[str, Tuple[float, float]] = {
     "Income": (1.0, 8.0),
 }
 
-# Features that can realistically be modified
-# NOTE: NoDocbcCost, Income, Education, AnyHealthcare are excluded
-# because they are social/access barriers — clinically inappropriate to suggest changing.
-MUTABLE_FEATURES: Set[str] = {
-    "BMI", "HighBP", "HighChol", "Smoker", "PhysActivity",
-    "Fruits", "Veggies", "HvyAlcoholConsump", "MentHlth",
-    "PhysHlth", "GenHlth", "DiffWalk",
-}
+# Features that can realistically be modified — exactly the policy's keys.
+MUTABLE_FEATURES: Set[str] = set(DIABETES_POLICY)
 
 # Perturbation scales (std as fraction of range) for each mutable feature
 PERTURB_SCALES: Dict[str, float] = {
     "BMI": 0.15,           # 15% of range (35 BMI units)
-    "HighBP": 1.0,         # Binary — flip probability
-    "HighChol": 1.0,       # Binary — flip probability
-    "Smoker": 0.8,         # Binary — high flip probability
     "PhysActivity": 0.9,   # Binary — high flip probability
     "Fruits": 0.7,         # Binary
     "Veggies": 0.7,        # Binary
     "HvyAlcoholConsump": 0.6,  # Binary
-    "MentHlth": 0.2,       # 20% of 30-day range
-    "PhysHlth": 0.2,       # 20% of 30-day range
-    "GenHlth": 0.25,       # 25% of 4-unit range
-    "DiffWalk": 0.5,       # Binary
 }
 
-# Directional constraints: prevent clinically harmful perturbations.
-# Key   = feature name
-# Value = set of allowed target values (the only clinically safe values)
-# Features NOT listed here can flip bidirectionally (original behavior).
+# Directional constraints for binary features, derived from the policy:
+# feature -> the set of allowed target values.
 DIRECTIONAL_CONSTRAINTS: Dict[str, Set[int]] = {
-    "HvyAlcoholConsump": {0},   # Only allow stopping/reducing alcohol, never starting
-    "Smoker": {0},              # Only allow stopping smoking, never starting
-    "Veggies": {1},             # Only allow adopting vegetable intake, never dropping
-    "Fruits": {1},              # Only allow adopting fruit intake, never dropping
-    "PhysActivity": {1},        # Only allow adopting physical activity, never dropping
-    "DiffWalk": {0},            # Never advise decreasing mobility (0→1 forbidden)
-    "HighBP": {0},              # Only allow resolving high blood pressure, never inducing it
-    "HighChol": {0},            # Only allow resolving high cholesterol, never inducing it
+    feat: {int(target)}
+    for feat, (kind, target) in DIABETES_POLICY.items()
+    if kind == "to"
 }
+
+
+def policy_violations(
+    original: Dict[str, Any],
+    changes: Dict[str, Any],
+    policy: Dict[str, Tuple[str, float]],
+) -> List[str]:
+    """
+    Every way `changes` (feature -> new value) breaks `policy`. Empty list =
+    allowed. Shared by the diabetes generator and the heart loader, and run
+    on every scenario immediately before it is returned, so a violating
+    scenario cannot be emitted even if candidate generation changes later.
+    """
+    problems = []
+    for feat, new in sorted(changes.items()):
+        if feat not in policy:
+            problems.append(f"{feat}: immutable")
+            continue
+        old = original.get(feat)
+        if old is None or new is None:
+            problems.append(f"{feat}: missing value cannot be a lever")
+            continue
+        kind, bound = policy[feat]
+        old, new = float(old), float(new)
+        if new == old:
+            continue
+        if kind == "decrease" and not (new < old and new >= bound):
+            problems.append(f"{feat}: {old} -> {new} (decrease only, floor {bound})")
+        elif kind == "to" and new != float(bound):
+            problems.append(f"{feat}: {old} -> {new} (may only move to {bound})")
+    return problems
+
+
+def all_improvements(
+    patient_data: Dict[str, Any], policy: Dict[str, Tuple[str, float]]
+) -> Dict[str, Any]:
+    """The patient with every allowed lever pushed to its most favourable
+    value (continuous to its floor, binary to its target). Levers the
+    patient is missing (None) or already satisfies are left as they are."""
+    improved = dict(patient_data)
+    for feat, (kind, bound) in sorted(policy.items()):
+        value = patient_data.get(feat)
+        if value is None:
+            continue
+        if kind == "decrease":
+            if float(value) > bound:
+                improved[feat] = bound
+        else:
+            improved[feat] = bound
+    return improved
 
 
 class CounterfactualGenerator:
@@ -202,8 +258,11 @@ class CounterfactualGenerator:
             log.debug("Patient already in desired class — no counterfactuals generated")
             return []
         
-        # Generate candidate perturbations
+        # Generate candidate perturbations. The all-levers-improved patient is
+        # always evaluated too, so a crossing that exists is not missed by
+        # random sampling alone.
         candidates = self._sample_candidates(patient_data)
+        candidates.append(all_improvements(patient_data, DIABETES_POLICY))
         
         # Evaluate each candidate through the full pipeline
         valid_candidates = []
@@ -218,6 +277,8 @@ class CounterfactualGenerator:
                     
                     # Calculate changes relative to baseline
                     changes = self._compute_changes(patient_data, cand_raw)
+                    if not changes or policy_violations(patient_data, changes, DIABETES_POLICY):
+                        continue
                     
                     # Calculate proximity score (L1 distance normalized)
                     proximity = self._proximity_score(patient_data, cand_raw)
@@ -237,6 +298,17 @@ class CounterfactualGenerator:
             log.debug("No valid counterfactuals found — try increasing n_samples")
             return []
         
+        # One candidate per set of changed features — the closest one. Three
+        # scenarios that all say "lower BMI" (to 22.7, 21.4, 21.3) are one
+        # scenario, not three alternatives; with few levers, fewer than
+        # n_counterfactuals scenarios is the honest answer.
+        best_per_set: Dict[Tuple[str, ...], Dict[str, Any]] = {}
+        for cand in valid_candidates:
+            key = tuple(sorted(cand["changes"]))
+            if key not in best_per_set or cand["proximity"] > best_per_set[key]["proximity"]:
+                best_per_set[key] = cand
+        valid_candidates = [best_per_set[k] for k in sorted(best_per_set)]
+
         # Sort by proximity (closest first), then select diverse subset
         selected = self._select_diverse(valid_candidates)
         
@@ -267,10 +339,46 @@ class CounterfactualGenerator:
                 "risk_reduction_absolute_pp": round(absolute_pp, 2),
                 "probability_scale": "corrected",
                 "feasibility": feasibility,
+                "crosses_threshold": True,
             })
-        
+
+        # Final filter (defence in depth): nothing that breaks the policy
+        # leaves this function, whatever generated it.
+        counterfactuals = [
+            cf for cf in counterfactuals
+            if not policy_violations(patient_data, cf["changes"], DIABETES_POLICY)
+        ]
         log.debug(f"Generated {len(counterfactuals)} counterfactuals")
         return counterfactuals
+
+    def best_achievable(self, patient_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        What the model estimates with EVERY allowed lever improved at once,
+        whether or not that crosses the threshold. None when the patient has
+        no lever left to move. Same fields as a generate() scenario, with
+        `crosses_threshold` saying whether it gets below the threshold.
+        """
+        improved = all_improvements(patient_data, DIABETES_POLICY)
+        changes = self._compute_changes(patient_data, improved)
+        if not changes or policy_violations(patient_data, changes, DIABETES_POLICY):
+            return None
+        baseline = self._get_proba_corrected(self.pipeline_fn(pd.DataFrame([patient_data])))
+        after = self._get_proba_corrected(self.pipeline_fn(pd.DataFrame([improved])))
+        relative_pct = max(0.0, (baseline - after) / max(baseline, 0.001) * 100)
+        absolute_pp = max(0.0, (baseline - after) * 100)
+        return {
+            "scenario": self._build_scenario(changes),
+            "changes": changes,
+            "new_probability": round(after, 4),
+            "new_probability_corrected": round(after, 4),
+            "baseline_probability_corrected": round(baseline, 4),
+            "risk_reduction": f"{int(round(relative_pct))}%",
+            "risk_reduction_relative_pct": round(relative_pct, 2),
+            "risk_reduction_absolute_pp": round(absolute_pp, 2),
+            "probability_scale": "corrected",
+            "feasibility": self._assess_feasibility(changes),
+            "crosses_threshold": bool(after < self.inference_threshold),
+        }
     
     # ------------------------------------------------------------------
     # Internal methods
@@ -326,8 +434,10 @@ class CounterfactualGenerator:
         for _ in range(self.n_samples):
             cand = dict(patient_data)  # Copy all features
             
-            # Perturb mutable features
-            for feat in MUTABLE_FEATURES:
+            # Perturb mutable features — sorted, so the RNG is consumed in
+            # the same order in every process (iterating the set directly
+            # followed PYTHONHASHSEED and made results differ per process).
+            for feat in sorted(MUTABLE_FEATURES):
                 if feat not in patient_data:
                     continue
                 
@@ -349,10 +459,14 @@ class CounterfactualGenerator:
                     lo, hi = CLINICAL_BOUNDS[feat]
                     scale = PERTURB_SCALES.get(feat, 0.15)
                     
-                    # Sample from truncated normal around original value
+                    # Half-normal step in the one allowed direction: a
+                    # "decrease" lever never goes up (the old two-sided
+                    # normal proposed weight GAIN), and never below its floor.
                     std = (hi - lo) * scale
-                    perturbed = self.np_rng.normal(loc=original, scale=std)
-                    perturbed = np.clip(perturbed, lo, hi)
+                    step = abs(self.np_rng.normal(loc=0.0, scale=std))
+                    kind, floor = DIABETES_POLICY.get(feat, ("decrease", lo))
+                    perturbed = max(original - step, max(lo, floor))
+                    perturbed = min(round(perturbed, 1), original)
                     
                     # For ordinal features, round to integer
                     if feat in {"MentHlth", "PhysHlth", "GenHlth",
@@ -378,10 +492,9 @@ class CounterfactualGenerator:
             # Only report changes for raw (not engineered) features
             if key in ENGINEERED_FEATURES:
                 continue
-            # Defensive: skip immutable/systemic features — they should never
-            # appear as actionable changes, even if a perturbation slipped through
-            if key in IMMUTABLE_FEATURES:
-                continue
+            # Every raw change is reported — including an immutable one, if a
+            # perturbation ever slipped through — so policy_violations() can
+            # reject the scenario instead of it silently hiding the change.
             
             orig_val = float(original.get(key, 0))
             cand_val = float(candidate[key])
@@ -403,7 +516,7 @@ class CounterfactualGenerator:
         total_distance = 0.0
         n_features = 0
         
-        for feat in MUTABLE_FEATURES:
+        for feat in sorted(MUTABLE_FEATURES):
             if feat not in original or feat not in candidate:
                 continue
             if feat in ENGINEERED_FEATURES:
