@@ -91,14 +91,12 @@ flowchart LR
     A[configs/heart_disease.yaml] --> B[OmniDiagRouter._load_all_configs]
     C[configs/diabetes.yaml] --> B
     B --> D{Register loader}
-    D -->|CAD: single XGBoost| E[ModelLoader]
+    D -->|CAD: self-contained sklearn Pipeline| E[ModelLoader]
     D -->|DM: stacking ensemble| F[EnsembleModelLoader]
-    E --> G[features/heart_disease_features.py]
+    E --> G[pipeline.predict_proba - no feature engineering]
     F --> H[features/diabetes_features.py]
-    G --> I[HeartDiseaseFeatureEngineer]
     H --> J[DiabetesFeatureEngineer]
-    I --> K[3 engineering paths]
-    J --> K
+    J --> K[3 engineering paths]
     K --> L[Heuristic: statistical interactions]
     K --> M[Clinical: risk score formulas]
     K --> N[Medical: domain-specific markers]
@@ -130,7 +128,7 @@ flowchart LR
 
 [`OmniDiagRouter`](backend/router.py) scans [`configs/`](configs/) at startup and auto-discovers all YAML configuration files. Each config specifies the model type (single XGBoost or stacking ensemble), weights path, feature engineering module, and preprocessor artifacts. The router lazy-loads a [`ModelLoader`](backend/model_loader.py) or [`EnsembleModelLoader`](backend/ensemble_loader.py) per disease on first request — no additional endpoints or routing code needed when registering a new disease.
 
-Each disease config declares the model architecture, weights paths with fallback resolution, a Python module path for the disease-specific [`BaseFeatureEngineer`](features/base_features.py:17) subclass, preprocessor directory containing `label_encoders.pkl` and `standard_scaler.pkl`, SHAP explainer type (`tree` or `deep`), and schema back-reference via [`DISEASE_SCHEMA_REGISTRY`](backend/schemas.py).
+Each disease config declares the model architecture, weights paths with fallback resolution, SHAP explainer type (`tree` or `deep`), and schema back-reference via [`DISEASE_SCHEMA_REGISTRY`](backend/schemas.py). A Python module path for a disease-specific [`BaseFeatureEngineer`](features/base_features.py:17) subclass and a preprocessor directory (`label_encoders.pkl` + `standard_scaler.pkl`) still apply to diabetes; heart_disease's config carries neither — its Pipeline is self-contained (see [Explainable Inference Core](#explainable-inference-core)).
 
 ### RBAC & Security Middleware
 
@@ -148,11 +146,11 @@ Rate limiting is applied via [`SlowAPI`](backend/rate_limit.py:49) with per-rout
 
 ### Human-in-the-Loop Active Learning
 
-The active learning pipeline consists of three components. [`sampler.py`](backend/active_learning/sampler.py:26) computes binary entropy **around the module's own decision threshold**, not around 0.5: the probability is first mapped by [`centre_on_threshold()`](backend/active_learning/sampler.py) — the prior-shift map with the threshold `t` sent to 0.5, strictly increasing and the identity when `t = 0.5` — and then `H(q) = -q·log₂(q) - (1-q)·log₂(1-q)` is taken. A prediction with `H ≥ 0.88` ([`_DEFAULT_ENTROPY_THRESHOLD`](backend/active_learning/sampler.py)) is queued via [`should_queue_for_review(probability_corrected, decision_threshold)`](backend/active_learning/sampler.py). For heart (argmax, `t = 0.5`) that is the familiar ≈30–70 % band; for diabetes (`t = 0.059776` on the prevalence-corrected scale) it is ≈2.6–13 %. The distinction matters: a 0.5-centred sampler on the corrected diabetes scale queued 4,789 of 14,139 test rows, every one a confident Positive at ≥ 5× the threshold, and **0 of the 849** rows within ±20 % of the threshold; the threshold-centred sampler queues 3,566 rows including **all 849**. Each queued row records `uncertainty_scale` and `decision_threshold` beside `uncertainty_score`, so scores from different releases are never compared blindly. [`uncertainty_band()`](backend/active_learning/sampler.py) maps the same centred value to `CERTAIN` / `CONFIDENT` / `BORDERLINE` / `UNCERTAIN`. The [`routes.py`](backend/active_learning/routes.py) module exposes `GET /api/v4/review/queue` (paginated, filterable by disease), `POST /api/v4/review/{id}/annotate` (writes `label` and transitions `status → reviewed`), `POST /api/v4/review/{id}/skip`, and `GET /api/v4/review/stats`.
+The active learning pipeline consists of three components. [`sampler.py`](backend/active_learning/sampler.py:26) computes binary entropy **around the module's own decision threshold**, not around 0.5: the probability is first mapped by [`centre_on_threshold()`](backend/active_learning/sampler.py) — the prior-shift map with the threshold `t` sent to 0.5, strictly increasing and the identity when `t = 0.5` — and then `H(q) = -q·log₂(q) - (1-q)·log₂(1-q)` is taken. A prediction with `H ≥ 0.88` ([`_DEFAULT_ENTROPY_THRESHOLD`](backend/active_learning/sampler.py)) is queued via [`should_queue_for_review(probability_corrected, decision_threshold)`](backend/active_learning/sampler.py). For heart (`t = 0.3695`, read from the shipped model bundle, not argmax) that is ≈20–58 %; for diabetes (`t = 0.108184` on the prevalence-corrected scale) it is ≈5–22 %. The distinction matters: a 0.5-centred sampler on the corrected diabetes scale queued 4,789 of 14,139 test rows, every one a confident Positive at ≥ 5× the threshold, and **0 of the 849** rows within ±20 % of the threshold; the threshold-centred sampler queues 3,566 rows including **all 849**. Each queued row records `uncertainty_scale` and `decision_threshold` beside `uncertainty_score`, so scores from different releases are never compared blindly. [`uncertainty_band()`](backend/active_learning/sampler.py) maps the same centred value to `CERTAIN` / `CONFIDENT` / `BORDERLINE` / `UNCERTAIN`. The [`routes.py`](backend/active_learning/routes.py) module exposes `GET /api/v4/review/queue` (paginated, filterable by disease), `POST /api/v4/review/{id}/annotate` (writes `label` and transitions `status → reviewed`), `POST /api/v4/review/{id}/skip`, and `GET /api/v4/review/stats`.
 
 [`run_retrain_pipeline()`](backend/active_learning/retrain.py:149) is the full async pipeline. [`get_annotated_samples()`](backend/active_learning/retrain.py:38) issues a raw SQL JOIN of `review_queue` and `predictions` filtered to `status='reviewed'` and `label IS NOT NULL`. [`retrain_xgb()`](backend/active_learning/retrain.py:84) loads the current `.pkl`, constructs an `xgb.DMatrix`, and calls `xgb.train()` with `xgb_model=model` for 20 incremental boost rounds at lr=0.05 — the existing tree structure is preserved and extended. The old model is renamed to a timestamped `.bak.pkl` before the new weights are written. On success, [`ModelLoader.invalidate()`](backend/model_loader.py) / [`EnsembleModelLoader.invalidate()`](backend/ensemble_loader.py) clears the live router's cached model object so the very next prediction lazy-reloads the new weights from disk — **no process restart required**. This hot-reload path was verified end-to-end (swap in a differently-shaped model file → confirm the next request immediately errors with a feature-mismatch specific to the *new* file, proving it was actually loaded). [`_log_to_mlflow()`](backend/active_learning/retrain.py:137) records the retrain run unconditionally, with a warning-only failure path if MLflow is unreachable.
 
-🚧 **Known limitation:** `retrain_xgb()` builds its training matrix directly from the raw predict-time `input_features` (`X = np.array([list(feat.values()) for feat in features_list])`). For **heart_disease**, those values include un-encoded categorical strings (e.g. `ChestPainType="ATA"`), which makes this step raise `ValueError: could not convert string to float` before it ever reaches retraining — no real annotated-sample retrain cycle for heart_disease currently completes. For **diabetes**, `retrain_xgb()` always writes to the single hardcoded path `models/diabetes/omni_diag_xgb_optimized.pkl`, which is **not** one of the three files `EnsembleModelLoader` actually loads (`xgb_model.pkl`, `lgb_model.pkl`, `rf_model.pkl`) — so even a numerically successful run retrains a file the live ensemble never reads, a silent no-op. The hot-reload mechanism described above is implemented and tested; connecting it to a disease-aware, correctly-encoded retrain step is the next piece of work here.
+🚧 **Known limitation:** `retrain_xgb()` builds its training matrix directly from the raw predict-time `input_features` (`X = np.array([list(feat.values()) for feat in features_list])`) and always reads/writes the single hardcoded path `models/{disease}/omni_diag_xgb_optimized.pkl`. For **heart_disease**, that filename no longer exists at all — the shipped weights are `models/heart_disease/heart_full_tuned.pkl`, a `dict` bundle (`{pipeline, features, threshold, ...}`), not a bare `XGBClassifier` — so `retrain_xgb()` fails immediately at its own `if not model_path.exists()` check, before the un-encoded-categorical-strings issue it was originally written to describe is ever reached. No real annotated-sample retrain cycle for heart_disease currently completes, for a different reason than previously documented. For **diabetes**, that same hardcoded path is **not** one of the three files `EnsembleModelLoader` actually loads (`xgb_model.pkl`, `lgb_model.pkl`, `rf_model.pkl`) — so even a numerically successful run retrains a file the live ensemble never reads, a silent no-op. The hot-reload mechanism described above is implemented and tested; connecting it to a disease-aware, correctly-shaped retrain step is the next piece of work here.
 
 ### DeepSeek LLM Clinical Report Generation
 
@@ -168,14 +166,14 @@ When `DEEPSEEK_API_KEY` is absent or the API call raises any exception, [`_rule_
 
 The inference pipeline order is **disease-specific**, matching how each model was trained (verified live for both diseases):
 
-- **heart_disease (CAD)** — [`ModelLoader.predict()`](backend/model_loader.py:270): label-encode + scale **first**, then engineer heuristic + medical features from the already-scaled values. Reversing this order costs ~5% accuracy per an internal A/B diagnostic (see code comment at `model_loader.py:280`). The `clinical` path (`Clinical_Risk_Score`) is implemented in [`engineer_clinical()`](features/heart_disease_features.py:70) but is **not called** anywhere in the live predict/explain pipeline — confirmed absent from live SHAP output — it exists only for offline heuristic-vs-clinical A/B analysis.
+- **heart_disease (CAD)** — [`ModelLoader.predict()`](backend/model_loader.py:179) does **no manual preprocessing at all**: raw feature values go straight into `pipeline.predict_proba()`. The shipped weights file (`models/heart_disease/heart_full_tuned.pkl`) is a single self-contained `sklearn.Pipeline` — a `ColumnTransformer` (`IterativeImputer` + `StandardScaler` for the 6 numeric features, `SimpleImputer` + `OrdinalEncoder` for the 5 categorical ones) feeding an `XGBClassifier` — so imputation, scaling and encoding all happen inside the Pipeline itself. There is no separate feature-engineering step and no `label_encoders.pkl` / `standard_scaler.pkl` preprocessor files for this disease; six of the eleven input fields (`RestingBP, Cholesterol, FastingBS, MaxHR, Oldpeak, ST_Slope`) are `Optional` on the schema for exactly this reason — the Pipeline is built to impute them.
 - **diabetes** — [`EnsembleModelLoader.predict()`](backend/ensemble_loader.py:245): engineer heuristic + medical features **first**, then encode + scale. Here `engineer_clinical()` is a documented no-op ([diabetes_features.py:101](features/diabetes_features.py:101)); its formula is computed inside `engineer_medical()` instead, by deliberate design (documented in-code) so it participates in live inference. It does — `Diabetes_Clinical_Risk` is typically the top-ranked SHAP feature for this disease (confirmed live).
 
 On explain requests, the pipeline appends a SHAP TreeExplainer step returning structured JSON: `shap_chart_data` sorted by absolute SHAP value descending, a text explanation of the top-3 features with direction labels, and the base expected log-odds value. The `shap_chart_data` column in `predictions` stores this JSON for offline audit retrieval via `GET /admin/audit-logs` or direct DB query.
 
 #### XGBoost 3.x Compatibility Patch
 
-XGBoost 3.x stores `base_score` as a bracket-wrapped string (e.g. `[5.85E-1]`) in its UBJSON serialisation. SHAP's `TreeExplainer` calls `save_raw()` and parses the output with `float()`, which fails on the bracketed format. [`ModelLoader`](backend/model_loader.py) applies a `save_raw()` monkey-patch at load time that strips the brackets from the UBJSON byte stream, enabling SHAP to read `base_score` correctly. The patch is applied only to XGBoost models and silently skipped for other types.
+XGBoost 3.x stores `base_score` as a bracket-wrapped string (e.g. `[5.85E-1]`) in its UBJSON serialisation. SHAP's `TreeExplainer` calls `save_raw()` and parses the output with `float()`, which fails on the bracketed format. [`ModelLoader`](backend/model_loader.py) applies a `save_raw()` monkey-patch at load time that strips the brackets from the UBJSON byte stream, enabling SHAP to read `base_score` correctly. For heart_disease the patch targets `pipeline.named_steps["clf"]` (the `XGBClassifier` step inside the shipped Pipeline), not a bare top-level estimator. The patch is applied only to XGBoost models and silently skipped for other types.
 
 ### DiCE-Inspired Counterfactual Engine
 
@@ -191,18 +189,15 @@ XGBoost 3.x stores `base_score` as a bracket-wrapped string (e.g. `[5.85E-1]`) i
 
 ### Feature Engineering Pipeline
 
-Each disease implements a [`BaseFeatureEngineer`](features/base_features.py:17) subclass with three abstract methods executed in dependency order:
+Disease-specific now, not uniform: **diabetes** implements a [`BaseFeatureEngineer`](features/base_features.py:17) subclass with three abstract methods executed in dependency order; **heart_disease does none of this** — its shipped Pipeline (see [Explainable Inference Core](#explainable-inference-core)) takes the 11 raw clinical fields directly, with no derived features at all. `features/heart_disease_features.py` and its heuristic/clinical/medical formulas below (`Age_BP_Interaction`, `Clinical_Risk_Score`, `RPP`, ...) describe the pre-Pipeline heart model and are **no longer called anywhere in live inference**.
 
 **Heuristic (Statistical Interactions)** — Computes multiplicative interaction terms and ratios:
-- CAD: `Age_BP_Interaction` (age × resting BP), `HR_Age_Ratio` (max HR / age), `Chol_Age_Ratio` (cholesterol / age)
 - DM: [`BMI_Age_Interaction`](features/diabetes_features.py:55), [`Health_Index`](features/diabetes_features.py:63), [`Lifestyle_Score`](features/diabetes_features.py:77), [`SES_Composite`](features/diabetes_features.py:88)
 
-**Clinical (Risk Score Formulas)** — Computes exponentiated linear risk scores using clinical weights. Neither disease's live pipeline calls `engineer_clinical()` directly (see [Explainable Inference Core](#explainable-inference-core)); the formulas are real, but reached differently per disease:
-- CAD: `Clinical_Risk_Score = exp(Age × 0.048 + RestingBP × 0.015 + Cholesterol × 0.002)`, implemented in [`engineer_clinical()`](features/heart_disease_features.py:70) — **not invoked during live inference**; offline A/B use only.
+**Clinical (Risk Score Formulas)** — Computes exponentiated linear risk scores using clinical weights. Diabetes' live pipeline does not call `engineer_clinical()` directly (see [Explainable Inference Core](#explainable-inference-core)); the formula is real, but reached differently:
 - DM: `Diabetes_Clinical_Risk = exp(BMI × 0.05 + Age × 0.03 + GenHlth × 0.2 + HighBP × 0.5)` — despite the name, this is actually computed inside [`engineer_medical()`](features/diabetes_features.py:128), **not** `engineer_clinical()` (a documented no-op at [diabetes_features.py:101](features/diabetes_features.py:101)). This relocation is deliberate so the formula runs live — it's typically the top SHAP-ranked feature for diabetes predictions.
 
 **Medical (Domain-Specific)** — Computes cardiology-validated composite markers:
-- CAD: `RPP` (Rate-Pressure Product = RestingBP × MaxHR), `Exercise_Risk_Index` (Oldpeak × ExerciseAngina)
 - DM: `Diabetes_Clinical_Risk` (see Clinical section above — it lives in the medical-path method for pipeline-compatibility reasons, not because of aliasing)
 
 ### Prometheus + Evidently + Grafana Monitoring
@@ -346,11 +341,11 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │
 ├── models/                               # Trained model artifacts
 │   ├── advanced_feature_engineering.py   # Standalone feature computation functions
-│   ├── heart_disease/                    # CAD XGBoost weights + preprocessors
+│   ├── heart_disease/                    # CAD self-contained Pipeline bundle (heart_full_tuned.pkl)
 │   └── diabetes/                         # DM ensemble weights + preprocessors
 │
 ├── configs/                              # Disease YAML configurations
-│   ├── heart_disease.yaml                # CAD v5.0.0 — single XGBoost (898 estimators)
+│   ├── heart_disease.yaml                # CAD v6.0.0 — self-contained sklearn Pipeline (500-estimator XGBoost)
 │   ├── diabetes.yaml                     # DM v1.1.0 — stacking ensemble
 │   └── config_loader.py                  # Centralised YAML loader
 │
@@ -418,7 +413,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   │       ├── schemaToZod.js            # FieldMetadata[] → Zod validation schema
 │   │       ├── featureCategorizer.js     # Field → category grouping
 │   │       └── medicalDictionary.js      # Feature name → clinical description
-│   └── mockPatients.js                   # Pre-defined patient records (3 CAD, 2 DM)
+│   └── mockPatients.js                   # Pre-defined patient records (3 CAD, 4 DM)
 │
 ├── data/                                 # Raw and processed datasets per disease
 ├── experiment_files/                     # Training experiments and diagnostics
@@ -545,7 +540,7 @@ Mounted at `/auth` (**not** under `/api/v4`) — verified live against a running
 
 | Method | Path | Auth | Response |
 |---|---|---|---|
-| `POST` | `/api/v4/{disease}/predict` | Anonymous OK¹ | `PredictResponse` — heart: `{prediction, confidence, diagnosis}`; diabetes adds the scale audit fields below. `Cache-Hit` is a response **header**, not a body field |
+| `POST` | `/api/v4/{disease}/predict` | Anonymous OK¹ | `PredictResponse` — heart: `{prediction, confidence, diagnosis, inference_threshold}`, plus `data_completeness_warning` when a high-SHAP-importance input was missing and imputed; diabetes adds the scale audit fields below. `Cache-Hit` is a response **header**, not a body field |
 | `POST` | `/api/v4/{disease}/explain` | Anonymous OK¹ | `{prediction, confidence, diagnosis, chart_data[], text_explanation, base_value}`; diabetes adds `base_value_raw, shap_scale, shap_reconstructed_probability_corrected, shap_additivity_gap, per_model_shap, shap_weights, ensemble_variance, model_agreement` |
 | `POST` | `/api/v4/{disease}/counterfactuals` | Anonymous OK¹ | diabetes: `{status, baseline_probability, baseline_probability_corrected, probability_scale, counterfactuals[{scenario, changes{}, new_probability, new_probability_corrected, baseline_probability_corrected, risk_reduction, risk_reduction_relative_pct, risk_reduction_absolute_pp, probability_scale, feasibility}]}`; heart: `{status, baseline_probability, counterfactuals[{scenario_id, probability, changes[{feature, original_value, counterfactual_value, direction}]}]}` |
 | `POST` | `/api/v4/{disease}/batch` | `doctor`/`nurse`/`super_admin` | `{results[], summary{total, ok, errors}}` — CSV upload, max 500 rows |
@@ -556,7 +551,7 @@ Mounted at `/auth` (**not** under `/api/v4`) — verified live against a running
 
 #### Probability scale (diabetes)
 
-The diabetes ensemble was trained on the 50/50-resampled BRFSS file, so its raw output sits on a 50 % prior. `EnsembleModelLoader.predict()` maps it to the deployment prevalence (`configs/diabetes.yaml → prevalence_deploy`, currently 0.14) with a Bayes prior-shift correction before anything is compared or returned. The rule the codebase follows ([`backend/probability_scale.py`](backend/probability_scale.py), enforced by the AST guard in [`tests/test_probability_scale_contract.py`](tests/test_probability_scale_contract.py)):
+The diabetes ensemble was trained on the 50/50-resampled BRFSS file, so its raw output sits on a 50 % prior. `EnsembleModelLoader.predict()` maps it to the deployment prevalence (`configs/diabetes.yaml → prevalence_deploy`, currently 0.237 — Jordan's actual diabetes prevalence; a US/BRFSS placeholder of ~0.14 was used until 2026-09-21) with a Bayes prior-shift correction before anything is compared or returned. The rule the codebase follows ([`backend/probability_scale.py`](backend/probability_scale.py), enforced by the AST guard in [`tests/test_probability_scale_contract.py`](tests/test_probability_scale_contract.py)):
 
 > An unsuffixed probability or threshold is on the scale the module reports — **corrected** for diabetes. A value on the model's own training-prior scale always carries a `_raw` suffix.
 
@@ -564,12 +559,12 @@ The diabetes ensemble was trained on the 50/50-resampled BRFSS file, so its raw 
 |---|---|---|
 | `confidence` | corrected | Same value as `probability_corrected`. Compare with `inference_threshold`, **never with 0.5** |
 | `probability_corrected` / `probability_raw` | corrected / raw | Both returned for audit |
-| `inference_threshold` / `inference_threshold_raw` | corrected / raw | 0.059776 / 0.280855 |
-| `risk_bands` / `risk_bands_raw` | corrected / raw | high 0.2753 / 0.70, moderate 0.0979 / 0.40 |
-| `prevalence_correction_applied`, `prevalence_train`, `prevalence_deploy` | — | `true`, 0.50, 0.14 |
+| `inference_threshold` / `inference_threshold_raw` | corrected / raw | 0.108184 / 0.280854 |
+| `risk_bands` / `risk_bands_raw` | corrected / raw | high 0.4202 / 0.70, moderate 0.1716 / 0.40 |
+| `prevalence_correction_applied`, `prevalence_train`, `prevalence_deploy` | — | `true`, 0.50, 0.237 |
 | `model_contributions`, `ensemble_variance` | raw | Per-base-model outputs, uncorrected |
 
-`GET /api/v4/diseases` returns `info.inference_threshold` and `info.risk_bands` on the same scale. Stored rows carry `predictions.probability_scale` (`'corrected'` | `'raw'` | `NULL` for rows written before the column existed); aggregates split by it (`GET /api/v4/admin/stats → avg_confidence_by_scale`, drift runs → `rows_by_probability_scale`) and treat `NULL` as its own `unknown` group. Heart has a single scale and returns none of these fields.
+`GET /api/v4/diseases` returns `info.inference_threshold` and `info.risk_bands` on the same scale. Stored rows carry `predictions.probability_scale` (`'corrected'` | `'raw'` | `NULL` for rows written before the column existed); aggregates split by it (`GET /api/v4/admin/stats → avg_confidence_by_scale`, drift runs → `rows_by_probability_scale`) and treat `NULL` as its own `unknown` group. Heart applies no prevalence correction and has a single scale — it returns a bare `inference_threshold` (0.3695, read from the model bundle, not this table's corrected/raw pair) but none of the other fields above.
 
 A legacy `POST /api/v3/predict` (tagged **Legacy** in Swagger) is still mounted and, unlike its v4 counterpart, requires `CLINICAL_ROLES`. It is retained for backward compatibility only — new integrations should use `/api/v4/{disease}/predict`.
 

@@ -26,7 +26,7 @@
    2.4 [Disease Module Registration Protocol](#24-disease-module-registration-protocol)  
 
 3. [Machine Learning Methodology](#3-machine-learning-methodology)  
-   3.1 [Heart Disease — Single XGBoost Classifier](#31-heart-disease--single-xgboost-classifier)  
+   3.1 [Heart Disease — Self-Contained sklearn Pipeline (XGBoost)](#31-heart-disease--self-contained-sklearn-pipeline-xgboost)  
    3.2 [Diabetes — Stacking Ensemble (XGBoost + LightGBM + Random Forest)](#32-diabetes--stacking-ensemble-xgboost--lightgbm--random-forest)  
    3.3 [Feature Engineering Pipeline](#33-feature-engineering-pipeline)  
    3.4 [Inference Threshold Tuning & Clinical Sensitivity Optimization](#34-inference-threshold-tuning--clinical-sensitivity-optimization)  
@@ -347,10 +347,11 @@ POST /api/v4/heart_disease/predict
   -> router.py: configs["heart_disease"] lookup
   -> router.py: _get_loader() lazy-init or cache-hit
   -> model_loader.py: predict(patient_data)
-  -> model_loader.py: _engineer_features() -> heuristic -> clinical
-  -> model_loader.py: _apply_preprocessors() -> StandardScaler
-  -> model_loader.py: model.predict_proba() -> XGBoost inference
-  -> Return {prediction, probability, ...}
+  -> model_loader.py: pipeline.predict_proba(df) -> imputation + scaling +
+                       encoding + XGBoost inference, all inside the shipped
+                       sklearn Pipeline; no separate engineering/preprocessing
+                       step for this disease
+  -> Return {prediction, confidence, diagnosis, inference_threshold, ...}
 ```
 
 ### 2.3 API Surface & Request Lifecycle
@@ -393,29 +394,25 @@ This protocol is documented in [`plans/adding_new_disease_guide.md`](plans/addin
 
 ## 3. Machine Learning Methodology
 
-### 3.1 Heart Disease — Single XGBoost Classifier
+### 3.1 Heart Disease — Self-Contained sklearn Pipeline (XGBoost)
 
-**Dataset:** Cleveland Heart Disease (UCI Repository), processed via [`experiment_files/data_pipeline/transform_heart11.py`](experiment_files/data_pipeline/transform_heart11.py)  
-**Input features:** 12 base clinical features (age, sex, chest pain type, resting BP, cholesterol, fasting blood sugar, resting ECG, max heart rate, exercise-induced angina, ST depression, slope, num major vessels, thalassemia)  
-**Engineered features:** 5 interaction terms — Age_BP_Interaction, HR_Age_Ratio, Chol_Age_Ratio, Rate-Pressure Product (RPP), Exercise_Risk_Index  
-**Model architecture:** `XGBClassifier` with tuned hyperparameters stored in [`models/heart_disease/grid_best.json`](models/heart_disease/grid_best.json)
+**Dataset:** UCI Heart Disease, 4 original site files (Cleveland 303, Hungarian 294, Switzerland 123, Long Beach VA 200 — 920 patients total), merged and processed for [`heart_full_tuned.pkl`](models/heart_disease/heart_full_tuned.pkl). `ca` (num major vessels) and `thal` (thalassemia) are excluded — invasive tests, absent from the production input.
+**Input features:** 11 base clinical features (age, sex, chest pain type, resting BP, cholesterol, fasting blood sugar, resting ECG, max heart rate, exercise-induced angina, ST depression, ST slope) — no `ca`/`thal`.
+**Engineered features:** none. The shipped weights file is a single self-contained `sklearn.Pipeline` — a `ColumnTransformer` (`IterativeImputer` + `StandardScaler` for the 6 numeric features, `SimpleImputer(strategy='most_frequent')` + `OrdinalEncoder` for the 5 categorical ones) feeding an Optuna-tuned `XGBClassifier`. Imputation, scaling and encoding happen inside the Pipeline; there is no separate feature-engineering stage, and no `label_encoders.pkl` / `standard_scaler.pkl` preprocessor files for this disease.
+**Model architecture:** `XGBClassifier` (`n_estimators=500, max_depth=4, learning_rate≈0.0289`, full params in [`evaluation_evidence/heart/hpo_threshold_summary.json`](evaluation_evidence/heart/hpo_threshold_summary.json)), selected by a 500-trial Optuna search.
 
-**Performance metrics ([`models/metrics.json`](models/metrics.json)):**
+**Performance metrics ([`evaluation_evidence/heart/hpo_threshold_summary.json`](evaluation_evidence/heart/hpo_threshold_summary.json), [`evaluation_evidence/heart/final_metrics.json`](evaluation_evidence/heart/final_metrics.json)):**
 
 | Metric | Value |
 |---|---|
-| Test Accuracy | 80.17% |
-| ROC-AUC | 85.64% |
-| CV Accuracy (mean) | 88.98% |
-| CV Accuracy (std) | 0.0169 |
-| Precision | 0.8391 |
-| Recall | 0.8046 |
-| F1-Score | 0.8215 |
-| Optimal Threshold | 0.420 |
+| Leave-one-site-out ROC-AUC (nested, honest estimate) | 81.30% |
+| Pooled cross-validation ROC-AUC (contaminated — sites mixed across folds, optimistic) | 88.86% |
+| External validation, Tehran (Z-Alizadeh Sani) cohort ROC-AUC | 72.17% ⚠️ measured on the pre-tuning model checkpoint, not yet re-run against the shipped `heart_full_tuned.pkl` — see `WEAKNESS_REGISTER.md` HM-6 |
+| Deployed decision threshold | 0.3695 |
 
-**Threshold selection rationale:** The default XGBoost threshold of 0.5 was suboptimal for the Cleveland dataset due to class imbalance (approximately 46% positive). [`experiment_files/models/evaluate_threshold.py`](experiment_files/models/evaluate_threshold.py) performed grid search over [0.1, 0.9] with stride 0.01, maximizing the F1-score. The optimal threshold of 0.420 balances precision (0.8391) and recall (0.8046), minimizing false negatives in a clinical context.
+**Threshold selection rationale:** The threshold is selected by minimizing a clinical cost function `Cost = 2.0×FN + 1.0×FP` (false negatives weighted twice false positives) on out-of-fold predictions from training data — not on the test/validation split. This produced 0.3695, well below sklearn's default `argmax` cut-point of 0.5, reflecting the higher cost of a missed diagnosis in a screening context.
 
-**Training pipeline:** [`experiment_files/models/train_v5_xgb.py`](experiment_files/models/train_v5_xgb.py) executes the full training cycle — data loading, 5-fold cross-validation, hyperparameter grid search via [`optimize_xgb_v5.py`](experiment_files/models/optimize_xgb_v5.py), and final model serialization to `omni_diag_xgb_optimized.pkl`.
+**Training pipeline:** the model was tuned via a 500-trial Optuna search targeting ROC-AUC (not accuracy) on out-of-fold predictions; no retraining or re-tuning was performed as part of the Pipeline-replacement work described in this document — the search artifacts predate it and are read-only inputs.
 
 ### 3.2 Diabetes — Stacking Ensemble (XGBoost + LightGBM + Random Forest)
 
@@ -444,46 +441,48 @@ The dominance of XGBoost and LightGBM coefficients indicates that tree-based gra
 
 **Performance metrics ([`models/diabetes/ensemble_metrics.json`](models/diabetes/ensemble_metrics.json)):**
 
-| Metric | Single XGBoost | Stacking Ensemble | Voting Ensemble |
+| Metric | Single XGBoost | Stacking Ensemble (deployed) | Voting Ensemble |
 |---|---|---|---|
-| Accuracy | 0.7541 | **0.7518** | 0.7532 |
-| ROC-AUC | 0.8253 | **0.8311** | 0.8309 |
-| Sensitivity | 0.8726 | **0.917** | 0.901 |
-| Specificity | 0.6357 | 0.587 | 0.605 |
-| Inference Threshold | 0.5 | **0.275** | 0.5 |
+| Accuracy | 0.7541 | **0.7336** | 0.7532 |
+| ROC-AUC | 0.8253 | **0.8305** | 0.8309 |
+| Sensitivity | 0.8726 | **0.9131** | 0.901 |
+| Specificity | 0.6357 | 0.5542 | 0.605 |
+| Inference Threshold (deployed / raw) | 0.5 | **0.108184 / 0.280854** | 0.5 |
 
-**Ensemble selection rationale:** The stacking ensemble was selected over single XGBoost and voting ensemble despite comparable accuracy because of its superior **sensitivity (91.7%)** — a critical clinical requirement for a screening tool where false negatives carry higher risk than false positives. The lower specificity (58.7%) is acceptable in a screening context, as positive cases would proceed to confirmatory diagnostic testing.
+Single-XGBoost and Voting-Ensemble columns are reference figures from the original architecture comparison and were not re-measured against the current OOF-selected threshold and 0.237 deployment prevalence; only the deployed Stacking Ensemble column above reflects `evaluation_evidence/diabetes/final_metrics_table.json` as of 2026-09-21.
+
+**Ensemble selection rationale:** The stacking ensemble was selected over single XGBoost and voting ensemble despite comparable accuracy because of its superior **sensitivity (91.31%)** — a critical clinical requirement for a screening tool where false negatives carry higher risk than false positives. The lower specificity (55.42%) is acceptable in a screening context, as positive cases would proceed to confirmatory diagnostic testing.
 
 ### 3.3 Feature Engineering Pipeline
 
-Feature engineering is implemented as a three-stage pipeline invoked within both [`ModelLoader`](backend/model_loader.py:210) and [`EnsembleModelLoader`](backend/ensemble_loader.py:201):
+Disease-specific, not uniform: **diabetes** runs a three-stage pipeline invoked within [`EnsembleModelLoader`](backend/ensemble_loader.py:201); **heart_disease runs none of this** — its shipped `sklearn.Pipeline` (see §3.1) takes the 11 raw clinical fields directly, with imputation/scaling/encoding internal to the Pipeline and no derived features at all.
 
 ```
 Stage 1: Heuristic Features
   +-- engineer_heuristic(df) -> domain-specific interaction terms
-  |    HeartDisease: Age_BP_Interaction, HR_Age_Ratio, Chol_Age_Ratio, RPP, Exercise_Risk_Index
   |    Diabetes: BMI_Age_Interaction, Health_Index, Lifestyle_Score, SES_Composite
 
 Stage 2: Clinical Features
   +-- engineer_clinical(df) -> composite clinical risk indices
-  |    HeartDisease: Thalach deviation, ST-segment stress differential
   |    Diabetes: Diabetes_Clinical_Risk (polyuria, polydipsia, fatigue, blurred vision proxies)
 
 Stage 3: Medical Features (future expansion)
   +-- engineer_medical(df) -> placeholder for biomarker/diagnostic inputs
 ```
 
-Each stage is implemented as a method on the disease-specific `FeatureEngineer` class, inheriting from [`BaseFeatureEngineer`](features/base_features.py). The method pattern uses `pd.DataFrame` transformations with a `self._log_feature()` utility for debugging and audit trail logging.
+Each stage is implemented as a method on [`DiabetesFeatureEngineer`](features/diabetes_features.py), inheriting from [`BaseFeatureEngineer`](features/base_features.py). `features/heart_disease_features.py` and its interaction terms (`Age_BP_Interaction`, `HR_Age_Ratio`, `Chol_Age_Ratio`, `RPP`, `Exercise_Risk_Index`) describe the pre-Pipeline heart model and are no longer called anywhere in live inference.
 
 ### 3.4 Inference Threshold Tuning & Clinical Sensitivity Optimization
 
-The diabetes module employs a **clinically optimized inference threshold** of 0.275, significantly lower than the default 0.5. This threshold was determined through systematic evaluation ([`experiment_files/models/evaluate_threshold.py`](experiment_files/models/evaluate_threshold.py)) prioritizing sensitivity over specificity.
+The diabetes module employs a **clinically optimized inference threshold**, significantly lower than the default 0.5, derived on two axes: a raw threshold of 0.280854 selected by minimizing `Cost = 2.0×FN + 1.0×FP` on out-of-fold training predictions (not the test set — an earlier version selected it on `y_test`, a methodological flaw fixed since; see `evaluation_evidence/diabetes/threshold_decision_log.md`), then mapped through a Bayes prior-shift correction to the deployment prevalence, currently 0.237 (Jordan's actual diabetes prevalence — a US/BRFSS placeholder of ~0.14 was used until 2026-09-21), giving a deployed threshold of 0.108184.
 
-**Clinical rationale:** For diabetes screening applications, the cost of a false negative (undiagnosed diabetic patient) substantially exceeds the cost of a false positive (patient referred for confirmatory testing). The 0.275 threshold achieves 91.7% sensitivity, meaning approximately 92 of every 100 diabetic patients would be correctly identified — compared to 87.3% at the default 0.5 threshold.
+**Clinical rationale:** For diabetes screening applications, the cost of a false negative (undiagnosed diabetic patient) substantially exceeds the cost of a false positive (patient referred for confirmatory testing). The deployed threshold achieves 91.31% sensitivity — sensitivity and specificity are invariant to the prevalence correction, since it only rescales the displayed probability and threshold together, never who gets flagged.
 
 **Configuration in [`configs/diabetes.yaml`](configs/diabetes.yaml):**
 ```yaml
-inference_threshold: 0.275
+prevalence_train: 0.50
+prevalence_deploy: 0.237
+inference_threshold: 0.108184    # on the corrected scale; raw equivalent 0.280854
 ```
 
 The threshold is applied within [`EnsembleModelLoader.predict()`](backend/ensemble_loader.py:246) — predicted probabilities above the threshold are classified as positive, and the threshold value is included in the API response for audit transparency.
@@ -604,7 +603,7 @@ Input: patient_data (dict of feature: value)
 7. Return list of Counterfactual objects
 ```
 
-**Oversampling factor rationale:** The factor of 60 was determined empirically. Given the feature dimensionality (12-21 base features) and the constraint satisfaction rate (approximately 1-5% of random samples survive all filters), 300 samples per counterfactual target ensures a sufficiently large candidate pool for diversity selection.
+**Oversampling factor rationale:** The factor of 60 was determined empirically. Given the feature dimensionality (11-21 base features) and the constraint satisfaction rate (approximately 1-5% of random samples survive all filters), 300 samples per counterfactual target ensures a sufficiently large candidate pool for diversity selection.
 
 **Diversity selection algorithm ([`_select_diverse()`](backend/counterfactual_generator.py:386)):**
 
@@ -863,8 +862,8 @@ FROM python:3.10-slim
 - Graceful degradation patterns prevent silent failures
 
 **Limitations requiring disclosure:**
-- Models trained on limited datasets (Cleveland: ~300 samples; BRFSS: ~70K with class imbalance)
-- Diabetes ensemble has reduced specificity (58.7%)
+- Models trained on limited datasets (heart: 920 samples across 4 UCI sites, still small by clinical-validation standards; BRFSS: ~70K with class imbalance)
+- Diabetes ensemble has reduced specificity (55.4%)
 - No continuous monitoring or drift detection implemented
 - Counterfactual explanations based on learned patterns, not causal inference
 
@@ -937,12 +936,12 @@ The [`medicalDictionary.js`](frontend/src/utils/medicalDictionary.js) front-end 
 | [`backend/main.py`](backend/main.py) | FastAPI application entry point, route definitions | `app`, `health_check()`, `explain_disease()` |
 | [`backend/router.py`](backend/router.py) | Dynamic disease routing and model dispatch | `OmniDiagRouter`, `_create_loader()`, `_get_loader()` |
 | [`backend/schemas.py`](backend/schemas.py) | Pydantic models for API request/response | `HeartDiseaseInput`, `DiabetesInput`, `ExplainResponse`, `Counterfactual` |
-| [`backend/model_loader.py`](backend/model_loader.py) | Single XGBoost model loading and inference | `ModelLoader`, XGBoost 3.x monkey-patch |
+| [`backend/model_loader.py`](backend/model_loader.py) | Loads the heart_disease Pipeline bundle and runs inference | `ModelLoader`, XGBoost 3.x monkey-patch |
 | [`backend/ensemble_loader.py`](backend/ensemble_loader.py) | Stacking ensemble inference and SHAP aggregation | `EnsembleModelLoader`, weighted SHAP averaging |
 | [`backend/counterfactual_generator.py`](backend/counterfactual_generator.py) | DiCE-inspired counterfactual search | `CounterfactualGenerator`, Clinical Firewall |
 | [`backend/shap_service.py`](backend/shap_service.py) | SHAP explanation serialization | `generate_shap_explanation()` |
-| [`configs/heart_disease.yaml`](configs/heart_disease.yaml) | Heart disease module configuration | Model paths, feature names, version 5.0.0 |
-| [`configs/diabetes.yaml`](configs/diabetes.yaml) | Diabetes module configuration | Ensemble model paths, threshold 0.275 |
+| [`configs/heart_disease.yaml`](configs/heart_disease.yaml) | Heart disease module configuration | Model paths, feature names, version 6.0.0 |
+| [`configs/diabetes.yaml`](configs/diabetes.yaml) | Diabetes module configuration | Ensemble model paths, threshold 0.108184 (deployed prevalence 0.237) |
 | [`configs/config_loader.py`](configs/config_loader.py) | Centralized config loading utility | `load_config()`, `resolve_path()`, `resolve_file_path()` |
 | [`frontend/src/App.jsx`](frontend/src/App.jsx) | Main application shell | Dual-mode routing, sidebar, disease selector |
 | [`frontend/src/components/EngineeringMode.jsx`](frontend/src/components/EngineeringMode.jsx) | Developer testing interface | Full parameter form, raw JSON view |
@@ -958,16 +957,17 @@ The [`medicalDictionary.js`](frontend/src/utils/medicalDictionary.js) front-end 
 
 ## Appendix C: Model Performance Comparison
 
-| Metric | Heart Disease (XGBoost) | Diabetes (Stacking Ensemble) |
+| Metric | Heart Disease (Pipeline + XGBoost) | Diabetes (Stacking Ensemble) |
 |---|---|---|
-| Accuracy | 80.17% | 75.18% |
-| ROC-AUC | 85.64% | 83.11% |
-| Sensitivity | 80.46% | 91.70% |
-| Specificity | 83.13% | 58.70% |
-| Inference Threshold | 0.420 | 0.275 |
-| Base Features | 12 | 21 |
-| Engineered Features | 5 | 5 |
-| Training Samples | ~303 | ~35,000 (balanced subset) |
+| Accuracy | — (see LOSO sensitivity/specificity; no single held-out accuracy figure for the tuned model) | 73.36% |
+| ROC-AUC | 81.30% (nested leave-one-site-out, honest estimate); 88.86% pooled CV (contaminated — sites mixed across folds, optimistic) | 83.05% |
+| Sensitivity | 91.7% (LOSO, at the chosen cost-rule threshold) | 91.31% |
+| Specificity | 48.2% (LOSO, at the chosen cost-rule threshold) | 55.42% |
+| External validation | 72.17% ROC-AUC, Tehran (Z-Alizadeh Sani) cohort ⚠️ pre-tuning checkpoint, not yet re-run on the shipped model — see `WEAKNESS_REGISTER.md` HM-6 | — (no second cohort; see `WEAKNESS_REGISTER.md` D-5) |
+| Inference Threshold | 0.3695 | 0.108184 (deployed prevalence-corrected); 0.280854 raw |
+| Base Features | 11 (`ca`/`thal` excluded — invasive, absent from production) | 21 |
+| Engineered Features | 0 — imputation/scaling/encoding happen inside the shipped Pipeline, no derived features | 5 |
+| Training Samples | 920 (4 UCI sites: Cleveland 303, Hungarian 294, Switzerland 123, Long Beach VA 200) | 56,553 (80% split of the 70,692-row balanced file) |
 
 ## Appendix D: Git Branch History
 

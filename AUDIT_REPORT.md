@@ -1111,3 +1111,33 @@ Every finding was produced by reading the file or executing the code. Two scope 
 - **Magnitude of the heart-disease leakage.** C-8 is confirmed as a fact of the pipeline. How
   many points of the 80.17% it is worth is **UNVERIFIED** — quantifying it requires re-running
   `clean_data.py` fit-on-train-only and retraining, which would modify artifacts.
+
+---
+
+## تحديث لاحق — 21-09-2026
+
+**كل رقم وجدول أعلاه يعكس حالة النظام بتاريخ التدقيق (2026-09-15) ولم يُعدَّل — هذا سجل
+تاريخي لما وُجد فعلاً وقتها، لا وصفاً للحالة الحالية.** منذ ذلك التاريخ استُبدل نموذج القلب
+بالكامل (Pipeline ذاتي الاحتواء يشمل التصحيح/التوسيع/الترميز داخلياً)، وصُحِّح انتشار السكري
+المنشور. النتيجة: كل بند في "Verdict at a glance" (أعلاه) الخاص بالقلب — بما فيها C-8 (تسريب
+المُعايِر/المُستوفي على كامل الـ605 صفاً قبل التقسيم) وC-10/C-11/C-12 (العتبة 0.420 غير
+موجودة، argmax 0.5 هو المستخدَم فعلياً) — **لم يعد قابلاً للتكرار على النموذج المنشور حالياً**،
+لأنه نموذج مختلف كلياً ببنية مختلفة، لا لأن الأخطاء المكتشَفة أُصلحت في نفس النموذج القديم.
+
+**الأرقام الحالية الصحيحة** (مصدرها `evaluation_evidence/heart/hpo_threshold_summary.json`
+للأداء الداخلي والعتبة، و`evaluation_evidence/heart/final_metrics.json` لرقم طهران الخارجي —
+راجع أيضاً `evaluation_evidence/diabetes/final_metrics_table.json` للسكري):
+
+| البند | كان (بتاريخ هذا التدقيق) | الآن (2026-09-21) |
+|---|---|---|
+| بيانات القلب | `final_ready_data.csv`، 605 صف، Cleveland فقط | UCI 4 مواقع مدموجة، 920 مريضاً (Cleveland 303 + Hungarian 294 + Switzerland 123 + Long Beach VA 200) |
+| عتبة القلب | لا توجد في الكود — argmax 0.5 فعلياً | **0.3695**، مكتوبة في `configs/heart_disease.yaml` ومطبَّقة فعلياً |
+| LOSO ROC-AUC (القلب) | غير مقاس بهذا الشكل | **81.30%** (nested، تقدير أمين) |
+| تحقق طهران الخارجي (القلب) | 72.17% (على checkpoint قبل الضبط) | **72.17% — لم يُعَد قياسه بعد على النموذج المضبوط `heart_full_tuned.pkl`** — قيد صريح، سجّل `WEAKNESS_REGISTER.md` HM-6 |
+| معالجة القلب المسبقة | `label_encoders.pkl` + `standard_scaler.pkl` منفصلان، fit على كامل البيانات قبل التقسيم (C-8) | لا ملفات معالجة منفصلة إطلاقاً — الـPipeline يتضمّن `IterativeImputer`/`StandardScaler`/`OrdinalEncoder` داخلياً |
+| انتشار السكري المنشور | 0.14 (افتراض أمريكي/BRFSS مؤقت) | **0.237** (انتشار السكري الفعلي في الأردن) |
+| عتبة السكري المصحَّحة | 0.059776 | **0.108184** |
+
+**لم يُعَد تشغيل أي تدقيق جديد كامل** — هذا الجدول إشارة إلى مصدر الحقيقة الحالي فقط، وليس
+تدقيقاً موازياً لِما ورد أعلاه. التفاصيل الكاملة في `docs/DIABETES_AUDIT_REPORT.md` (السكري)
+و`WEAKNESS_REGISTER.md` بنود `HM-1` إلى `HM-6` (القلب).
