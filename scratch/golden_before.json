@@ -1,0 +1,2776 @@
+{
+ "cases": {
+  "diabetes": [
+   "D-001",
+   "D-002",
+   "D-003",
+   "D-004",
+   "edge_all_min",
+   "edge_all_max",
+   "edge_history_only"
+  ],
+  "heart_disease": [
+   "P-001",
+   "P-002",
+   "P-003",
+   "edge_missing_high_impact",
+   "edge_min_bounds",
+   "edge_max_bounds"
+  ]
+ },
+ "diabetes": {
+  "batch": {
+   "body": {
+    "disease": "diabetes",
+    "failed": 1,
+    "results": [
+     {
+      "confidence": 0.02599222034329994,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 1,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.19309335892906537,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 2,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.6374221773442857,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 3,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.14378197334874293,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 4,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.0313305527086472,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 5,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.5375904636683598,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 6,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.2247123197026257,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 7,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.023514209367029776,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 8,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.09357173972347478,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 9,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.5062433515224596,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 10,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.07619764874728105,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 11,
+      "status": "ok"
+     },
+     {
+      "confidence": null,
+      "data_completeness_warning": null,
+      "diagnosis": null,
+      "error": "422: {'error': \"Invalid patient input for 'diabetes': Age\", 'code': 'VALIDATION_ERROR', 'detail': [{'type': 'less_than_equal', 'loc': ['Age'], 'msg': 'Input should be less than or equal to 13', 'input': 99, 'ctx': {'le': 13}, 'url': 'https://errors.pydantic.dev/2.13/v/less_than_equal'}]}",
+      "prediction": null,
+      "row": 12,
+      "status": "error"
+     }
+    ],
+    "succeeded": 11,
+    "total": 12
+   },
+   "status": 200
+  },
+  "counterfactuals": {
+   "D-001": {
+    "body": {
+     "baseline_probability": 0.02599222034329994,
+     "baseline_probability_corrected": 0.02599222034329994,
+     "counterfactuals": [],
+     "message": "Patient is already below the clinical threshold. Counterfactuals focus on reducing high-risk predictions.",
+     "probability_scale": "corrected",
+     "status": "not_applicable"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "baseline_probability_corrected",
+      "counterfactuals",
+      "message",
+      "probability_scale",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "not_applicable",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "D-002": {
+    "body": {
+     "baseline_probability": 0.19309335892906537,
+     "baseline_probability_corrected": 0.19309335892906537,
+     "counterfactuals": [
+      {
+       "baseline_probability_corrected": 0.1931,
+       "changes": {
+        "BMI": 27.601465677452985,
+        "HighBP": 0.0,
+        "PhysHlth": 3.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0896,
+       "new_probability_corrected": 0.0896,
+       "probability_scale": "corrected",
+       "risk_reduction": "54%",
+       "risk_reduction_absolute_pp": 10.35,
+       "risk_reduction_relative_pct": 53.61,
+       "scenario": "If BMI drops to 27.6, blood pressure is controlled and physical health days drop to 3"
+      },
+      {
+       "baseline_probability_corrected": 0.1931,
+       "changes": {
+        "BMI": 30.597925327408863,
+        "GenHlth": 1.0,
+        "HighBP": 0.0,
+        "MentHlth": 2.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0374,
+       "new_probability_corrected": 0.0374,
+       "probability_scale": "corrected",
+       "risk_reduction": "81%",
+       "risk_reduction_absolute_pp": 15.57,
+       "risk_reduction_relative_pct": 80.61,
+       "scenario": "If BMI drops to 30.6, general health improves to level 1, blood pressure is controlled and mental health days drop to 2"
+      },
+      {
+       "baseline_probability_corrected": 0.1931,
+       "changes": {
+        "HighBP": 0.0,
+        "MentHlth": 2.0,
+        "PhysHlth": 0.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0778,
+       "new_probability_corrected": 0.0778,
+       "probability_scale": "corrected",
+       "risk_reduction": "60%",
+       "risk_reduction_absolute_pp": 11.53,
+       "risk_reduction_relative_pct": 59.7,
+       "scenario": "If blood pressure is controlled, mental health days drop to 2 and physical health improves (0 poor days)"
+      }
+     ],
+     "message": null,
+     "probability_scale": "corrected",
+     "status": "generated"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "baseline_probability_corrected",
+      "counterfactuals",
+      "message",
+      "probability_scale",
+      "status"
+     ],
+     "scenario_count": 3,
+     "scenario_keys": [
+      "baseline_probability_corrected",
+      "changes",
+      "feasibility",
+      "new_probability",
+      "new_probability_corrected",
+      "probability_scale",
+      "risk_reduction",
+      "risk_reduction_absolute_pp",
+      "risk_reduction_relative_pct",
+      "scenario"
+     ],
+     "status": "generated",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "D-003": {
+    "body": {
+     "baseline_probability": 0.6374221773442857,
+     "baseline_probability_corrected": 0.6374221773442857,
+     "counterfactuals": [
+      {
+       "baseline_probability_corrected": 0.6374,
+       "changes": {
+        "BMI": 26.16355758897283,
+        "Fruits": 1.0,
+        "GenHlth": 2.0,
+        "HighBP": 0.0,
+        "HighChol": 0.0,
+        "MentHlth": 3.0,
+        "PhysActivity": 1.0,
+        "PhysHlth": 13.0,
+        "Smoker": 0.0,
+        "Veggies": 1.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.09,
+       "new_probability_corrected": 0.09,
+       "probability_scale": "corrected",
+       "risk_reduction": "86%",
+       "risk_reduction_absolute_pp": 54.74,
+       "risk_reduction_relative_pct": 85.87,
+       "scenario": "If BMI drops to 26.2, increases fruit intake, general health improves to level 2, blood pressure is controlled, cholesterol is controlled, mental health days drop to 3, starts physical activity, physical health days drop to 13, stops smoking and increases vegetable intake"
+      },
+      {
+       "baseline_probability_corrected": 0.6374,
+       "changes": {
+        "BMI": 28.830784477366524,
+        "DiffWalk": 0.0,
+        "Fruits": 1.0,
+        "GenHlth": 2.0,
+        "HighBP": 0.0,
+        "HighChol": 0.0,
+        "MentHlth": 8.0,
+        "PhysActivity": 1.0,
+        "PhysHlth": 15.0,
+        "Veggies": 1.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0993,
+       "new_probability_corrected": 0.0993,
+       "probability_scale": "corrected",
+       "risk_reduction": "84%",
+       "risk_reduction_absolute_pp": 53.82,
+       "risk_reduction_relative_pct": 84.43,
+       "scenario": "If BMI drops to 28.8, maintains or improves mobility, increases fruit intake, general health improves to level 2, blood pressure is controlled, cholesterol is controlled, mental health days drop to 8, starts physical activity, physical health days drop to 15 and increases vegetable intake"
+      },
+      {
+       "baseline_probability_corrected": 0.6374,
+       "changes": {
+        "BMI": 30.446883477365013,
+        "DiffWalk": 0.0,
+        "Fruits": 1.0,
+        "GenHlth": 2.0,
+        "HighBP": 0.0,
+        "HighChol": 0.0,
+        "MentHlth": 16.0,
+        "PhysActivity": 1.0,
+        "Smoker": 0.0,
+        "Veggies": 1.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0837,
+       "new_probability_corrected": 0.0837,
+       "probability_scale": "corrected",
+       "risk_reduction": "87%",
+       "risk_reduction_absolute_pp": 55.37,
+       "risk_reduction_relative_pct": 86.87,
+       "scenario": "If BMI drops to 30.4, maintains or improves mobility, increases fruit intake, general health improves to level 2, blood pressure is controlled, cholesterol is controlled, mental health days drop to 16, starts physical activity, stops smoking and increases vegetable intake"
+      }
+     ],
+     "message": null,
+     "probability_scale": "corrected",
+     "status": "generated"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "baseline_probability_corrected",
+      "counterfactuals",
+      "message",
+      "probability_scale",
+      "status"
+     ],
+     "scenario_count": 3,
+     "scenario_keys": [
+      "baseline_probability_corrected",
+      "changes",
+      "feasibility",
+      "new_probability",
+      "new_probability_corrected",
+      "probability_scale",
+      "risk_reduction",
+      "risk_reduction_absolute_pp",
+      "risk_reduction_relative_pct",
+      "scenario"
+     ],
+     "status": "generated",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "D-004": {
+    "body": {
+     "baseline_probability": 0.14378197334874293,
+     "baseline_probability_corrected": 0.14378197334874293,
+     "counterfactuals": [
+      {
+       "baseline_probability_corrected": 0.1438,
+       "changes": {
+        "BMI": 25.581479392741404,
+        "HighBP": 0.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.059,
+       "new_probability_corrected": 0.059,
+       "probability_scale": "corrected",
+       "risk_reduction": "59%",
+       "risk_reduction_absolute_pp": 8.48,
+       "risk_reduction_relative_pct": 58.97,
+       "scenario": "If BMI drops to 25.6 and blood pressure is controlled"
+      },
+      {
+       "baseline_probability_corrected": 0.1438,
+       "changes": {
+        "HighBP": 0.0,
+        "MentHlth": 2.0
+       },
+       "feasibility": "medium",
+       "new_probability": 0.0506,
+       "new_probability_corrected": 0.0506,
+       "probability_scale": "corrected",
+       "risk_reduction": "65%",
+       "risk_reduction_absolute_pp": 9.32,
+       "risk_reduction_relative_pct": 64.82,
+       "scenario": "If blood pressure is controlled and mental health days drop to 2"
+      },
+      {
+       "baseline_probability_corrected": 0.1438,
+       "changes": {
+        "BMI": 28.610093906282263,
+        "GenHlth": 2.0,
+        "HighBP": 0.0,
+        "MentHlth": 4.0,
+        "PhysHlth": 1.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0355,
+       "new_probability_corrected": 0.0355,
+       "probability_scale": "corrected",
+       "risk_reduction": "75%",
+       "risk_reduction_absolute_pp": 10.83,
+       "risk_reduction_relative_pct": 75.29,
+       "scenario": "If BMI drops to 28.6, general health improves to level 2, blood pressure is controlled, mental health days drop to 4 and physical health days drop to 1"
+      }
+     ],
+     "message": null,
+     "probability_scale": "corrected",
+     "status": "generated"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "baseline_probability_corrected",
+      "counterfactuals",
+      "message",
+      "probability_scale",
+      "status"
+     ],
+     "scenario_count": 3,
+     "scenario_keys": [
+      "baseline_probability_corrected",
+      "changes",
+      "feasibility",
+      "new_probability",
+      "new_probability_corrected",
+      "probability_scale",
+      "risk_reduction",
+      "risk_reduction_absolute_pp",
+      "risk_reduction_relative_pct",
+      "scenario"
+     ],
+     "status": "generated",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "edge_all_max": {
+    "body": {
+     "baseline_probability": 0.5375904636683598,
+     "baseline_probability_corrected": 0.5375904636683598,
+     "counterfactuals": [],
+     "message": "Could not find valid counterfactuals for this patient. The patient may need more significant lifestyle or medical changes than typical recommendations can provide.",
+     "probability_scale": "corrected",
+     "status": "no_valid_counterfactuals"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "baseline_probability_corrected",
+      "counterfactuals",
+      "message",
+      "probability_scale",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "no_valid_counterfactuals",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "edge_all_min": {
+    "body": {
+     "baseline_probability": 0.0313305527086472,
+     "baseline_probability_corrected": 0.0313305527086472,
+     "counterfactuals": [],
+     "message": "Patient is already below the clinical threshold. Counterfactuals focus on reducing high-risk predictions.",
+     "probability_scale": "corrected",
+     "status": "not_applicable"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "baseline_probability_corrected",
+      "counterfactuals",
+      "message",
+      "probability_scale",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "not_applicable",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "edge_history_only": {
+    "body": {
+     "baseline_probability": 0.2247123197026257,
+     "baseline_probability_corrected": 0.2247123197026257,
+     "counterfactuals": [
+      {
+       "baseline_probability_corrected": 0.2247,
+       "changes": {
+        "BMI": 20.089178495946726,
+        "MentHlth": 4.0,
+        "Veggies": 1.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0561,
+       "new_probability_corrected": 0.0561,
+       "probability_scale": "corrected",
+       "risk_reduction": "75%",
+       "risk_reduction_absolute_pp": 16.86,
+       "risk_reduction_relative_pct": 75.04,
+       "scenario": "If BMI drops to 20.1, mental health days drop to 4 and increases vegetable intake"
+      },
+      {
+       "baseline_probability_corrected": 0.2247,
+       "changes": {
+        "BMI": 19.177983826187905,
+        "GenHlth": 2.0,
+        "PhysActivity": 1.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.0683,
+       "new_probability_corrected": 0.0683,
+       "probability_scale": "corrected",
+       "risk_reduction": "70%",
+       "risk_reduction_absolute_pp": 15.65,
+       "risk_reduction_relative_pct": 69.62,
+       "scenario": "If BMI drops to 19.2, general health improves to level 2 and starts physical activity"
+      },
+      {
+       "baseline_probability_corrected": 0.2247,
+       "changes": {
+        "BMI": 20.021519380238704,
+        "Fruits": 1.0,
+        "MentHlth": 5.0,
+        "PhysActivity": 1.0,
+        "PhysHlth": 5.0
+       },
+       "feasibility": "low",
+       "new_probability": 0.073,
+       "new_probability_corrected": 0.073,
+       "probability_scale": "corrected",
+       "risk_reduction": "68%",
+       "risk_reduction_absolute_pp": 15.17,
+       "risk_reduction_relative_pct": 67.52,
+       "scenario": "If BMI drops to 20.0, increases fruit intake, mental health days drop to 5, starts physical activity and physical health days drop to 5"
+      }
+     ],
+     "message": null,
+     "probability_scale": "corrected",
+     "status": "generated"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "baseline_probability_corrected",
+      "counterfactuals",
+      "message",
+      "probability_scale",
+      "status"
+     ],
+     "scenario_count": 3,
+     "scenario_keys": [
+      "baseline_probability_corrected",
+      "changes",
+      "feasibility",
+      "new_probability",
+      "new_probability_corrected",
+      "probability_scale",
+      "risk_reduction",
+      "risk_reduction_absolute_pp",
+      "risk_reduction_relative_pct",
+      "scenario"
+     ],
+     "status": "generated",
+     "status_code": 200
+    },
+    "status": 200
+   }
+  },
+  "explain": {
+   "D-001": {
+    "body": {
+     "base_value": -1.2004402863499726,
+     "base_value_raw": -0.031242396200646824,
+     "chart_data": [
+      {
+       "feature": "Diabetes_Clinical_Risk",
+       "shap_value": -1.369771973344796
+      },
+      {
+       "feature": "Age",
+       "shap_value": -0.3509403446125858
+      },
+      {
+       "feature": "HighChol",
+       "shap_value": -0.2711177196512698
+      },
+      {
+       "feature": "BMI",
+       "shap_value": -0.19584097616838556
+      },
+      {
+       "feature": "Sex",
+       "shap_value": -0.1569834867251202
+      },
+      {
+       "feature": "Income",
+       "shap_value": -0.10479831432595921
+      },
+      {
+       "feature": "GenHlth",
+       "shap_value": -0.07693557767962075
+      },
+      {
+       "feature": "MentHlth",
+       "shap_value": 0.06535861303833405
+      },
+      {
+       "feature": "SES_Composite",
+       "shap_value": -0.050587847309885844
+      },
+      {
+       "feature": "HeartDiseaseorAttack",
+       "shap_value": -0.04193652995928281
+      },
+      {
+       "feature": "Lifestyle_Score",
+       "shap_value": -0.03470142226134788
+      },
+      {
+       "feature": "CholCheck",
+       "shap_value": 0.028634090362259695
+      },
+      {
+       "feature": "Education",
+       "shap_value": -0.02835597430091096
+      },
+      {
+       "feature": "DiffWalk",
+       "shap_value": -0.022179768831867848
+      },
+      {
+       "feature": "HvyAlcoholConsump",
+       "shap_value": 0.01744353788187898
+      },
+      {
+       "feature": "Stroke",
+       "shap_value": -0.016112082847713895
+      },
+      {
+       "feature": "HighBP",
+       "shap_value": 0.008914710214708561
+      },
+      {
+       "feature": "PhysActivity",
+       "shap_value": -0.008466926402110437
+      },
+      {
+       "feature": "Smoker",
+       "shap_value": 0.0078031912349363275
+      },
+      {
+       "feature": "Fruits",
+       "shap_value": -0.0034869756704515894
+      },
+      {
+       "feature": "NoDocbcCost",
+       "shap_value": 0.0025647090448641593
+      },
+      {
+       "feature": "BMI_Age_Interaction",
+       "shap_value": 0.0022863595372856066
+      },
+      {
+       "feature": "Veggies",
+       "shap_value": 0.002231398237821946
+      },
+      {
+       "feature": "PhysHlth",
+       "shap_value": -0.001457492694450925
+      },
+      {
+       "feature": "AnyHealthcare",
+       "shap_value": 0.0010382078312340304
+      },
+      {
+       "feature": "Health_Index",
+       "shap_value": -4.764786773516839e-05
+      }
+     ],
+     "confidence": 0.02599222034329994,
+     "counterfactuals": null,
+     "diagnosis": "Negative",
+     "ensemble_variance": 0.0045,
+     "model_agreement": "high",
+     "prediction": 0,
+     "shap_additivity_gap": 0.004065670160331568,
+     "shap_reconstructed_probability_corrected": 0.021926550182968373,
+     "shap_scale": "corrected_log_odds",
+     "text_explanation": "Top factors influencing this prediction: Diabetes_Clinical_Risk (decreased risk), Age (decreased risk), HighChol (decreased risk)."
+    },
+    "status": 200
+   },
+   "D-002": {
+    "body": {
+     "base_value": -1.2004402863499726,
+     "base_value_raw": -0.031242396200646824,
+     "chart_data": [
+      {
+       "feature": "HighChol",
+       "shap_value": -0.34059372738213683
+      },
+      {
+       "feature": "Diabetes_Clinical_Risk",
+       "shap_value": 0.28657404139064485
+      },
+      {
+       "feature": "Age",
+       "shap_value": -0.17320312339889893
+      },
+      {
+       "feature": "GenHlth",
+       "shap_value": 0.09119164201052457
+      },
+      {
+       "feature": "Sex",
+       "shap_value": 0.06222640401265273
+      },
+      {
+       "feature": "Health_Index",
+       "shap_value": 0.05450355375335996
+      },
+      {
+       "feature": "HeartDiseaseorAttack",
+       "shap_value": -0.04682374642510605
+      },
+      {
+       "feature": "PhysHlth",
+       "shap_value": 0.03980779919465208
+      },
+      {
+       "feature": "CholCheck",
+       "shap_value": 0.03188374381431726
+      },
+      {
+       "feature": "HvyAlcoholConsump",
+       "shap_value": 0.031564474714248836
+      },
+      {
+       "feature": "DiffWalk",
+       "shap_value": -0.031103616877766038
+      },
+      {
+       "feature": "BMI",
+       "shap_value": -0.02901455988050699
+      },
+      {
+       "feature": "Lifestyle_Score",
+       "shap_value": -0.024767947661684667
+      },
+      {
+       "feature": "BMI_Age_Interaction",
+       "shap_value": 0.023154126394950236
+      },
+      {
+       "feature": "MentHlth",
+       "shap_value": 0.01983943680681813
+      },
+      {
+       "feature": "Stroke",
+       "shap_value": -0.019002063014077614
+      },
+      {
+       "feature": "Education",
+       "shap_value": 0.01662960390086743
+      },
+      {
+       "feature": "Income",
+       "shap_value": -0.016096062722204204
+      },
+      {
+       "feature": "Smoker",
+       "shap_value": 0.015342879761123024
+      },
+      {
+       "feature": "Veggies",
+       "shap_value": -0.012059296946744352
+      },
+      {
+       "feature": "HighBP",
+       "shap_value": 0.007151094632396154
+      },
+      {
+       "feature": "SES_Composite",
+       "shap_value": -0.005680302778690982
+      },
+      {
+       "feature": "PhysActivity",
+       "shap_value": -0.003184300208808676
+      },
+      {
+       "feature": "NoDocbcCost",
+       "shap_value": -0.001788733376819684
+      },
+      {
+       "feature": "AnyHealthcare",
+       "shap_value": 0.00119520534414973
+      },
+      {
+       "feature": "Fruits",
+       "shap_value": -0.00045715806758226914
+      }
+     ],
+     "confidence": 0.19309335892906537,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": 0.0075,
+     "model_agreement": "high",
+     "prediction": 1,
+     "shap_additivity_gap": 0.034289063763783795,
+     "shap_reconstructed_probability_corrected": 0.22738242269284917,
+     "shap_scale": "corrected_log_odds",
+     "text_explanation": "Top factors influencing this prediction: HighChol (decreased risk), Diabetes_Clinical_Risk (increased risk), Age (decreased risk)."
+    },
+    "status": 200
+   },
+   "D-003": {
+    "body": {
+     "base_value": -1.2004402863499726,
+     "base_value_raw": -0.031242396200646824,
+     "chart_data": [
+      {
+       "feature": "Diabetes_Clinical_Risk",
+       "shap_value": 0.9617762805055619
+      },
+      {
+       "feature": "HighChol",
+       "shap_value": 0.20338565350565152
+      },
+      {
+       "feature": "BMI",
+       "shap_value": 0.18376476584181203
+      },
+      {
+       "feature": "GenHlth",
+       "shap_value": 0.11999380701333041
+      },
+      {
+       "feature": "DiffWalk",
+       "shap_value": 0.08801080450162493
+      },
+      {
+       "feature": "Income",
+       "shap_value": 0.08196879736074207
+      },
+      {
+       "feature": "MentHlth",
+       "shap_value": -0.08057222108853955
+      },
+      {
+       "feature": "Sex",
+       "shap_value": 0.06262444050152177
+      },
+      {
+       "feature": "Age",
+       "shap_value": 0.055064160986333516
+      },
+      {
+       "feature": "BMI_Age_Interaction",
+       "shap_value": -0.053145474233125996
+      },
+      {
+       "feature": "Education",
+       "shap_value": -0.05258243606097504
+      },
+      {
+       "feature": "Smoker",
+       "shap_value": -0.04860756853970913
+      },
+      {
+       "feature": "PhysActivity",
+       "shap_value": 0.03798426889865203
+      },
+      {
+       "feature": "HeartDiseaseorAttack",
+       "shap_value": -0.036887091228070656
+      },
+      {
+       "feature": "Health_Index",
+       "shap_value": -0.03532161624315404
+      },
+      {
+       "feature": "Veggies",
+       "shap_value": 0.024838331253185145
+      },
+      {
+       "feature": "HvyAlcoholConsump",
+       "shap_value": 0.024153869531594294
+      },
+      {
+       "feature": "CholCheck",
+       "shap_value": 0.022238475889244432
+      },
+      {
+       "feature": "Lifestyle_Score",
+       "shap_value": 0.0164053581165929
+      },
+      {
+       "feature": "SES_Composite",
+       "shap_value": -0.012244602079339799
+      },
+      {
+       "feature": "PhysHlth",
+       "shap_value": -0.010711228322235731
+      },
+      {
+       "feature": "HighBP",
+       "shap_value": 0.010063654606728808
+      },
+      {
+       "feature": "NoDocbcCost",
+       "shap_value": 0.009597872540028139
+      },
+      {
+       "feature": "Stroke",
+       "shap_value": -0.0091949568226205
+      },
+      {
+       "feature": "AnyHealthcare",
+       "shap_value": 0.0043508211020293645
+      },
+      {
+       "feature": "Fruits",
+       "shap_value": -0.0023961784999476095
+      }
+     ],
+     "confidence": 0.6374221773442857,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": 0.0076,
+     "model_agreement": "high",
+     "prediction": 1,
+     "shap_additivity_gap": 0.04738533031455372,
+     "shap_reconstructed_probability_corrected": 0.590036847029732,
+     "shap_scale": "corrected_log_odds",
+     "text_explanation": "Top factors influencing this prediction: Diabetes_Clinical_Risk (increased risk), HighChol (increased risk), BMI (increased risk)."
+    },
+    "status": 200
+   },
+   "D-004": {
+    "body": {
+     "base_value": -1.2004402863499726,
+     "base_value_raw": -0.031242396200646824,
+     "chart_data": [
+      {
+       "feature": "HighChol",
+       "shap_value": -0.36465443303336065
+      },
+      {
+       "feature": "Diabetes_Clinical_Risk",
+       "shap_value": 0.2961280863777148
+      },
+      {
+       "feature": "Age",
+       "shap_value": -0.15909830590571555
+      },
+      {
+       "feature": "BMI",
+       "shap_value": -0.1330400949354039
+      },
+      {
+       "feature": "GenHlth",
+       "shap_value": 0.10487120749225934
+      },
+      {
+       "feature": "Sex",
+       "shap_value": -0.0775108849834835
+      },
+      {
+       "feature": "Health_Index",
+       "shap_value": 0.06913820425475785
+      },
+      {
+       "feature": "HeartDiseaseorAttack",
+       "shap_value": -0.05023108910463935
+      },
+      {
+       "feature": "HvyAlcoholConsump",
+       "shap_value": 0.03489564441414817
+      },
+      {
+       "feature": "Income",
+       "shap_value": -0.03191246964648858
+      },
+      {
+       "feature": "DiffWalk",
+       "shap_value": -0.030461109032506477
+      },
+      {
+       "feature": "BMI_Age_Interaction",
+       "shap_value": 0.030352845128251548
+      },
+      {
+       "feature": "CholCheck",
+       "shap_value": 0.03020889718181624
+      },
+      {
+       "feature": "MentHlth",
+       "shap_value": 0.02989856483439084
+      },
+      {
+       "feature": "Stroke",
+       "shap_value": -0.017874457553982905
+      },
+      {
+       "feature": "SES_Composite",
+       "shap_value": -0.017606412942206967
+      },
+      {
+       "feature": "Education",
+       "shap_value": 0.014205433256240975
+      },
+      {
+       "feature": "Lifestyle_Score",
+       "shap_value": -0.014145635543130393
+      },
+      {
+       "feature": "HighBP",
+       "shap_value": 0.011264663754713966
+      },
+      {
+       "feature": "Fruits",
+       "shap_value": 0.008149878963248577
+      },
+      {
+       "feature": "Smoker",
+       "shap_value": 0.005996611093757128
+      },
+      {
+       "feature": "PhysActivity",
+       "shap_value": -0.004109963214316539
+      },
+      {
+       "feature": "NoDocbcCost",
+       "shap_value": -0.0020326265269571494
+      },
+      {
+       "feature": "Veggies",
+       "shap_value": 0.0019107502595271232
+      },
+      {
+       "feature": "PhysHlth",
+       "shap_value": -0.0009623768683562042
+      },
+      {
+       "feature": "AnyHealthcare",
+       "shap_value": 0.0002810091226621304
+      }
+     ],
+     "confidence": 0.14378197334874293,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": 0.0085,
+     "model_agreement": "high",
+     "prediction": 1,
+     "shap_additivity_gap": 0.043650809562886056,
+     "shap_reconstructed_probability_corrected": 0.187432782911629,
+     "shap_scale": "corrected_log_odds",
+     "text_explanation": "Top factors influencing this prediction: HighChol (decreased risk), Diabetes_Clinical_Risk (increased risk), Age (decreased risk)."
+    },
+    "status": 200
+   },
+   "edge_all_max": {
+    "body": {
+     "base_value": -1.2004402863499726,
+     "base_value_raw": -0.031242396200646824,
+     "chart_data": [
+      {
+       "feature": "Diabetes_Clinical_Risk",
+       "shap_value": 1.0804108977415015
+      },
+      {
+       "feature": "HvyAlcoholConsump",
+       "shap_value": -0.6152952471087262
+      },
+      {
+       "feature": "HeartDiseaseorAttack",
+       "shap_value": 0.26905879052633114
+      },
+      {
+       "feature": "BMI",
+       "shap_value": -0.23861980328504787
+      },
+      {
+       "feature": "GenHlth",
+       "shap_value": 0.227916550924157
+      },
+      {
+       "feature": "HighChol",
+       "shap_value": 0.20568232575725157
+      },
+      {
+       "feature": "Education",
+       "shap_value": 0.15434421431483095
+      },
+      {
+       "feature": "Health_Index",
+       "shap_value": -0.1541075674560471
+      },
+      {
+       "feature": "BMI_Age_Interaction",
+       "shap_value": -0.15105465545345612
+      },
+      {
+       "feature": "Smoker",
+       "shap_value": -0.1477795748151952
+      },
+      {
+       "feature": "Sex",
+       "shap_value": 0.12323829236135765
+      },
+      {
+       "feature": "Age",
+       "shap_value": 0.12174772990812877
+      },
+      {
+       "feature": "Stroke",
+       "shap_value": 0.10683270396870309
+      },
+      {
+       "feature": "DiffWalk",
+       "shap_value": 0.10203644335147714
+      },
+      {
+       "feature": "NoDocbcCost",
+       "shap_value": -0.0633029617303079
+      },
+      {
+       "feature": "PhysHlth",
+       "shap_value": 0.050257878719713454
+      },
+      {
+       "feature": "Lifestyle_Score",
+       "shap_value": 0.041064147747230335
+      },
+      {
+       "feature": "MentHlth",
+       "shap_value": 0.04058166113519336
+      },
+      {
+       "feature": "PhysActivity",
+       "shap_value": -0.029929638709903974
+      },
+      {
+       "feature": "SES_Composite",
+       "shap_value": -0.015248553372220891
+      },
+      {
+       "feature": "Income",
+       "shap_value": 0.014860697807305279
+      },
+      {
+       "feature": "Veggies",
+       "shap_value": 0.012324016124386378
+      },
+      {
+       "feature": "CholCheck",
+       "shap_value": 0.012094739747647227
+      },
+      {
+       "feature": "Fruits",
+       "shap_value": 0.008991740181693351
+      },
+      {
+       "feature": "AnyHealthcare",
+       "shap_value": 0.0032766867119765966
+      },
+      {
+       "feature": "HighBP",
+       "shap_value": -0.002062676645870923
+      }
+     ],
+     "confidence": 0.5375904636683598,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": 0.0315,
+     "model_agreement": "high",
+     "prediction": 1,
+     "shap_additivity_gap": 0.04836915548305165,
+     "shap_reconstructed_probability_corrected": 0.4892213081853082,
+     "shap_scale": "corrected_log_odds",
+     "text_explanation": "Top factors influencing this prediction: Diabetes_Clinical_Risk (increased risk), HvyAlcoholConsump (decreased risk), HeartDiseaseorAttack (increased risk)."
+    },
+    "status": 200
+   },
+   "edge_all_min": {
+    "body": {
+     "base_value": -1.2004402863499726,
+     "base_value_raw": -0.031242396200646824,
+     "chart_data": [
+      {
+       "feature": "Diabetes_Clinical_Risk",
+       "shap_value": -1.358592150834232
+      },
+      {
+       "feature": "SES_Composite",
+       "shap_value": 0.8962805900241259
+      },
+      {
+       "feature": "CholCheck",
+       "shap_value": -0.6363726727565686
+      },
+      {
+       "feature": "Age",
+       "shap_value": -0.5476974537302375
+      },
+      {
+       "feature": "BMI",
+       "shap_value": -0.4716015393139174
+      },
+      {
+       "feature": "Income",
+       "shap_value": 0.44409495616258815
+      },
+      {
+       "feature": "HighChol",
+       "shap_value": -0.3089425194543366
+      },
+      {
+       "feature": "BMI_Age_Interaction",
+       "shap_value": -0.24880880741642689
+      },
+      {
+       "feature": "Lifestyle_Score",
+       "shap_value": 0.14265897737027022
+      },
+      {
+       "feature": "GenHlth",
+       "shap_value": -0.1351469090496279
+      },
+      {
+       "feature": "Sex",
+       "shap_value": -0.09203355560982023
+      },
+      {
+       "feature": "AnyHealthcare",
+       "shap_value": 0.08347277992804235
+      },
+      {
+       "feature": "PhysHlth",
+       "shap_value": -0.07445499541168532
+      },
+      {
+       "feature": "PhysActivity",
+       "shap_value": 0.07139377363224862
+      },
+      {
+       "feature": "MentHlth",
+       "shap_value": -0.0684025784549129
+      },
+      {
+       "feature": "HeartDiseaseorAttack",
+       "shap_value": -0.05723908855185408
+      },
+      {
+       "feature": "Veggies",
+       "shap_value": 0.04662734636076888
+      },
+      {
+       "feature": "Fruits",
+       "shap_value": 0.03947088557160841
+      },
+      {
+       "feature": "Education",
+       "shap_value": 0.03515719565908762
+      },
+      {
+       "feature": "Health_Index",
+       "shap_value": -0.026897369177852112
+      },
+      {
+       "feature": "DiffWalk",
+       "shap_value": -0.02435443731534262
+      },
+      {
+       "feature": "HighBP",
+       "shap_value": -0.017587368414389903
+      },
+      {
+       "feature": "Stroke",
+       "shap_value": -0.015274841826070732
+      },
+      {
+       "feature": "Smoker",
+       "shap_value": 0.00934917773438434
+      },
+      {
+       "feature": "HvyAlcoholConsump",
+       "shap_value": 0.006548735071158673
+      },
+      {
+       "feature": "NoDocbcCost",
+       "shap_value": -0.003313130816651029
+      }
+     ],
+     "confidence": 0.0313305527086472,
+     "counterfactuals": null,
+     "diagnosis": "Negative",
+     "ensemble_variance": 0.0518,
+     "model_agreement": "moderate",
+     "prediction": 0,
+     "shap_additivity_gap": 0.002360798428328488,
+     "shap_reconstructed_probability_corrected": 0.028969754280318713,
+     "shap_scale": "corrected_log_odds",
+     "text_explanation": "Top factors influencing this prediction: Diabetes_Clinical_Risk (decreased risk), SES_Composite (increased risk), CholCheck (decreased risk)."
+    },
+    "status": 200
+   },
+   "edge_history_only": {
+    "body": {
+     "base_value": -1.2004402863499726,
+     "base_value_raw": -0.031242396200646824,
+     "chart_data": [
+      {
+       "feature": "Diabetes_Clinical_Risk",
+       "shap_value": -0.4891644759666451
+      },
+      {
+       "feature": "HeartDiseaseorAttack",
+       "shap_value": 0.35868755459080814
+      },
+      {
+       "feature": "Stroke",
+       "shap_value": 0.3067072785395275
+      },
+      {
+       "feature": "BMI",
+       "shap_value": -0.2576597660895231
+      },
+      {
+       "feature": "HighChol",
+       "shap_value": -0.20216588185946036
+      },
+      {
+       "feature": "Age",
+       "shap_value": 0.12041094515502293
+      },
+      {
+       "feature": "BMI_Age_Interaction",
+       "shap_value": 0.11656125041672567
+      },
+      {
+       "feature": "Sex",
+       "shap_value": -0.09772332279768095
+      },
+      {
+       "feature": "Health_Index",
+       "shap_value": 0.0761255372312324
+      },
+      {
+       "feature": "Smoker",
+       "shap_value": 0.07498048898894329
+      },
+      {
+       "feature": "MentHlth",
+       "shap_value": 0.07338063323927689
+      },
+      {
+       "feature": "GenHlth",
+       "shap_value": 0.06550288988094327
+      },
+      {
+       "feature": "DiffWalk",
+       "shap_value": -0.04044503830664312
+      },
+      {
+       "feature": "PhysHlth",
+       "shap_value": -0.030624551658570955
+      },
+      {
+       "feature": "HvyAlcoholConsump",
+       "shap_value": 0.027760535130536817
+      },
+      {
+       "feature": "CholCheck",
+       "shap_value": 0.02487975110921379
+      },
+      {
+       "feature": "Veggies",
+       "shap_value": 0.020310378578329416
+      },
+      {
+       "feature": "Income",
+       "shap_value": 0.014754234628149038
+      },
+      {
+       "feature": "Fruits",
+       "shap_value": -0.013734179504878178
+      },
+      {
+       "feature": "SES_Composite",
+       "shap_value": -0.009947810387280487
+      },
+      {
+       "feature": "HighBP",
+       "shap_value": 0.0098073379216364
+      },
+      {
+       "feature": "AnyHealthcare",
+       "shap_value": 0.0038493989802010037
+      },
+      {
+       "feature": "NoDocbcCost",
+       "shap_value": -0.0009190870693918121
+      },
+      {
+       "feature": "Education",
+       "shap_value": 0.0008922984125016733
+      },
+      {
+       "feature": "PhysActivity",
+       "shap_value": 0.0007999670324069306
+      },
+      {
+       "feature": "Lifestyle_Score",
+       "shap_value": -0.0006205405758121553
+      }
+     ],
+     "confidence": 0.2247123197026257,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": 0.0407,
+     "model_agreement": "high",
+     "prediction": 1,
+     "shap_additivity_gap": 0.034890397191142536,
+     "shap_reconstructed_probability_corrected": 0.25960271689376824,
+     "shap_scale": "corrected_log_odds",
+     "text_explanation": "Top factors influencing this prediction: Diabetes_Clinical_Risk (decreased risk), HeartDiseaseorAttack (increased risk), Stroke (increased risk)."
+    },
+    "status": 200
+   }
+  },
+  "predict": {
+   "D-001": {
+    "body": {
+     "confidence": 0.02599222034329994,
+     "diagnosis": "Negative",
+     "ensemble_type": "stacking",
+     "ensemble_variance": 0.0045,
+     "inference_threshold": 0.108184,
+     "inference_threshold_raw": 0.28085419664349526,
+     "model_agreement": "high",
+     "model_contributions": {
+      "lightgbm": 0.03886920886520407,
+      "random_forest": 0.036145349075467445,
+      "xgboost": 0.04666541889309883
+     },
+     "prediction": 0,
+     "prevalence_correction_applied": true,
+     "prevalence_deploy": 0.237,
+     "prevalence_train": 0.5,
+     "probability_corrected": 0.02599222034329994,
+     "probability_raw": 0.0791156228395719,
+     "risk_bands": {
+      "high": 0.4202127659574468,
+      "moderate": 0.1715526601520087
+     },
+     "risk_bands_raw": {
+      "high": 0.7,
+      "moderate": 0.4
+     }
+    },
+    "status": 200
+   },
+   "D-002": {
+    "body": {
+     "confidence": 0.19309335892906537,
+     "diagnosis": "Positive",
+     "ensemble_type": "stacking",
+     "ensemble_variance": 0.0075,
+     "inference_threshold": 0.108184,
+     "inference_threshold_raw": 0.28085419664349526,
+     "model_agreement": "high",
+     "model_contributions": {
+      "lightgbm": 0.4572667491828881,
+      "random_forest": 0.47219725001606355,
+      "xgboost": 0.47408008575439453
+     },
+     "prediction": 1,
+     "prevalence_correction_applied": true,
+     "prevalence_deploy": 0.237,
+     "prevalence_train": 0.5,
+     "probability_corrected": 0.19309335892906537,
+     "probability_raw": 0.43515814119340773,
+     "risk_bands": {
+      "high": 0.4202127659574468,
+      "moderate": 0.1715526601520087
+     },
+     "risk_bands_raw": {
+      "high": 0.7,
+      "moderate": 0.4
+     }
+    },
+    "status": 200
+   },
+   "D-003": {
+    "body": {
+     "confidence": 0.6374221773442853,
+     "diagnosis": "Positive",
+     "ensemble_type": "stacking",
+     "ensemble_variance": 0.0076,
+     "inference_threshold": 0.108184,
+     "inference_threshold_raw": 0.28085419664349526,
+     "model_agreement": "high",
+     "model_contributions": {
+      "lightgbm": 0.8409342077881713,
+      "random_forest": 0.8590073300267068,
+      "xgboost": 0.853386402130127
+     },
+     "prediction": 1,
+     "prevalence_correction_applied": true,
+     "prevalence_deploy": 0.237,
+     "prevalence_train": 0.5,
+     "probability_corrected": 0.6374221773442853,
+     "probability_raw": 0.8498456462755143,
+     "risk_bands": {
+      "high": 0.4202127659574468,
+      "moderate": 0.1715526601520087
+     },
+     "risk_bands_raw": {
+      "high": 0.7,
+      "moderate": 0.4
+     }
+    },
+    "status": 200
+   },
+   "D-004": {
+    "body": {
+     "confidence": 0.14378197334874293,
+     "diagnosis": "Positive",
+     "ensemble_type": "stacking",
+     "ensemble_variance": 0.0085,
+     "inference_threshold": 0.108184,
+     "inference_threshold_raw": 0.28085419664349526,
+     "model_agreement": "high",
+     "model_contributions": {
+      "lightgbm": 0.388562190981333,
+      "random_forest": 0.405451538993217,
+      "xgboost": 0.40763619542121887
+     },
+     "prediction": 1,
+     "prevalence_correction_applied": true,
+     "prevalence_deploy": 0.237,
+     "prevalence_train": 0.5,
+     "probability_corrected": 0.14378197334874293,
+     "probability_raw": 0.35091285223481256,
+     "risk_bands": {
+      "high": 0.4202127659574468,
+      "moderate": 0.1715526601520087
+     },
+     "risk_bands_raw": {
+      "high": 0.7,
+      "moderate": 0.4
+     }
+    },
+    "status": 200
+   },
+   "edge_all_max": {
+    "body": {
+     "confidence": 0.5375904636683598,
+     "diagnosis": "Positive",
+     "ensemble_type": "stacking",
+     "ensemble_variance": 0.0315,
+     "inference_threshold": 0.108184,
+     "inference_threshold_raw": 0.28085419664349526,
+     "model_agreement": "high",
+     "model_contributions": {
+      "lightgbm": 0.7628656791272385,
+      "random_forest": 0.7495514252150465,
+      "xgboost": 0.8219849467277527
+     },
+     "prediction": 1,
+     "prevalence_correction_applied": true,
+     "prevalence_deploy": 0.237,
+     "prevalence_train": 0.5,
+     "probability_corrected": 0.5375904636683598,
+     "probability_raw": 0.7891557509815005,
+     "risk_bands": {
+      "high": 0.4202127659574468,
+      "moderate": 0.1715526601520087
+     },
+     "risk_bands_raw": {
+      "high": 0.7,
+      "moderate": 0.4
+     }
+    },
+    "status": 200
+   },
+   "edge_all_min": {
+    "body": {
+     "confidence": 0.0313305527086472,
+     "diagnosis": "Negative",
+     "ensemble_type": "stacking",
+     "ensemble_variance": 0.0518,
+     "inference_threshold": 0.108184,
+     "inference_threshold_raw": 0.28085419664349526,
+     "model_agreement": "moderate",
+     "model_contributions": {
+      "lightgbm": 0.049630155934316994,
+      "random_forest": 0.17602343614720223,
+      "xgboost": 0.10310904681682587
+     },
+     "prediction": 0,
+     "prevalence_correction_applied": true,
+     "prevalence_deploy": 0.237,
+     "prevalence_train": 0.5,
+     "probability_corrected": 0.0313305527086472,
+     "probability_raw": 0.0943081265125635,
+     "risk_bands": {
+      "high": 0.4202127659574468,
+      "moderate": 0.1715526601520087
+     },
+     "risk_bands_raw": {
+      "high": 0.7,
+      "moderate": 0.4
+     }
+    },
+    "status": 200
+   },
+   "edge_history_only": {
+    "body": {
+     "confidence": 0.2247123197026257,
+     "diagnosis": "Positive",
+     "ensemble_type": "stacking",
+     "ensemble_variance": 0.0407,
+     "inference_threshold": 0.108184,
+     "inference_threshold_raw": 0.28085419664349526,
+     "model_agreement": "high",
+     "model_contributions": {
+      "lightgbm": 0.5181732085601433,
+      "random_forest": 0.41988602875763525,
+      "xgboost": 0.48296335339546204
+     },
+     "prediction": 1,
+     "prevalence_correction_applied": true,
+     "prevalence_deploy": 0.237,
+     "prevalence_train": 0.5,
+     "probability_corrected": 0.2247123197026257,
+     "probability_raw": 0.48270308846345455,
+     "risk_bands": {
+      "high": 0.4202127659574468,
+      "moderate": 0.1715526601520087
+     },
+     "risk_bands_raw": {
+      "high": 0.7,
+      "moderate": 0.4
+     }
+    },
+    "status": 200
+   }
+  },
+  "schema": {
+   "body": {
+    "description": "Patient input schema for Diabetes Risk Assessment.\n\nAll 21 fields correspond to the CDC BRFSS 2015 Health Indicators dataset.\nBinary fields (0/1) and continuous/ordinal fields are validated with\nappropriate ranges.\n\n**Auto-computed features (no input needed):**\nWhen a prediction is made, the system automatically computes:\n    - BMI_Age_Interaction, Health_Index, Lifestyle_Score, SES_Composite\n    - Diabetes_Clinical_Risk\n\nThese are calculated server-side; you only need to provide the 21 base fields.",
+    "example": {
+     "Age": 7,
+     "AnyHealthcare": 1,
+     "BMI": 30.0,
+     "CholCheck": 1,
+     "DiffWalk": 0,
+     "Education": 4,
+     "Fruits": 0,
+     "GenHlth": 3,
+     "HeartDiseaseorAttack": 0,
+     "HighBP": 1,
+     "HighChol": 1,
+     "HvyAlcoholConsump": 0,
+     "Income": 4,
+     "MentHlth": 10,
+     "NoDocbcCost": 0,
+     "PhysActivity": 0,
+     "PhysHlth": 5,
+     "Sex": 1,
+     "Smoker": 1,
+     "Stroke": 0,
+     "Veggies": 0
+    },
+    "properties": {
+     "Age": {
+      "description": "Age category: 1=18-24 ... 13=80+ (BRFSS coding)",
+      "maximum": 13,
+      "minimum": 1,
+      "title": "Age",
+      "type": "integer"
+     },
+     "AnyHealthcare": {
+      "description": "Have any form of health insurance (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Anyhealthcare",
+      "type": "integer"
+     },
+     "BMI": {
+      "description": "Body Mass Index",
+      "maximum": 100.0,
+      "minimum": 10.0,
+      "title": "Bmi",
+      "type": "number"
+     },
+     "CholCheck": {
+      "description": "Cholesterol check in past 5 years (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Cholcheck",
+      "type": "integer"
+     },
+     "DiffWalk": {
+      "description": "Serious difficulty walking/climbing stairs (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Diffwalk",
+      "type": "integer"
+     },
+     "Education": {
+      "description": "Education level: 1=None to 6=College graduate",
+      "maximum": 6,
+      "minimum": 1,
+      "title": "Education",
+      "type": "integer"
+     },
+     "Fruits": {
+      "description": "Consume fruit 1+ times per day (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Fruits",
+      "type": "integer"
+     },
+     "GenHlth": {
+      "description": "General health: 1=Excellent, 2=Very Good, 3=Good, 4=Fair, 5=Poor",
+      "maximum": 5,
+      "minimum": 1,
+      "title": "Genhlth",
+      "type": "integer"
+     },
+     "HeartDiseaseorAttack": {
+      "description": "Coronary heart disease or MI (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Heartdiseaseorattack",
+      "type": "integer"
+     },
+     "HighBP": {
+      "description": "High blood pressure (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Highbp",
+      "type": "integer"
+     },
+     "HighChol": {
+      "description": "High cholesterol (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Highchol",
+      "type": "integer"
+     },
+     "HvyAlcoholConsump": {
+      "description": "Heavy drinkers: adult men >14, women >7 per week (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Hvyalcoholconsump",
+      "type": "integer"
+     },
+     "Income": {
+      "description": "Income scale: 1=<$10K to 8=>$75K",
+      "maximum": 8,
+      "minimum": 1,
+      "title": "Income",
+      "type": "integer"
+     },
+     "MentHlth": {
+      "description": "Days of poor mental health in past 30",
+      "maximum": 30,
+      "minimum": 0,
+      "title": "Menthlth",
+      "type": "integer"
+     },
+     "NoDocbcCost": {
+      "description": "Could not see doctor due to cost (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Nodocbccost",
+      "type": "integer"
+     },
+     "PhysActivity": {
+      "description": "Physical activity in past 30 days (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Physactivity",
+      "type": "integer"
+     },
+     "PhysHlth": {
+      "description": "Days of poor physical health in past 30",
+      "maximum": 30,
+      "minimum": 0,
+      "title": "Physhlth",
+      "type": "integer"
+     },
+     "Sex": {
+      "description": "Sex: 1=Male, 0=Female",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Sex",
+      "type": "integer"
+     },
+     "Smoker": {
+      "description": "Smoked at least 100 cigarettes in life (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Smoker",
+      "type": "integer"
+     },
+     "Stroke": {
+      "description": "Ever told you had a stroke (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Stroke",
+      "type": "integer"
+     },
+     "Veggies": {
+      "description": "Consume vegetables 1+ times per day (1=Yes, 0=No)",
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Veggies",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "HighBP",
+     "HighChol",
+     "CholCheck",
+     "Smoker",
+     "Stroke",
+     "HeartDiseaseorAttack",
+     "PhysActivity",
+     "Fruits",
+     "Veggies",
+     "HvyAlcoholConsump",
+     "AnyHealthcare",
+     "NoDocbcCost",
+     "DiffWalk",
+     "Sex",
+     "BMI",
+     "MentHlth",
+     "PhysHlth",
+     "GenHlth",
+     "Age",
+     "Education",
+     "Income"
+    ],
+    "title": "DiabetesInput",
+    "type": "object"
+   },
+   "status": 200
+  }
+ },
+ "diseases": {
+  "body": {
+   "all_registered": [
+    "diabetes",
+    "heart_disease"
+   ],
+   "diseases": [
+    {
+     "info": {
+      "available": true,
+      "description": "CDC BRFSS 2015 \u2014 Diabetes Health Indicators prediction using stacking ensemble (XGBoost + LightGBM + Random Forest) with Logistic Regression meta-learner and SHAP explainability \u2014 21 clinical features",
+      "display_name": "Diabetes Risk Assessment",
+      "explainer_type": "tree",
+      "inference_threshold": 0.108184,
+      "model_type": "ensemble",
+      "name": "diabetes",
+      "risk_bands": {
+       "high": 0.4202127659574468,
+       "moderate": 0.1715526601520087
+      },
+      "supports_counterfactuals": true,
+      "version": "1.1.0"
+     },
+     "name": "diabetes"
+    },
+    {
+     "info": {
+      "available": true,
+      "description": "Non-invasive CAD risk triage using an XGBoost Pipeline (IterativeImputer + StandardScaler + OrdinalEncoder, no engineered biomarkers) with SHAP explainability \u2014 11 raw clinical features, trained on 920 patients across 4 UCI sites",
+      "display_name": "Coronary Artery Disease Risk",
+      "explainer_type": "tree",
+      "inference_threshold": 0.3695,
+      "model_type": "xgboost",
+      "name": "heart_disease",
+      "risk_bands": null,
+      "supports_counterfactuals": true,
+      "version": "6.0.0"
+     },
+     "name": "heart_disease"
+    }
+   ]
+  },
+  "status": 200
+ },
+ "heart_disease": {
+  "batch": {
+   "body": {
+    "disease": "heart_disease",
+    "failed": 1,
+    "results": [
+     {
+      "confidence": 0.2915087044239044,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 1,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.9650428295135498,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 2,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.09815660864114761,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 3,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.9660131335258484,
+      "data_completeness_warning": "High-impact features missing and imputed automatically: Oldpeak, Cholesterol. This prediction relied on statistical imputation rather than the patient's actual values for these inputs, which rank among the model's most influential \u2014 treat with extra caution.",
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 4,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.14366820454597473,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 5,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.9538712501525879,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 6,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.3776437044143677,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 7,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.9579548835754395,
+      "data_completeness_warning": null,
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 8,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.19632896780967712,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 9,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.9487798810005188,
+      "data_completeness_warning": "High-impact features missing and imputed automatically: Oldpeak, Cholesterol. This prediction relied on statistical imputation rather than the patient's actual values for these inputs, which rank among the model's most influential \u2014 treat with extra caution.",
+      "diagnosis": "Positive",
+      "error": null,
+      "prediction": 1,
+      "row": 10,
+      "status": "ok"
+     },
+     {
+      "confidence": 0.15765908360481262,
+      "data_completeness_warning": null,
+      "diagnosis": "Negative",
+      "error": null,
+      "prediction": 0,
+      "row": 11,
+      "status": "ok"
+     },
+     {
+      "confidence": null,
+      "data_completeness_warning": null,
+      "diagnosis": null,
+      "error": "422: {'error': \"Invalid patient input for 'heart_disease': Age\", 'code': 'VALIDATION_ERROR', 'detail': [{'type': 'greater_than_equal', 'loc': ['Age'], 'msg': 'Input should be greater than or equal to 20', 'input': 5, 'ctx': {'ge': 20}, 'url': 'https://errors.pydantic.dev/2.13/v/greater_than_equal'}]}",
+      "prediction": null,
+      "row": 12,
+      "status": "error"
+     }
+    ],
+    "succeeded": 11,
+    "total": 12
+   },
+   "status": 200
+  },
+  "counterfactuals": {
+   "P-001": {
+    "body": {
+     "baseline_probability": 0.2915087044239044,
+     "counterfactuals": [],
+     "message": "Patient is already at low risk. No counterfactuals needed.",
+     "status": "not_applicable"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "counterfactuals",
+      "message",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "not_applicable",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "P-002": {
+    "body": {
+     "baseline_probability": 0.9650428295135498,
+     "counterfactuals": [],
+     "status": "success"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "counterfactuals",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "success",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "P-003": {
+    "body": {
+     "baseline_probability": 0.09815660864114761,
+     "counterfactuals": [],
+     "message": "Patient is already at low risk. No counterfactuals needed.",
+     "status": "not_applicable"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "counterfactuals",
+      "message",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "not_applicable",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "edge_max_bounds": {
+    "body": {
+     "baseline_probability": 0.9538712501525879,
+     "counterfactuals": [],
+     "status": "success"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "counterfactuals",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "success",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "edge_min_bounds": {
+    "body": {
+     "baseline_probability": 0.14366820454597473,
+     "counterfactuals": [],
+     "message": "Patient is already at low risk. No counterfactuals needed.",
+     "status": "not_applicable"
+    },
+    "shape": {
+     "keys": [
+      "baseline_probability",
+      "counterfactuals",
+      "message",
+      "status"
+     ],
+     "scenario_count": 0,
+     "scenario_keys": [],
+     "status": "not_applicable",
+     "status_code": 200
+    },
+    "status": 200
+   },
+   "edge_missing_high_impact": {
+    "body": {
+     "error": "Counterfactuals generation failed: TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'",
+     "request_id": "1c543476-9f22-4055-a448-de1317e2614d",
+     "traceback": [
+      "  File \"/home/yahia/Desktop/Projects/Heart_Disease_Project/backend/model_loader.py\", line 437, in generate_counterfactuals",
+      "    cf[feat] = 1 - int(original)",
+      "                   ~~~^^^^^^^^^^",
+      "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'",
+      ""
+     ]
+    },
+    "shape": {
+     "keys": [
+      "error",
+      "request_id",
+      "traceback"
+     ],
+     "scenario_count": null,
+     "scenario_keys": [],
+     "status": null,
+     "status_code": 500
+    },
+    "status": 500
+   }
+  },
+  "explain": {
+   "P-001": {
+    "body": {
+     "base_value": 0.6854819059371948,
+     "base_value_raw": null,
+     "chart_data": [
+      {
+       "feature": "ChestPainType",
+       "shap_value": -1.2893058061599731
+      },
+      {
+       "feature": "Oldpeak",
+       "shap_value": -0.46401965618133545
+      },
+      {
+       "feature": "Cholesterol",
+       "shap_value": 0.3573625981807709
+      },
+      {
+       "feature": "ExerciseAngina",
+       "shap_value": -0.3199831247329712
+      },
+      {
+       "feature": "Sex",
+       "shap_value": 0.23422950506210327
+      },
+      {
+       "feature": "MaxHR",
+       "shap_value": 0.22647662460803986
+      },
+      {
+       "feature": "Age",
+       "shap_value": -0.15529434382915497
+      },
+      {
+       "feature": "FastingBS",
+       "shap_value": -0.12183491140604019
+      },
+      {
+       "feature": "RestingBP",
+       "shap_value": -0.05492652952671051
+      },
+      {
+       "feature": "ST_Slope",
+       "shap_value": 0.03564590960741043
+      },
+      {
+       "feature": "RestingECG",
+       "shap_value": -0.0218999944627285
+      }
+     ],
+     "confidence": 0.2915087044239044,
+     "counterfactuals": null,
+     "diagnosis": "Negative",
+     "ensemble_variance": null,
+     "model_agreement": null,
+     "prediction": 0,
+     "shap_additivity_gap": null,
+     "shap_reconstructed_probability_corrected": null,
+     "shap_scale": null,
+     "text_explanation": "Top factors influencing this prediction: ChestPainType (decreased risk), Oldpeak (decreased risk), Cholesterol (increased risk)."
+    },
+    "status": 200
+   },
+   "P-002": {
+    "body": {
+     "base_value": 0.6854819059371948,
+     "base_value_raw": null,
+     "chart_data": [
+      {
+       "feature": "ChestPainType",
+       "shap_value": 0.7084808349609375
+      },
+      {
+       "feature": "Sex",
+       "shap_value": -0.6470980644226074
+      },
+      {
+       "feature": "ExerciseAngina",
+       "shap_value": 0.5944228172302246
+      },
+      {
+       "feature": "Oldpeak",
+       "shap_value": 0.5614069104194641
+      },
+      {
+       "feature": "MaxHR",
+       "shap_value": 0.5232388973236084
+      },
+      {
+       "feature": "FastingBS",
+       "shap_value": 0.34127041697502136
+      },
+      {
+       "feature": "RestingBP",
+       "shap_value": 0.29552745819091797
+      },
+      {
+       "feature": "Age",
+       "shap_value": 0.21681691706180573
+      },
+      {
+       "feature": "ST_Slope",
+       "shap_value": 0.0433359369635582
+      },
+      {
+       "feature": "RestingECG",
+       "shap_value": -0.014830436557531357
+      },
+      {
+       "feature": "Cholesterol",
+       "shap_value": 0.00999436154961586
+      }
+     ],
+     "confidence": 0.9650428295135498,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": null,
+     "model_agreement": null,
+     "prediction": 1,
+     "shap_additivity_gap": null,
+     "shap_reconstructed_probability_corrected": null,
+     "shap_scale": null,
+     "text_explanation": "Top factors influencing this prediction: ChestPainType (increased risk), Sex (decreased risk), ExerciseAngina (increased risk)."
+    },
+    "status": 200
+   },
+   "P-003": {
+    "body": {
+     "base_value": 0.6854819059371948,
+     "base_value_raw": null,
+     "chart_data": [
+      {
+       "feature": "ChestPainType",
+       "shap_value": -0.7667710781097412
+      },
+      {
+       "feature": "Age",
+       "shap_value": -0.47756946086883545
+      },
+      {
+       "feature": "Cholesterol",
+       "shap_value": -0.45850667357444763
+      },
+      {
+       "feature": "MaxHR",
+       "shap_value": -0.4020584225654602
+      },
+      {
+       "feature": "Oldpeak",
+       "shap_value": -0.3835119307041168
+      },
+      {
+       "feature": "ExerciseAngina",
+       "shap_value": -0.28660276532173157
+      },
+      {
+       "feature": "Sex",
+       "shap_value": 0.25131362676620483
+      },
+      {
+       "feature": "ST_Slope",
+       "shap_value": -0.13906776905059814
+      },
+      {
+       "feature": "RestingBP",
+       "shap_value": -0.11353582888841629
+      },
+      {
+       "feature": "FastingBS",
+       "shap_value": -0.1094227284193039
+      },
+      {
+       "feature": "RestingECG",
+       "shap_value": -0.01762593723833561
+      }
+     ],
+     "confidence": 0.09815660864114761,
+     "counterfactuals": null,
+     "diagnosis": "Negative",
+     "ensemble_variance": null,
+     "model_agreement": null,
+     "prediction": 0,
+     "shap_additivity_gap": null,
+     "shap_reconstructed_probability_corrected": null,
+     "shap_scale": null,
+     "text_explanation": "Top factors influencing this prediction: ChestPainType (decreased risk), Age (decreased risk), Cholesterol (decreased risk)."
+    },
+    "status": 200
+   },
+   "edge_max_bounds": {
+    "body": {
+     "base_value": 0.6854819059371948,
+     "base_value_raw": null,
+     "chart_data": [
+      {
+       "feature": "Oldpeak",
+       "shap_value": 1.3541544675827026
+      },
+      {
+       "feature": "MaxHR",
+       "shap_value": -0.8827683925628662
+      },
+      {
+       "feature": "ChestPainType",
+       "shap_value": 0.6996180415153503
+      },
+      {
+       "feature": "ExerciseAngina",
+       "shap_value": 0.4746852219104767
+      },
+      {
+       "feature": "FastingBS",
+       "shap_value": 0.2823227047920227
+      },
+      {
+       "feature": "Age",
+       "shap_value": 0.18543438613414764
+      },
+      {
+       "feature": "Sex",
+       "shap_value": 0.14251838624477386
+      },
+      {
+       "feature": "RestingBP",
+       "shap_value": 0.11650051176548004
+      },
+      {
+       "feature": "Cholesterol",
+       "shap_value": -0.05580830201506615
+      },
+      {
+       "feature": "ST_Slope",
+       "shap_value": 0.041714347898960114
+      },
+      {
+       "feature": "RestingECG",
+       "shap_value": -0.014761356636881828
+      }
+     ],
+     "confidence": 0.9538712501525879,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": null,
+     "model_agreement": null,
+     "prediction": 1,
+     "shap_additivity_gap": null,
+     "shap_reconstructed_probability_corrected": null,
+     "shap_scale": null,
+     "text_explanation": "Top factors influencing this prediction: Oldpeak (increased risk), MaxHR (decreased risk), ChestPainType (increased risk)."
+    },
+    "status": 200
+   },
+   "edge_min_bounds": {
+    "body": {
+     "base_value": 0.6854819059371948,
+     "base_value_raw": null,
+     "chart_data": [
+      {
+       "feature": "Sex",
+       "shap_value": -1.0030100345611572
+      },
+      {
+       "feature": "MaxHR",
+       "shap_value": 0.6574835181236267
+      },
+      {
+       "feature": "ChestPainType",
+       "shap_value": -0.5666353702545166
+      },
+      {
+       "feature": "Cholesterol",
+       "shap_value": -0.5074084401130676
+      },
+      {
+       "feature": "Oldpeak",
+       "shap_value": -0.41630083322525024
+      },
+      {
+       "feature": "ExerciseAngina",
+       "shap_value": -0.331432968378067
+      },
+      {
+       "feature": "Age",
+       "shap_value": -0.1757102906703949
+      },
+      {
+       "feature": "FastingBS",
+       "shap_value": -0.12894600629806519
+      },
+      {
+       "feature": "RestingBP",
+       "shap_value": -0.11353965848684311
+      },
+      {
+       "feature": "RestingECG",
+       "shap_value": 0.059005919843912125
+      },
+      {
+       "feature": "ST_Slope",
+       "shap_value": 0.05586111545562744
+      }
+     ],
+     "confidence": 0.14366820454597473,
+     "counterfactuals": null,
+     "diagnosis": "Negative",
+     "ensemble_variance": null,
+     "model_agreement": null,
+     "prediction": 0,
+     "shap_additivity_gap": null,
+     "shap_reconstructed_probability_corrected": null,
+     "shap_scale": null,
+     "text_explanation": "Top factors influencing this prediction: Sex (decreased risk), MaxHR (increased risk), ChestPainType (decreased risk)."
+    },
+    "status": 200
+   },
+   "edge_missing_high_impact": {
+    "body": {
+     "base_value": 0.6854819059371948,
+     "base_value_raw": null,
+     "chart_data": [
+      {
+       "feature": "ChestPainType",
+       "shap_value": 0.6870396137237549
+      },
+      {
+       "feature": "FastingBS",
+       "shap_value": 0.617636501789093
+      },
+      {
+       "feature": "ExerciseAngina",
+       "shap_value": 0.5345689058303833
+      },
+      {
+       "feature": "Cholesterol",
+       "shap_value": 0.24900725483894348
+      },
+      {
+       "feature": "Sex",
+       "shap_value": 0.19753970205783844
+      },
+      {
+       "feature": "Age",
+       "shap_value": 0.18566115200519562
+      },
+      {
+       "feature": "MaxHR",
+       "shap_value": 0.08531629294157028
+      },
+      {
+       "feature": "Oldpeak",
+       "shap_value": 0.0722583457827568
+      },
+      {
+       "feature": "ST_Slope",
+       "shap_value": 0.03897885978221893
+      },
+      {
+       "feature": "RestingBP",
+       "shap_value": -0.006675951648503542
+      },
+      {
+       "feature": "RestingECG",
+       "shap_value": 0.00039091589860618114
+      }
+     ],
+     "confidence": 0.9660131335258484,
+     "counterfactuals": null,
+     "diagnosis": "Positive",
+     "ensemble_variance": null,
+     "model_agreement": null,
+     "prediction": 1,
+     "shap_additivity_gap": null,
+     "shap_reconstructed_probability_corrected": null,
+     "shap_scale": null,
+     "text_explanation": "Top factors influencing this prediction: ChestPainType (increased risk), FastingBS (increased risk), ExerciseAngina (increased risk)."
+    },
+    "status": 200
+   }
+  },
+  "predict": {
+   "P-001": {
+    "body": {
+     "confidence": 0.2915087044239044,
+     "diagnosis": "Negative",
+     "inference_threshold": 0.3695,
+     "prediction": 0
+    },
+    "status": 200
+   },
+   "P-002": {
+    "body": {
+     "confidence": 0.9650428295135498,
+     "diagnosis": "Positive",
+     "inference_threshold": 0.3695,
+     "prediction": 1
+    },
+    "status": 200
+   },
+   "P-003": {
+    "body": {
+     "confidence": 0.09815660864114761,
+     "diagnosis": "Negative",
+     "inference_threshold": 0.3695,
+     "prediction": 0
+    },
+    "status": 200
+   },
+   "edge_max_bounds": {
+    "body": {
+     "confidence": 0.9538712501525879,
+     "diagnosis": "Positive",
+     "inference_threshold": 0.3695,
+     "prediction": 1
+    },
+    "status": 200
+   },
+   "edge_min_bounds": {
+    "body": {
+     "confidence": 0.14366820454597473,
+     "diagnosis": "Negative",
+     "inference_threshold": 0.3695,
+     "prediction": 0
+    },
+    "status": 200
+   },
+   "edge_missing_high_impact": {
+    "body": {
+     "confidence": 0.9660131335258484,
+     "data_completeness_warning": "High-impact features missing and imputed automatically: Oldpeak, Cholesterol. This prediction relied on statistical imputation rather than the patient's actual values for these inputs, which rank among the model's most influential \u2014 treat with extra caution.",
+     "diagnosis": "Positive",
+     "inference_threshold": 0.3695,
+     "prediction": 1
+    },
+    "status": 200
+   }
+  },
+  "schema": {
+   "body": {
+    "description": "Patient input schema for Coronary Artery Disease (CAD) risk assessment.\n\nAll fields correspond to the 12 harmonized clinical features from the\nUCI Cleveland + Z-Alizadeh Sani merged dataset.\n\n**Auto-computed features (no input needed):**\nWhen a prediction is made, the system automatically computes:\n    - RPP (Rate-Pressure Product): RestingBP \u00d7 MaxHR\n    - Exercise_Risk_Index: Oldpeak \u00d7 ExerciseAngina (encoded)\n    - Age_BP_Interaction: Age \u00d7 RestingBP\n    - HR_Age_Ratio: MaxHR / Age\n    - Chol_Age_Ratio: Cholesterol / Age\n\nThese are calculated server-side; you only need to provide the 12 base fields.\n\nCategorical fields (Sex, ChestPainType, RestingECG, ExerciseAngina,\nST_Slope) accept both raw strings (e.g., 'M', 'ATA', 'Normal') and\npre-encoded integers. The ModelLoader applies label encoding internally.",
+    "example": {
+     "Age": 54,
+     "ChestPainType": "ATA",
+     "Cholesterol": 289,
+     "ExerciseAngina": "N",
+     "FastingBS": 0,
+     "MaxHR": 122,
+     "Oldpeak": 0.0,
+     "RestingBP": 140,
+     "RestingECG": "Normal",
+     "ST_Slope": "Flat",
+     "Sex": "M"
+    },
+    "properties": {
+     "Age": {
+      "description": "Age in years",
+      "maximum": 100,
+      "minimum": 20,
+      "title": "Age",
+      "type": "integer"
+     },
+     "ChestPainType": {
+      "description": "Chest pain type: 'TA', 'ATA', 'NAP', or 'ASY' (or encoded 0-3)",
+      "enum": [
+       "TA",
+       "ATA",
+       "NAP",
+       "ASY"
+      ],
+      "title": "Chestpaintype",
+      "type": "string"
+     },
+     "Cholesterol": {
+      "anyOf": [
+       {
+        "maximum": 600,
+        "minimum": 100,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "Serum cholesterol (mg/dl)",
+      "title": "Cholesterol"
+     },
+     "ExerciseAngina": {
+      "description": "Exercise-induced angina: 'Y' or 'N' (or encoded 0/1)",
+      "enum": [
+       "Y",
+       "N"
+      ],
+      "title": "Exerciseangina",
+      "type": "string"
+     },
+     "FastingBS": {
+      "anyOf": [
+       {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "Fasting blood sugar > 120 mg/dl (1=True, 0=False)",
+      "title": "Fastingbs"
+     },
+     "MaxHR": {
+      "anyOf": [
+       {
+        "maximum": 220,
+        "minimum": 60,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "Maximum heart rate achieved",
+      "title": "Maxhr"
+     },
+     "Oldpeak": {
+      "anyOf": [
+       {
+        "maximum": 10.0,
+        "minimum": -3.0,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "ST depression induced by exercise relative to rest",
+      "title": "Oldpeak"
+     },
+     "RestingBP": {
+      "anyOf": [
+       {
+        "maximum": 220,
+        "minimum": 80,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "Resting blood pressure (mm Hg)",
+      "title": "Restingbp"
+     },
+     "RestingECG": {
+      "description": "Resting ECG: 'Normal', 'ST', or 'LVH' (or encoded 0-2)",
+      "enum": [
+       "Normal",
+       "ST",
+       "LVH"
+      ],
+      "title": "Restingecg",
+      "type": "string"
+     },
+     "ST_Slope": {
+      "anyOf": [
+       {
+        "enum": [
+         "Up",
+         "Flat",
+         "Down"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)",
+      "title": "St Slope"
+     },
+     "Sex": {
+      "description": "Sex: 'M' or 'F' (or encoded 0/1)",
+      "enum": [
+       "M",
+       "F"
+      ],
+      "title": "Sex",
+      "type": "string"
+     }
+    },
+    "required": [
+     "Age",
+     "Sex",
+     "ChestPainType",
+     "RestingECG",
+     "ExerciseAngina"
+    ],
+    "title": "HeartDiseaseInput",
+    "type": "object"
+   },
+   "status": 200
+  }
+ },
+ "legacy_v3_predict": {
+  "body": {
+   "confidence": 0.2915087044239044,
+   "diagnosis": "Negative",
+   "inference_threshold": 0.3695,
+   "prediction": 0
+  },
+  "status": 200
+ }
+}
