@@ -82,7 +82,8 @@ features:
 # Model configuration — Stacking Ensemble
 # ---------------------------------------------------------------------------
 model:
-  type: "ensemble"                    # Signals EnsembleModelLoader in router
+  family: "stacking_ensemble"         # Dispatch key: backend class registered in backend/model_backends/
+  type: "ensemble"                    # Descriptive only (shown as model_type by /diseases)
   explainer_type: "tree"              # All base models use TreeExplainer
   # Stated on the DEPLOYMENT prior (prevalence_deploy), because predict() compares
   # it with the prevalence-corrected probability. Raw (50/50-prior) equivalent:

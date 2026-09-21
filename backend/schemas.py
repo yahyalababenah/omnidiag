@@ -421,12 +421,20 @@ class DiabetesInput(BaseModel):
 # Schema Registry
 # =============================================================================
 # Maps disease names (from config) to their Pydantic input schemas.
-# When a new disease is added, register its schema here.
+# A new disease can instead declare `schema: {module, class}` in its YAML;
+# backend/router.py then calls register_schema() for it.
 
 DISEASE_SCHEMA_REGISTRY: Dict[str, Type[BaseModel]] = {
     "heart_disease": HeartDiseaseInput,
     "diabetes": DiabetesInput,
 }
+
+
+def register_schema(disease_name: str, schema: Type[BaseModel]) -> None:
+    """Register (or replace) the input schema for `disease_name`."""
+    if not (isinstance(schema, type) and issubclass(schema, BaseModel)):
+        raise TypeError(f"Schema for '{disease_name}' must be a pydantic BaseModel, got {schema!r}")
+    DISEASE_SCHEMA_REGISTRY[disease_name] = schema
 
 
 def get_schema_for_disease(disease_name: str) -> Type[BaseModel]:

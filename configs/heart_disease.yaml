@@ -57,7 +57,8 @@ features:
 # Model configuration
 # ---------------------------------------------------------------------------
 model:
-  type: "xgboost"                    # Model architecture: xgboost | tabnet | deep_learning
+  family: "sklearn_pipeline"         # Dispatch key: backend class registered in backend/model_backends/
+  type: "xgboost"                    # Descriptive only (shown as model_type by /diseases)
   explainer_type: "tree"             # SHAP explainer: tree (TreeExplainer) | deep (DeepExplainer)
   counterfactuals: true              # Enable What-If scenario generation
   weights_path: "models/heart_disease/heart_full_tuned.pkl"
