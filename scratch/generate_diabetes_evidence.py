@@ -38,7 +38,7 @@ from backend.prevalence_correction import (apply_prevalence_correction,
                                            invert_prevalence_correction)
 
 N_BOOT = 2000
-PREVALENCE_GRID = [0.50, 0.40, 0.30, 0.20, 0.14, 0.10]
+PREVALENCE_GRID = [0.50, 0.40, 0.30, 0.237, 0.20, 0.14, 0.10]
 N_CAL_BINS = 10
 
 # Reference palette (dataviz skill): slot 1 = before, slot 2 = after.
@@ -107,6 +107,14 @@ def calibration_points(y, p, w, bins=N_CAL_BINS):
 
 
 def point_metrics(y, p_raw, t_raw, pi_dep):
+    # int(round(...)), matching main()'s `pct` -- plain int() truncates
+    # (23.7 -> 23) instead of rounding (23.7 -> 24), which only ever
+    # differed from round() by chance when pi_dep*100 was a whole number
+    # (e.g. the old 0.14 -> 14 in both conventions). A pi_dep whose
+    # percentage isn't a whole number (e.g. 0.237 -> 23.7) exposes the
+    # mismatch as a KeyError further down where callers look up the key
+    # main() computed with round().
+    pct = int(round(pi_dep * 100))
     tn, fp, fn, tp = confusion(y, p_raw, t_raw)
     se, sp = tp / (tp + fn), tn / (tn + fp)
     ppv50 = tp / (tp + fp)
@@ -115,8 +123,8 @@ def point_metrics(y, p_raw, t_raw, pi_dep):
         "accuracy": (tp + tn) / len(y),
         "f1": 2 * tp / (2 * tp + fp + fn),
         "ppv_test_50": ppv50, "npv_test_50": tn / (tn + fn),
-        f"ppv_at_{int(pi_dep*100)}": ppv_at(se, sp, pi_dep),
-        f"npv_at_{int(pi_dep*100)}": npv_at(se, sp, pi_dep),
+        f"ppv_at_{pct}": ppv_at(se, sp, pi_dep),
+        f"npv_at_{pct}": npv_at(se, sp, pi_dep),
         "flagged_at_deploy": se * pi_dep + (1 - sp) * (1 - pi_dep),
         "cost_per_1000_test": 1000 * (FN_COST * fn + FP_COST * fp) / len(y),
         "tn": tn, "fp": fp, "fn": fn, "tp": tp,

@@ -32,29 +32,29 @@
       "evidence_file": "evaluation_evidence/diabetes/pr_curve.png"
     },
     {
-      "metric": "pr_auc_at_14",
+      "metric": "pr_auc_at_24",
       "threshold_set": "-",
-      "value": 0.4281226106,
-      "ci95_low": 0.4104875181,
-      "ci95_high": 0.4484413695,
+      "value": 0.5774275896,
+      "ci95_low": 0.5612137618,
+      "ci95_high": 0.5945391443,
       "threshold": "threshold-free",
       "evidence_file": "evaluation_evidence/diabetes/pr_curve.png"
     },
     {
-      "metric": "brier_raw_at_14",
+      "metric": "brier_raw_at_24",
       "threshold_set": "-",
-      "value": 0.1752662892,
-      "ci95_low": 0.1706652551,
-      "ci95_high": 0.1797703556,
+      "value": 0.1731957694,
+      "ci95_low": 0.1689492786,
+      "ci95_high": 0.1773824123,
       "threshold": "threshold-free",
       "evidence_file": "evaluation_evidence/diabetes/calibration.json"
     },
     {
-      "metric": "brier_corrected_at_14",
+      "metric": "brier_corrected_at_24",
       "threshold_set": "-",
-      "value": 0.0973779597,
-      "ci95_low": 0.095919706,
-      "ci95_high": 0.0989108315,
+      "value": 0.1347587379,
+      "ci95_low": 0.1322652235,
+      "ci95_high": 0.1373273765,
       "threshold": "threshold-free",
       "evidence_file": "evaluation_evidence/diabetes/calibration.json"
     },
@@ -68,11 +68,11 @@
       "evidence_file": "evaluation_evidence/diabetes/calibration.json"
     },
     {
-      "metric": "ece_corrected_at_14",
+      "metric": "ece_corrected_at_24",
       "threshold_set": "-",
-      "value": 0.0081947619,
-      "ci95_low": 0.0058585754,
-      "ci95_high": 0.0128888731,
+      "value": 0.0160332865,
+      "ci95_low": 0.0119153686,
+      "ci95_high": 0.0220026733,
       "threshold": "threshold-free",
       "evidence_file": "evaluation_evidence/diabetes/calibration.json"
     },
@@ -131,29 +131,29 @@
       "evidence_file": "evaluation_evidence/diabetes/classification_report_old_0.2750.txt"
     },
     {
-      "metric": "ppv_at_14",
+      "metric": "ppv_at_24",
       "threshold_set": "old",
-      "value": 0.247486414,
-      "ci95_low": 0.2426580487,
-      "ci95_high": 0.252681984,
+      "value": 0.3855702281,
+      "ci95_low": 0.3794061562,
+      "ci95_high": 0.39215398,
       "threshold": "0.2750 raw",
       "evidence_file": "evaluation_evidence/diabetes/ppv_collapse_table.csv"
     },
     {
-      "metric": "npv_at_14",
+      "metric": "npv_at_24",
       "threshold_set": "old",
-      "value": 0.9754744147,
-      "ci95_low": 0.973565637,
-      "ci95_high": 0.9773160127,
+      "value": 0.9542229724,
+      "ci95_low": 0.9507437532,
+      "ci95_high": 0.9575909413,
       "threshold": "0.2750 raw",
       "evidence_file": "evaluation_evidence/diabetes/ppv_collapse_table.csv"
     },
     {
       "metric": "flagged_at_deploy",
       "threshold_set": "old",
-      "value": 0.517913462,
-      "ci95_low": 0.5077530912,
-      "ci95_high": 0.5277519121,
+      "value": 0.5627627984,
+      "ci95_low": 0.5536328021,
+      "ci95_high": 0.5714498417,
       "threshold": "0.2750 raw",
       "evidence_file": "evaluation_evidence/diabetes/ppv_collapse_table.csv"
     },
@@ -172,7 +172,7 @@
       "value": 0.9131418871,
       "ci95_low": 0.9063567565,
       "ci95_high": 0.9196231832,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/confusion_matrix_new_0.2809.txt"
     },
     {
@@ -181,7 +181,7 @@
       "value": 0.5541725601,
       "ci95_low": 0.54264735,
       "ci95_high": 0.5661316869,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/confusion_matrix_new_0.2809.txt"
     },
     {
@@ -190,7 +190,7 @@
       "value": 0.7336445293,
       "ci95_low": 0.7264304406,
       "ci95_high": 0.7408603862,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/classification_report_new_0.2809.txt"
     },
     {
@@ -199,7 +199,7 @@
       "value": 0.7741664668,
       "ci95_low": 0.7673612362,
       "ci95_high": 0.7808913984,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/classification_report_new_0.2809.txt"
     },
     {
@@ -208,7 +208,7 @@
       "value": 0.6719059019,
       "ci95_low": 0.6629074017,
       "ci95_high": 0.6811960237,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/classification_report_new_0.2809.txt"
     },
     {
@@ -217,34 +217,34 @@
       "value": 0.8645189762,
       "ci95_low": 0.8546375581,
       "ci95_high": 0.8743154031,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/classification_report_new_0.2809.txt"
     },
     {
-      "metric": "ppv_at_14",
+      "metric": "ppv_at_24",
       "threshold_set": "new",
-      "value": 0.2500528088,
-      "ci95_low": 0.2451580317,
-      "ci95_high": 0.2554015676,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "value": 0.3888286544,
+      "ci95_low": 0.3826032474,
+      "ci95_high": 0.3955800908,
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/ppv_collapse_table.csv"
     },
     {
-      "metric": "npv_at_14",
+      "metric": "npv_at_24",
       "threshold_set": "new",
-      "value": 0.9751198523,
-      "ci95_low": 0.9731948394,
-      "ci95_high": 0.9769998322,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "value": 0.9535758028,
+      "ci95_low": 0.9500692486,
+      "ci95_high": 0.9570119165,
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/ppv_collapse_table.csv"
     },
     {
       "metric": "flagged_at_deploy",
       "threshold_set": "new",
-      "value": 0.5112514625,
-      "ci95_low": 0.5008951523,
-      "ci95_high": 0.5209756485,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "value": 0.5565809639,
+      "ci95_low": 0.5472926423,
+      "ci95_high": 0.5652611857,
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/ppv_collapse_table.csv"
     },
     {
@@ -253,7 +253,7 @@
       "value": 309.7814555485,
       "ci95_low": 300.6577551453,
       "ci95_high": 318.8344295919,
-      "threshold": "0.2809 raw / 0.0598 deployed",
+      "threshold": "0.2809 raw / 0.1082 deployed",
       "evidence_file": "evaluation_evidence/diabetes/confusion_matrix_new_0.2809.txt"
     },
     {
@@ -275,9 +275,9 @@
       "evidence_file": "evaluation_evidence/diabetes/oof_threshold.json"
     },
     {
-      "metric": "threshold_deployed (pi=0.14)",
+      "metric": "threshold_deployed (pi=0.237)",
       "threshold_set": "-",
-      "value": 0.059776,
+      "value": 0.108184,
       "ci95_low": null,
       "ci95_high": null,
       "threshold": "-",

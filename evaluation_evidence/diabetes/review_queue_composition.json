@@ -1,0 +1,23 @@
+{
+  "n_test": 14139,
+  "old": {
+    "prevalence_deploy": 0.14,
+    "threshold": 0.059776,
+    "queued": 3566,
+    "queued_pct": 25.221019874107082,
+    "queued_pred_pos": 1878,
+    "queued_pred_neg": 1688,
+    "queued_true_pos": 1233,
+    "queued_true_neg": 2333
+  },
+  "new": {
+    "prevalence_deploy": 0.237,
+    "threshold": 0.108184,
+    "queued": 3566,
+    "queued_pct": 25.221019874107082,
+    "queued_pred_pos": 1878,
+    "queued_pred_neg": 1688,
+    "queued_true_pos": 1233,
+    "queued_true_neg": 2333
+  }
+}

@@ -192,34 +192,36 @@ class TestFormatShap:
 
 
 # ── Corrected-scale bands (diabetes) ──────────────────────────────────────────
-# Diabetes probabilities are on the deployment prior (~14%), so its bands are
-# the corrected twins of the raw 0.70 / 0.40 cut-points. Literal 0.70 / 0.40
-# made HIGH unreachable and filed thousands of Positive patients under LOW.
-_DIABETES_BANDS = {"high": 0.2752808988764045, "moderate": 0.09790209790209792}
+# Diabetes probabilities are on the deployment prior (23.7%, Jordan's actual
+# diabetes prevalence -- was ~14%, a US/BRFSS placeholder, until 2026-09-21),
+# so its bands are the corrected twins of the raw 0.70 / 0.40 cut-points.
+# Literal 0.70 / 0.40 made HIGH unreachable and filed thousands of Positive
+# patients under LOW.
+_DIABETES_BANDS = {"high": 0.4202127659574468, "moderate": 0.1715526601520087}
 
 
 class TestCorrectedScaleBands:
     async def test_diabetes_positive_is_high_on_corrected_bands(self):
-        """L-5a: 0.48 corrected (raw 0.85) is HIGH, not MODERATE."""
+        """L-5a: 0.64 corrected (raw 0.85) is HIGH, not MODERATE."""
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
-                probability_corrected=0.4795,
+                probability_corrected=0.6377,
                 label="Positive",
                 shap_values=_SHAP_VALUES,
                 features=_FEATURES,
                 risk_bands=_DIABETES_BANDS,
-                decision_threshold=0.059776,
+                decision_threshold=0.108184,
             )
         assert result["risk_band"] == "HIGH"
         assert "Urgent specialist referral" in result["report"]
 
     async def test_diabetes_moderate_band(self):
-        """L-5b: 0.111 corrected (raw 0.435) is MODERATE, not LOW."""
+        """L-5b: 0.193 corrected (raw 0.435) is MODERATE, not LOW."""
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
-                probability_corrected=0.1114,
+                probability_corrected=0.1930,
                 label="Positive",
                 risk_bands=_DIABETES_BANDS,
             )
@@ -230,7 +232,7 @@ class TestCorrectedScaleBands:
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
-                probability_corrected=0.4795,
+                probability_corrected=0.6377,
                 label="Positive",
                 confidence_band="LOW",
                 risk_bands=_DIABETES_BANDS,

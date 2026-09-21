@@ -1,12 +1,12 @@
 {
-  "brier_raw_at_14": 0.17526628915440093,
-  "brier_corrected_at_14": 0.09737795972378095,
-  "brier_raw_at_test_50": 0.1675826407336554,
-  "ece_raw_at_14": 0.23918725354488451,
-  "ece_corrected_at_14": 0.0081947618548104,
-  "ece_raw_at_test_50": 0.02758795284034813,
-  "mean_prob_raw_at_14": 0.37918725354488453,
-  "mean_prob_corrected_at_14": 0.142394360084455,
-  "deployment_prevalence": 0.14,
+  "brier_raw_at_24": 0.17319576938502498,
+  "brier_corrected_at_24": 0.13475873788175405,
+  "brier_raw_at_test_50": 0.16758264073365542,
+  "ece_raw_at_24": 0.17487988306794916,
+  "ece_corrected_at_24": 0.01603328652094975,
+  "ece_raw_at_test_50": 0.027587952840348134,
+  "mean_prob_raw_at_24": 0.4118798830679491,
+  "mean_prob_corrected_at_24": 0.239428661924475,
+  "deployment_prevalence": 0.237,
   "method": "importance-weighted held-out test set; 10 equal-width bins"
 }

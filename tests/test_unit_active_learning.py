@@ -9,7 +9,7 @@ decision threshold, not around 0.5. Two regimes are tested explicitly:
     threshold. Here the threshold-centred view is the identity, so every
     classic 0.5-centred expectation still holds. These tests pass the
     threshold explicitly so that assumption is visible, not implicit.
-  * DIABETES (t = 0.059776, prevalence-corrected) — the case the old,
+  * DIABETES (t = 0.108184, prevalence-corrected) — the case the old,
     0.5-centred implementation got wrong: it queued confident Positives
     and skipped every patient near the real decision boundary.
 """
@@ -25,7 +25,12 @@ from backend.active_learning.sampler import (
 )
 
 ARGMAX = 0.5
-DIABETES_T = 0.059776   # configs/diabetes.yaml → model.inference_threshold
+# configs/diabetes.yaml -> model.inference_threshold. Was 0.059776 (prevalence_deploy
+# 0.14, a US/BRFSS placeholder) until 2026-09-21, when prevalence_deploy was set to
+# 0.237 (Jordan's actual diabetes prevalence). The raw threshold (0.280854) and every
+# clinical decision it implies are unaffected by that move -- only this corrected
+# number is.
+DIABETES_T = 0.108184
 
 
 def test_default_threshold_is_argmax():
@@ -122,7 +127,10 @@ class TestCentreOnThreshold:
         assert centre_on_threshold(DIABETES_T, DIABETES_T) == pytest.approx(0.5, abs=1e-12)
 
     async def test_order_preserving(self):
-        ps = [0.0, 0.01, 0.03, DIABETES_T, 0.1, 0.3, 0.65, 1.0]
+        # Must stay in ascending order -- DIABETES_T (0.108184) now sits
+        # between 0.1 and 0.3, not between 0.03 and 0.1 as it did at the old
+        # 0.059776.
+        ps = [0.0, 0.01, 0.03, 0.1, DIABETES_T, 0.3, 0.65, 1.0]
         qs = [centre_on_threshold(p, DIABETES_T) for p in ps]
         assert qs == sorted(qs)
 
@@ -136,22 +144,25 @@ class TestCentreOnThreshold:
             centre_on_threshold(0.3, bad)
 
 
-# ── Diabetes regime (t = 0.059776, corrected scale) ───────────────────────────
+# ── Diabetes regime (t = 0.108184, corrected scale) ───────────────────────────
 
 class TestDiabetesThreshold:
     async def test_entropy_is_maximal_at_the_decision_threshold(self):
         assert prediction_entropy(DIABETES_T, DIABETES_T) == pytest.approx(1.0)
 
     async def test_near_threshold_patients_are_queued(self):
-        # D-002 (0.111) and D-004 (0.081) sit just above a 0.0598 threshold.
-        assert should_queue_for_review(0.1114, DIABETES_T) is True
-        assert should_queue_for_review(0.0809, DIABETES_T) is True
-        assert should_queue_for_review(0.045, DIABETES_T) is True
+        # D-002 (0.1931) and D-004 (0.1438) sit just above the 0.108184
+        # threshold; 0.08 sits just below it -- all three close enough to be
+        # worth a clinician's time regardless of which side they're on.
+        assert should_queue_for_review(0.1931, DIABETES_T) is True
+        assert should_queue_for_review(0.1438, DIABETES_T) is True
+        assert should_queue_for_review(0.08, DIABETES_T) is True
 
     async def test_confident_positive_is_not_queued(self):
-        # 0.48 corrected is ~8x the threshold. The 0.5-centred sampler queued
-        # exactly this kind of patient and nothing near the boundary.
-        assert should_queue_for_review(0.4795, DIABETES_T) is False
+        # D-003 (0.6374 corrected) is ~5.9x the threshold. The 0.5-centred
+        # sampler queued exactly this kind of patient and nothing near the
+        # boundary.
+        assert should_queue_for_review(0.6374, DIABETES_T) is False
 
     async def test_confident_negative_is_not_queued(self):
         assert should_queue_for_review(0.005, DIABETES_T) is False
@@ -163,7 +174,7 @@ class TestDiabetesThreshold:
 
     async def test_zero_point_five_centred_would_have_got_it_backwards(self):
         """Document the old failure mode against the same two patients."""
-        near_boundary, confident = 0.0809, 0.4795
+        near_boundary, confident = 0.08, 0.6374
         # Old behaviour == passing the argmax threshold on a corrected scale.
         assert should_queue_for_review(near_boundary, ARGMAX) is False
         assert should_queue_for_review(confident, ARGMAX) is True

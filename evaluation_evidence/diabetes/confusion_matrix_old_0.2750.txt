@@ -1,6 +1,6 @@
 Diabetes stacking ensemble — held-out test set (n=14139, prevalence 50.00%)
 threshold (raw, training prior)      : 0.275000
-threshold (deployment prior, pi=0.14): 0.058157
+threshold (deployment prior, pi=0.237): 0.105401
 source of threshold                  : 0.275 (selected on y_test)
 
                  pred_neg   pred_pos

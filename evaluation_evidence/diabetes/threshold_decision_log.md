@@ -9,7 +9,7 @@
 | Range scanned | `np.linspace(0.01, 0.99, 200)` — 200 thresholds, step 0.0049 |
 | Tie rule | first threshold reaching the minimum (strict `<`) |
 | **Selected (raw)** | **0.280854** |
-| Selected, deployment prior π=0.14 | 0.059776 (written to configs/diabetes.yaml) |
+| Selected, deployment prior π=0.237 | 0.108184 (written to configs/diabetes.yaml) |
 | OOF cost at selected | 17477 (FN 2383, FP 12711) |
 | OOF cost at grid point nearest 0.275 (0.2759) | 17494 |
 | Old threshold re-derived on y_test today | 0.3203 |

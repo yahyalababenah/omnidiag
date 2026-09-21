@@ -5,26 +5,32 @@
  * Each patient has realistic vitals/data matching the disease's schema fields,
  * plus clinical meta-fields (history, medications, admittingComplaint).
  *
- * Diabetes profiles (4 total — the A/B/C/D demo set). Probabilities below were
- * re-measured 2026-09-18 by calling EnsembleModelLoader.predict() locally on
- * exactly these inputs, with configs/diabetes.yaml as committed:
- * inference_threshold 0.059776 on the deployment prior (raw equivalent
- * 0.280855), prevalence_train 0.50 → prevalence_deploy 0.14. If
- * prevalence_deploy changes, every "shown" value below changes with it; the
- * raw values and every Positive/Negative decision do not.
+ * Diabetes profiles (4 total — the A/B/C/D demo set). Raw probabilities were
+ * measured 2026-09-18 by calling EnsembleModelLoader.predict() locally on
+ * exactly these inputs; re-verified unchanged 2026-09-21 after the deployment
+ * prevalence decision below (raw values and the model itself never changed —
+ * only the correction target did). configs/diabetes.yaml as committed:
+ * inference_threshold 0.108184 on the deployment prior (raw equivalent
+ * 0.280854), prevalence_train 0.50 → prevalence_deploy 0.237 (Jordan's
+ * diabetes prevalence, per docs/OmniDiag_Proposal_Defense.md — was ~0.14,
+ * a US/BRFSS placeholder, until 2026-09-21). If prevalence_deploy changes
+ * again, every "shown" value below changes with it; the raw values and
+ * every Positive/Negative decision do not — confirmed on the full 14,139-row
+ * test set: 0 decisions changed by the prevalence move alone (same property
+ * that already held for 0.14; see evaluation_evidence/diabetes/before_after.json).
  *
  * Two scales, both listed — the UI shows the CORRECTED one:
  *                                   raw     shown (corrected)  decision
- *   D-001 Noor Sabbagh            0.0791   1.4%               NEGATIVE — Case A: no real risk factors
- *   D-002 Karim Yaghi             0.4352  11.1%               POSITIVE — Case B: HighBP + fair GenHlth
- *   D-003 Samir Abu-Ghazaleh      0.8498  48.0%               POSITIVE — Case C: severe, fully mutable
+ *   D-001 Noor Sabbagh            0.0791   2.6%               NEGATIVE — Case A: no real risk factors
+ *   D-002 Karim Yaghi             0.4352  19.3%               POSITIVE — Case B: HighBP + fair GenHlth
+ *   D-003 Samir Abu-Ghazaleh      0.8498  63.7%               POSITIVE — Case C: severe, fully mutable
  *                                                                        (obesity, hypertension, hyperlipidemia,
  *                                                                        smoking, sedentary, fair GenHlth, DiffWalk)
- *   D-004 Hala Mansour            0.3509   8.1%               POSITIVE — Case D: hypertension only —
+ *   D-004 Hala Mansour            0.3509  14.4%               POSITIVE — Case D: hypertension only —
  *                                                                        deliberately borderline
  *
- * A Positive at 8–11% is correct, not a bug: the corrected probabilities
- * sit on a ~14% base rate and the decision threshold is 5.98%, not 50%.
+ * A Positive at 14–19% is correct, not a bug: the corrected probabilities
+ * sit on a ~23.7% base rate and the decision threshold is 10.82%, not 50%.
  *
  * The earlier figures in this file (9.6 / 43.2 / 75.8 / 33.8%) were raw-scale
  * values measured on the live Space on 2026-09-11 against the old 0.275
@@ -50,7 +56,7 @@
  * (floating-point, likely multi-threaded XGBoost/LightGBM/RandomForest) that
  * is not controlled by CounterfactualGenerator's fixed random_state=42 — a
  * borderline candidate can land a hair on either side of the decision
- * threshold (0.059776 corrected / 0.280855 raw) depending on the container
+ * threshold (0.108184 corrected / 0.280855 raw) depending on the container
  * instance, even for identical input. Re-checked locally 2026-09-18: two
  * uncached calls for Case C returned 2 and 3 valid scenarios.
  * This patient was pushed as low-severity as practical to minimize that
@@ -132,7 +138,7 @@ const mockPatients = {
   ],
 
   diabetes: [
-    // ── Case A — clear negative baseline (raw 0.0791 · shown 1.4% · Negative) ──
+    // ── Case A — clear negative baseline (raw 0.0791 · shown 2.6% · Negative) ──
     // No real risk factors: no hypertension, no high cholesterol, normal BMI,
     // good self-rated health, active, non-smoker. Regenerated 2026-09-11 after
     // the ensemble-model-mismatch fix (see mockPatients.js history).
@@ -169,7 +175,7 @@ const mockPatients = {
         Income: 7,
       },
     },
-    // ── Case B — moderate positive (raw 0.4352 · shown 11.1% · Positive, 1.9× threshold) ──
+    // ── Case B — moderate positive (raw 0.4352 · shown 19.3% · Positive, 1.78× threshold) ──
     // One real risk factor (hypertension) plus only fair self-rated health and
     // a couple of recent unwell days — a "watch and treat" case rather than an
     // alarming one. No cholesterol issue and otherwise active.
@@ -206,7 +212,7 @@ const mockPatients = {
         Income: 6,
       },
     },
-    // ── Case C — strong positive (raw 0.8498 · shown 48.0% · Positive, HIGH band) ──
+    // ── Case C — strong positive (raw 0.8498 · shown 63.7% · Positive, HIGH band) ──
     // Severity comes entirely from mutable risk factors: obesity (BMI 33),
     // hypertension, hyperlipidemia, active smoking, sedentary lifestyle,
     // fair self-rated general health, and difficulty walking. No prior
@@ -259,11 +265,11 @@ const mockPatients = {
         Income: 4,
       },
     },
-    // ── Case D — deliberately borderline (raw 0.3509 · shown 8.1% · Positive) ──
+    // ── Case D — deliberately borderline (raw 0.3509 · shown 14.4% · Positive) ──
     // Hypertension only, everything else clean: no high cholesterol, active,
     // good diet, normal-to-mildly-elevated BMI. Lands above the decision
-    // threshold with a margin of +0.070 raw (0.3509 vs 0.2809) = +0.021
-    // corrected (0.0809 vs 0.0598, i.e. 1.35× the threshold) rather than flush
+    // threshold with a margin of +0.070 raw (0.3509 vs 0.2809) = +0.0356
+    // corrected (0.1438 vs 0.1082, i.e. 1.33× the threshold) rather than flush
     // against it —
     // LightGBM's output shifts a few points between inference environments,
     // so a case placed right at the edge could flip Positive/Negative on

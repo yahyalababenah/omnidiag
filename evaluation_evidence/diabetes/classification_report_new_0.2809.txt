@@ -10,12 +10,12 @@ A) Held-out test set as sampled (50/50):
    macro avg     0.7682    0.7337    0.7248     14139
 weighted avg     0.7682    0.7336    0.7248     14139
 
-B) Same rows re-weighted to deployment prevalence 14% (importance weights; recall per class is unchanged, precision is not):
+B) Same rows re-weighted to deployment prevalence 24% (importance weights; recall per class is unchanged, precision is not):
               precision    recall  f1-score   support
 
- No diabetes     0.9751    0.5542    0.7067    7070.0
-    Diabetes     0.2501    0.9131    0.3926 1150.930232558183
+ No diabetes     0.9536    0.5542    0.7010    7070.0
+    Diabetes     0.3888    0.9131    0.5454 2196.055045871692
 
-    accuracy                         0.6044 8220.930232558183
-   macro avg     0.6126    0.7337    0.5497 8220.930232558183
-weighted avg     0.8736    0.6044    0.6627 8220.930232558183
+    accuracy                         0.6392 9266.055045871692
+   macro avg     0.6712    0.7337    0.6232 9266.055045871692
+weighted avg     0.8197    0.6392    0.6641 9266.055045871692

@@ -366,6 +366,19 @@ question for the clinical owner is: *what is the true cost of a missed diabetic 
 unnecessary HbA1c test, and at which prevalence is that ratio stated?* The answer changes the
 threshold, every metric derived from it, and the Part 5 numbers above.
 
+> **2026-09-21 update — `prevalence_deploy` changed from 0.14 (US/BRFSS placeholder) to 0.237
+> (Jordan's actual diabetes prevalence, per `docs/OmniDiag_Proposal_Defense.md`).** Every number in
+> D-2/D-3/D-8 and W-04 above is stated at the OLD 0.14 prior and is now stale; they are left as
+> written rather than silently rewritten, since this register otherwise preserves what was measured
+> at the time (see the Part 6 preamble's own "Correction to earlier figures" convention). At the new
+> prior: deployed threshold **0.108184** (was 0.059776); implied FN:FP cost ratio **≈ 8.2 : 1**
+> (was ≈ 15.7 : 1, `(1 − 0.108184) / 0.108184 = 8.244`); PPV at deployment prevalence **38.9%** (was
+> 25.0%); NPV **95.4%** (was 97.5%). The open policy question itself is unchanged and still
+> unresolved — only the numbers it's being asked about moved. Current source of truth:
+> `evaluation_evidence/diabetes/` (regenerated 2026-09-21) and `docs/DIABETES_AUDIT_REPORT.md` §2.2/§3.3
+> (updated same day). D-2/D-3/D-8/W-04 themselves were **not** rewritten in this pass — flagged here,
+> not fully reworked, since they were outside the explicit scope of the 2026-09-21 prevalence change.
+
 **Part 5 counts:** FIXED 1 · MITIGATED 1 · OPEN 6 (1 decision-needed, 1 out of scope).
 These 8 rows are **not** included in the Counts table below, which describes Parts 1–4 as built on 2026-09-15.
 

@@ -1,0 +1,24 @@
+{
+  "n_test": 14139,
+  "raw_cutoffs": {
+    "high": 0.7,
+    "moderate": 0.4
+  },
+  "old": {
+    "prevalence_deploy": 0.14,
+    "high_cut_corrected": 0.275280898876,
+    "moderate_cut_corrected": 0.0979020979,
+    "high": 5226,
+    "moderate": 3266,
+    "low": 5647
+  },
+  "new": {
+    "prevalence_deploy": 0.237,
+    "high_cut_corrected": 0.420212729,
+    "moderate_cut_corrected": 0.17155277,
+    "high": 5226,
+    "moderate": 3266,
+    "low": 5647
+  },
+  "note": "Band assignment is identical for every one of the 14,139 test rows across both prevalence settings -- only the corrected cut-point VALUES shown to the clinician change, never which band a given patient falls in. This is a direct consequence of the Bayes prior-shift correction being a monotonic bijection applied consistently to both the probability and the cut-points (same property already holds for the decision threshold; see before_after.json decisions_changed_by_prevalence_correction=0)."
+}

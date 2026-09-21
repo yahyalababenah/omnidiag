@@ -14,9 +14,9 @@
   "threshold_new_raw_sensitivity_check_shipped_meta": 0.2808542713567839,
   "oof_min_cost": 17477.0,
   "prevalence_train": 0.5,
-  "prevalence_deploy": 0.14,
-  "threshold_old_corrected": 0.058157099697885205,
-  "threshold_new_corrected": 0.05977576639123845,
+  "prevalence_deploy": 0.237,
+  "threshold_old_corrected": 0.10540147165844588,
+  "threshold_new_corrected": 0.1081840356893228,
   "test_at_old": {
     "threshold_raw": 0.275,
     "tn": 3866,
