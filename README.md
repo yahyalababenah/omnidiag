@@ -27,7 +27,7 @@ pinned: false
 
 **OmniDiag** is a config-driven, multi-disease clinical decision support system built for healthcare professionals. It serves per-disease XGBoost and stacking ensemble models behind a unified FastAPI surface, with SHAP-based explainability, a DiCE-inspired counterfactual engine, a human-in-the-loop active learning pipeline, DeepSeek LLM clinical report generation, Prometheus/Grafana/Evidently monitoring, MLflow experiment tracking, and Kubernetes deployment with horizontal pod autoscaling.
 
-Coronary Artery Disease (CAD) and Diabetes Mellitus (DM) are currently registered. Adding a new disease requires a YAML config, Pydantic schema, feature engineer class, and model weights — no routing, middleware, or auth changes needed.
+Coronary Artery Disease (CAD) and Diabetes Mellitus (DM) are currently registered. Adding a disease within a registered model family requires a YAML config, a Pydantic schema, a feature engineer, and model weights — no routing, middleware, auth, or API changes. Adding a new model family requires one backend class implementing the ModelBackend interface, registered once. Tree-based families use TreeExplainer; other families use a slower generic SHAP explainer.
 
 ---
 
@@ -126,9 +126,9 @@ flowchart LR
 
 ### Config-Driven Disease Routing
 
-[`OmniDiagRouter`](backend/router.py) scans [`configs/`](configs/) at startup and auto-discovers all YAML configuration files. Each config specifies the model type (single XGBoost or stacking ensemble), weights path, feature engineering module, and preprocessor artifacts. The router lazy-loads a [`ModelLoader`](backend/model_loader.py) or [`EnsembleModelLoader`](backend/ensemble_loader.py) per disease on first request — no additional endpoints or routing code needed when registering a new disease.
+[`OmniDiagRouter`](backend/router.py) scans [`configs/`](configs/) at startup and auto-discovers all YAML configuration files. Each config names its model family in `model.family` (`sklearn_pipeline` for CAD, `stacking_ensemble` for DM), plus weights path, feature engineering module, and preprocessor artifacts. The router instantiates the [`ModelBackend`](backend/model_backends/base.py) registered for that family (the two built-in ones wrap [`ModelLoader`](backend/model_loader.py) and [`EnsembleModelLoader`](backend/ensemble_loader.py)); artifacts lazy-load on first request, and an unknown family fails at startup. See [docs/ADDING_A_MODEL_FAMILY.md](docs/ADDING_A_MODEL_FAMILY.md) for the steps, measured costs, and current limits.
 
-Each disease config declares the model architecture, weights paths with fallback resolution, SHAP explainer type (`tree` or `deep`), and schema back-reference via [`DISEASE_SCHEMA_REGISTRY`](backend/schemas.py). A Python module path for a disease-specific [`BaseFeatureEngineer`](features/base_features.py:17) subclass and a preprocessor directory (`label_encoders.pkl` + `standard_scaler.pkl`) still apply to diabetes; heart_disease's config carries neither — its Pipeline is self-contained (see [Explainable Inference Core](#explainable-inference-core)).
+Each disease config declares the model architecture, weights paths with fallback resolution, SHAP explainer type (`tree` or `deep`), and schema back-reference via [`DISEASE_SCHEMA_REGISTRY`](backend/schemas.py) (or a `schema: {module, class}` block in the YAML). A Python module path for a disease-specific [`BaseFeatureEngineer`](features/base_features.py:17) subclass and a preprocessor directory (`label_encoders.pkl` + `standard_scaler.pkl`) still apply to diabetes; heart_disease's config carries neither — its Pipeline is self-contained (see [Explainable Inference Core](#explainable-inference-core)).
 
 ### RBAC & Security Middleware
 
