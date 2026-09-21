@@ -712,14 +712,13 @@ async def batch_predict(
             failed += 1
 
     # Prediction: one vectorized model call for every validated row when the
-    # loader supports it (heart's ModelLoader.predict_batch -- see
-    # WEAKNESS_REGISTER.md HM-2; IterativeImputer inside the Pipeline is
-    # ~300x slower called once per row than once on the whole batch). Falls
-    # back to one predict() call per row for any loader without it
-    # (diabetes' EnsembleModelLoader) -- identical to this endpoint's
-    # behaviour before this change.
+    # model family declares a vectorised predict_batch (heart's
+    # sklearn_pipeline -- see WEAKNESS_REGISTER.md HM-2; IterativeImputer
+    # inside the Pipeline is ~300x slower called once per row than once on
+    # the whole batch). Otherwise one predict() call per row (diabetes'
+    # stacking_ensemble), so a failing row only fails itself.
     loader = router._get_loader(disease)
-    if hasattr(loader, "predict_batch") and validated_rows:
+    if loader.capabilities.supports_vectorized_batch and validated_rows:
         try:
             preds = loader.predict_batch([patient for _, patient in validated_rows])
             for (i, _), pred in zip(validated_rows, preds):

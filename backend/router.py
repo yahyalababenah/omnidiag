@@ -10,9 +10,10 @@ Key Design:
       file in configs/ and implement a feature engineer in features/.
     - Lazy model loading: models are loaded on first request, not at startup.
     - Consistent API: all diseases use the same predict() and explain() interface.
-    - Auto-detects ensemble configs: if config has 'model.ensemble' section,
-      uses EnsembleModelLoader instead of ModelLoader — zero changes to
-      existing heart disease module.
+    - Config-driven model families: `model.family` in the YAML names a
+      ModelBackend registered in backend/model_backends/ (e.g.
+      "sklearn_pipeline" for heart, "stacking_ensemble" for diabetes). An
+      unknown or missing family fails at startup, naming the registered ones.
 
 Usage:
     router = OmniDiagRouter()
@@ -22,10 +23,11 @@ Usage:
 
 import os
 import logging
+import importlib
 import yaml
 from typing import Dict, List, Optional, Any
 from fastapi import HTTPException
-from backend.model_loader import ModelLoader
+from backend.model_backends import ModelBackend, UnknownModelFamilyError, get_backend
 
 log = logging.getLogger("omnidiag.router")
 
@@ -39,7 +41,7 @@ class OmniDiagRouter:
     Attributes:
         configs_dir: Path to the directory containing YAML config files.
         disease_configs: Dict mapping disease_name -> parsed config dict.
-        model_loaders: Dict mapping disease_name -> ModelLoader | EnsembleModelLoader instance.
+        model_loaders: Dict mapping disease_name -> ModelBackend instance.
     """
     
     def __init__(self, configs_dir: str = "configs"):
@@ -52,7 +54,7 @@ class OmniDiagRouter:
         """
         self.configs_dir = configs_dir
         self.disease_configs: Dict[str, dict] = {}
-        self.model_loaders: Dict[str, object] = {}
+        self.model_loaders: Dict[str, ModelBackend] = {}
         self._load_all_configs()
     
     # ------------------------------------------------------------------
@@ -117,10 +119,7 @@ class OmniDiagRouter:
             # configures none — heart takes sklearn's argmax — and the UI
             # falls back to its own documented constant in that case.
             "inference_threshold": model_cfg.get("inference_threshold"),
-            "supports_counterfactuals": (
-                config.get("model", {}).get("ensemble") is not None
-                or config.get("model", {}).get("counterfactuals", False)
-            ),
+            "supports_counterfactuals": self._supports_counterfactuals(disease),
         }
     
     def predict(self, disease: str, patient_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -230,45 +229,61 @@ class OmniDiagRouter:
 
                     self.disease_configs[disease_name] = config
                     self.model_loaders[disease_name] = self._create_loader(config)
+                    self._register_schema(disease_name, config)
                     display = config.get("disease", {}).get("display_name", disease_name)
                     log.info("Registered disease: %s (%s)", display, disease_name)
 
                 except yaml.YAMLError as e:
                     log.error("Error parsing %s: %s", filename, e)
+                except UnknownModelFamilyError as e:
+                    # Fail fast: a disease whose family has no backend would
+                    # otherwise sit registered and 404 on every request.
+                    raise UnknownModelFamilyError(f"{filename}: {e}") from e
                 except Exception as e:
                     log.error("Error loading %s: %s", filename, e)
 
         if not self.disease_configs:
             log.warning("No disease configs loaded. The API will return 404 for all diseases.")
     
-    def _create_loader(self, config: dict) -> object:
+    def _create_loader(self, config: dict) -> ModelBackend:
         """
-        Create the appropriate loader for a disease config.
-        
-        Auto-detects ensemble vs single model based on config:
-          - If 'model.ensemble' key exists → EnsembleModelLoader
-          - Otherwise → standard ModelLoader
-        
+        Instantiate the ModelBackend registered for `model.family`.
+
         Args:
             config: Parsed YAML config dict.
-        
+
         Returns:
-            ModelLoader or EnsembleModelLoader instance.
+            A ModelBackend instance (artifacts load lazily, on first request).
+
+        Raises:
+            UnknownModelFamilyError: model.family is missing or unregistered.
         """
-        # Check if this disease uses an ensemble
-        ensemble_config = config.get("model", {}).get("ensemble")
-        if ensemble_config is not None:
-            from backend.ensemble_loader import EnsembleModelLoader
-            loader = EnsembleModelLoader(config)
-            log.info("Using EnsembleModelLoader (type=%s)", ensemble_config.get('type', 'unknown'))
-            return loader
-        
-        # Default: single model loader
-        return ModelLoader(config)
-    
-    def _get_loader(self, disease: str) -> object:
+        family = config.get("model", {}).get("family")
+        backend_cls = get_backend(family)
+        log.info("Using model family '%s' (%s)", family, backend_cls.__name__)
+        return backend_cls(config)
+
+    def _supports_counterfactuals(self, disease: str) -> bool:
+        loader = self.model_loaders.get(disease)
+        return bool(loader is not None and loader.capabilities.supports_counterfactuals)
+
+    def _register_schema(self, disease_name: str, config: dict) -> None:
         """
-        Get the loader (ModelLoader or EnsembleModelLoader) for a disease,
+        Register the disease's pydantic input schema when the YAML declares
+        one (`schema: {module: ..., class: ...}`). Diseases that declare none
+        keep whatever backend/schemas.py registers for them.
+        """
+        schema_cfg = config.get("schema")
+        if not schema_cfg:
+            return
+        from backend.schemas import register_schema
+
+        module = importlib.import_module(schema_cfg["module"])
+        register_schema(disease_name, getattr(module, schema_cfg["class"]))
+
+    def _get_loader(self, disease: str) -> ModelBackend:
+        """
+        Get the ModelBackend for a disease,
         raising HTTPException if not found.
         
         Args:
