@@ -553,6 +553,10 @@ class ModelLoader:
                 "Even with every modifiable factor improved, the estimated risk "
                 "remains above the threshold. The dominant factors are not "
                 "modifiable. Referral is recommended."
+                if best_achievable else
+                "No modifiable factor is available for this patient (none was "
+                "supplied, or each is already at its target). The estimated risk "
+                "remains above the threshold. Referral is recommended."
             ),
         }
 

@@ -366,6 +366,7 @@ class TestHeartMissingOptional:
         # No lever supplied -> nothing to move; never a guessed value.
         assert data["counterfactuals"] == []
         assert data["best_achievable"] is None
+        assert "No modifiable factor is available" in data["message"]
 
     @pytest.mark.parametrize("missing", ["RestingBP", "Cholesterol", "FastingBS"])
     async def test_a_missing_lever_is_skipped_not_guessed(self, live_client, missing):
