@@ -39,6 +39,15 @@
  * These numbers were measured locally, not on the Space; LightGBM output can
  * shift slightly between inference environments.
  *
+ * What-If update 2026-09-21 (fix/whatif-clinical-validity): HighBP, HighChol,
+ * Smoker, GenHlth, MentHlth, PhysHlth and DiffWalk are now IMMUTABLE in the
+ * What-If engine (BRFSS records them as history or outcomes, not levers). Only
+ * BMI (down, floor 18.5), PhysActivity/Fruits/Veggies (-> 1) and
+ * HvyAlcoholConsump (-> 0) may change. Case C therefore no longer crosses the
+ * threshold: /counterfactuals returns best_achievable (BMI 18.5 + activity +
+ * fruit + veg: 63.7% -> 42.3%) and the UI recommends referral. The notes
+ * below describe the earlier policy and are kept for history.
+ *
  * Case C note: HeartDiseaseorAttack and Stroke are deliberately 0 (Negative).
  * Both are IMMUTABLE_FEATURES in counterfactual_generator.py — the What-If
  * engine never proposes changing past medical history — so a patient whose
