@@ -17,8 +17,16 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useDisease } from '../context/DiseaseContext'
+import { API_BASE } from '../api'
 
-const BASE = '/api/v4'
+// Every other component that hand-rolls a fetch() (ClinicalNotesInput,
+// ReviewQueuePanel, AdminDashboard, AuthContext, ...) targets the absolute
+// API_BASE -- the backend and the frontend are not served from the same
+// origin. A bare relative '/api/v4/...' resolves against the frontend's own
+// origin instead, so the request never reaches the authenticated backend at
+// all; from the browser this looks exactly like "the request has no auth"
+// even though the Authorization header below is attached correctly.
+const BASE = `${API_BASE}/api/v4`
 
 function downloadCsv(rows, disease, threshold = null) {
   // The exported file outlives this session and gets opened in Excel with no
@@ -258,9 +266,30 @@ export default function BatchUpload() {
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || json?.detail || `HTTP ${res.status}`)
-      setData(json)
+
+      // Read as text first, not res.json() directly: a 401 with an empty
+      // body, a 500 that returns an HTML error page, or any other
+      // non-JSON response all make res.json() throw the same opaque
+      // "Unexpected end of JSON input" — indistinguishable from every
+      // other failure and useless for diagnosing what actually happened.
+      const text = await res.text()
+      let body = null
+      if (text) {
+        try { body = JSON.parse(text) } catch { /* not JSON; body stays null, handled below */ }
+      }
+
+      if (!res.ok) {
+        const serverMessage = body?.detail?.error || body?.detail || body?.error || null
+        throw new Error(
+          serverMessage
+            ? `${serverMessage} (HTTP ${res.status})`
+            : `Request failed — HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}`
+        )
+      }
+      if (!body) {
+        throw new Error(`Server returned an empty or invalid response (HTTP ${res.status})`)
+      }
+      setData(body)
     } catch (e) {
       setError(e.message)
     } finally {
