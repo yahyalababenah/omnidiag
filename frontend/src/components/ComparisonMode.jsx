@@ -10,6 +10,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
@@ -136,7 +137,7 @@ function ResultColumn({ label, result, loading, error, color, colorLight }) {
             ? <XCircle className="w-5 h-5 text-red-600" />
             : <CheckCircle2 className="w-5 h-5 text-green-600" />}
           <span className={`text-base font-bold ${isPositive ? 'text-red-700' : 'text-green-700'}`}>
-            {result.diagnosis ?? (isPositive ? 'Positive' : 'Negative')}
+            {isPositive ? SCREENING_ELEVATED : SCREENING_BELOW}
           </span>
         </div>
         <p className="text-xs text-gray-500">Risk Probability</p>
