@@ -419,6 +419,82 @@ class TestHeartNonRegression:
             assert by_row[row]["prediction"] == golden["prediction"]
             assert by_row[row]["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
 
+    @staticmethod
+    def _csv_row(patient, blank_key=None):
+        return ",".join("" if k == blank_key else str(v) for k, v in patient.items())
+
+    @pytest.mark.parametrize("missing_field", ["ST_Slope", "RestingBP"], ids=["ST_Slope", "RestingBP"])
+    async def test_batch_low_impact_missing_field_succeeds_without_warning(self, live_client, doctor_token, missing_field):
+        """
+        Regression guard for HM-5 (WEAKNESS_REGISTER.md). ST_Slope and
+        RestingBP are Optional on HeartDiseaseInput (the model's Pipeline
+        imputes them) but rank 10th/9th of 11 in
+        evaluation_evidence/heart/shap_importance.json -- low enough that a
+        missing value must not trigger data_completeness_warning, or the
+        warning stops meaning anything.
+        """
+        patient = dict(HEART_CASES["typical_up_slope"])
+        header = ",".join(patient.keys())
+        row = self._csv_row(patient, blank_key=missing_field)
+        csv_bytes = "\n".join([header, row]).encode("utf-8")
+
+        resp = await live_client.post(
+            "/api/v4/heart_disease/batch",
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["succeeded"] == 1, data
+        assert data["results"][0]["status"] == "ok"
+        assert data["results"][0].get("data_completeness_warning") is None
+
+    @pytest.mark.parametrize("missing_field", ["Oldpeak", "Cholesterol"], ids=["Oldpeak", "Cholesterol"])
+    async def test_batch_high_impact_missing_field_succeeds_with_warning(self, live_client, doctor_token, missing_field):
+        """
+        Regression guard for HM-5. Oldpeak (SHAP rank 2/11) and Cholesterol
+        (rank 5/11) are the two Optional fields that also sit in
+        ModelLoader._HIGH_IMPACT_FEATURES -- a missing value there must
+        still succeed (the whole point of HM-5), but with
+        data_completeness_warning naming the missing feature, visible in
+        the row the same as it would be to a clinician in the UI.
+        """
+        patient = dict(HEART_CASES["typical_up_slope"])
+        header = ",".join(patient.keys())
+        row = self._csv_row(patient, blank_key=missing_field)
+        csv_bytes = "\n".join([header, row]).encode("utf-8")
+
+        resp = await live_client.post(
+            "/api/v4/heart_disease/batch",
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["succeeded"] == 1, data
+        result = data["results"][0]
+        assert result["status"] == "ok"
+        assert result.get("data_completeness_warning") is not None
+        assert missing_field in result["data_completeness_warning"]
+
+    async def test_batch_complete_row_has_no_warning(self, live_client, doctor_token):
+        """HM-5: a fully complete row is unaffected -- no warning key at all,
+        exactly like every /batch response before this change."""
+        patient = dict(HEART_CASES["typical_up_slope"])
+        header = ",".join(patient.keys())
+        row = self._csv_row(patient)
+        csv_bytes = "\n".join([header, row]).encode("utf-8")
+
+        resp = await live_client.post(
+            "/api/v4/heart_disease/batch",
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["succeeded"] == 1, data
+        assert "data_completeness_warning" not in data["results"][0] or data["results"][0]["data_completeness_warning"] is None
+
     def test_threshold_is_read_from_the_model_file_not_a_constant(self, real_router):
         # bundle["threshold"] must be the number the .pkl actually carries,
         # and predict() must consult it at call time -- not a 0.5 argmax or

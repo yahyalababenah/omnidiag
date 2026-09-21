@@ -515,6 +515,21 @@ export default function ClinicalEmrMode() {
 
                 {result && !error && (
                   <div className="space-y-6">
+                    {/* Data completeness warning -- a high-impact input (see
+                        WEAKNESS_REGISTER.md HM-5) was missing and the model
+                        imputed it instead of using the patient's real value.
+                        Must be visible here, not just logged: the clinician
+                        reading this result is the one who needs to know. */}
+                    {result.data_completeness_warning && (
+                      <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-800">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+                        <div>
+                          <p className="font-medium">Incomplete clinical input</p>
+                          <p className="text-xs text-amber-700 mt-0.5">{result.data_completeness_warning}</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Diagnosis badge + risk probability */}
                     <div className="flex items-center justify-between p-4 rounded-lg border" style={{
                       backgroundColor: isPositive ? '#fef2f2' : '#f0fdf4',

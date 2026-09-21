@@ -24,6 +24,45 @@ log = logging.getLogger("omnidiag.model_loader")
 
 # Project root: resolve relative paths from the config
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Static, not computed from SHAP at runtime -- taken by hand from
+# evaluation_evidence/heart/shap_importance.json on 2026-09-21 (mean |SHAP|,
+# heart_full_tuned.pkl): ChestPainType 0.969, Oldpeak 0.551, ExerciseAngina
+# 0.524, Sex 0.407, Cholesterol 0.404 -- the next feature (Age, 0.366) is a
+# clear step down. Of these five, only Oldpeak and Cholesterol are actually
+# Optional on HeartDiseaseInput (backend/schemas.py); ChestPainType,
+# ExerciseAngina and Sex stay required, so a missing value there is a 422,
+# never a warning. RestingECG/RestingBP/Age were deliberately left off this
+# list even though some are Optional -- they rank near the bottom of the same
+# file and warning on them would dilute the signal for the features that
+# actually matter. If the model is ever retrained, re-check this list by
+# hand against the new shap_importance.json -- it will not update itself.
+_HIGH_IMPACT_FEATURES = ["ChestPainType", "Oldpeak", "ExerciseAngina", "Sex", "Cholesterol"]
+
+
+def _completeness_warning(patient_data: Dict[str, Any]) -> Optional[str]:
+    """
+    None unless a high-SHAP-importance feature is missing from patient_data.
+
+    A missing value here was accepted by validation (it's Optional on the
+    schema) and the Pipeline's imputer will fill it in — but that's a
+    statistical guess standing in for one of the model's most influential
+    inputs, not the patient's actual value, and a clinician reading the
+    prediction should know that. See WEAKNESS_REGISTER.md HM-5.
+    """
+    missing = [f for f in _HIGH_IMPACT_FEATURES if patient_data.get(f) is None]
+    if not missing:
+        return None
+    plural = len(missing) > 1
+    return (
+        f"High-impact feature{'s' if plural else ''} missing and imputed automatically: "
+        f"{', '.join(missing)}. This prediction relied on statistical imputation rather than "
+        f"the patient's actual value{'s' if plural else ''} for "
+        f"{'these inputs' if plural else 'this input'}, which rank"
+        f"{'' if plural else 's'} among the model's most influential — treat with extra caution."
+    )
+
+
 class ModelLoader:
     """
     Lazy loader for a single disease's model artifacts.
@@ -201,12 +240,16 @@ class ModelLoader:
         df = pd.DataFrame([patient_data])[features]
         proba = float(bundle["pipeline"].predict_proba(df)[0, 1])
         has_disease = proba >= threshold
-        return {
+        result = {
             "prediction": 1 if has_disease else 0,
             "confidence": proba,
             "diagnosis": "Positive" if has_disease else "Negative",
             "inference_threshold": threshold,
         }
+        warning = _completeness_warning(patient_data)
+        if warning:
+            result["data_completeness_warning"] = warning
+        return result
 
     def predict_batch(self, patients_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -251,15 +294,19 @@ class ModelLoader:
         df = pd.DataFrame(patients_data)[features]
         probas = bundle["pipeline"].predict_proba(df)[:, 1]
         results = []
-        for proba in probas:
+        for patient_data, proba in zip(patients_data, probas):
             proba = float(proba)
             has_disease = proba >= threshold
-            results.append({
+            row_result = {
                 "prediction": 1 if has_disease else 0,
                 "confidence": proba,
                 "diagnosis": "Positive" if has_disease else "Negative",
                 "inference_threshold": threshold,
-            })
+            }
+            warning = _completeness_warning(patient_data)
+            if warning:
+                row_result["data_completeness_warning"] = warning
+            results.append(row_result)
         return results
 
     def explain(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:

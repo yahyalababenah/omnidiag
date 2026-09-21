@@ -42,23 +42,36 @@ class HeartDiseaseInput(BaseModel):
     ST_Slope) accept both raw strings (e.g., 'M', 'ATA', 'Normal') and
     pre-encoded integers. The ModelLoader applies label encoding internally.
     """
+    # Required: no legitimate way to triage a patient without these, and
+    # ChestPainType/ExerciseAngina rank #1/#3 in the shipped model's SHAP
+    # importance (evaluation_evidence/heart/shap_importance.json) -- missing
+    # values for those are rejected outright, not silently imputed.
     Age: int = Field(..., description="Age in years", ge=20, le=100)
     Sex: Literal['M', 'F'] = Field(..., description="Sex: 'M' or 'F' (or encoded 0/1)")
     ChestPainType: Literal['TA', 'ATA', 'NAP', 'ASY'] = Field(..., description="Chest pain type: 'TA', 'ATA', 'NAP', or 'ASY' (or encoded 0-3)")
-    RestingBP: int = Field(..., description="Resting blood pressure (mm Hg)", ge=80, le=220)
-    Cholesterol: int = Field(..., description="Serum cholesterol (mg/dl)", ge=100, le=600)
-    FastingBS: int = Field(..., description="Fasting blood sugar > 120 mg/dl (1=True, 0=False)", ge=0, le=1)
     RestingECG: Literal['Normal', 'ST', 'LVH'] = Field(..., description="Resting ECG: 'Normal', 'ST', or 'LVH' (or encoded 0-2)")
-    MaxHR: int = Field(..., description="Maximum heart rate achieved", ge=60, le=220)
     ExerciseAngina: Literal['Y', 'N'] = Field(..., description="Exercise-induced angina: 'Y' or 'N' (or encoded 0/1)")
+
+    # Optional: the shipped Pipeline's ColumnTransformer imputes every one of
+    # these (IterativeImputer for the numeric four, SimpleImputer
+    # most-frequent for ST_Slope) -- it was built to accept incomplete raw
+    # UCI-site data (e.g. Hungarian rows are commonly missing several of
+    # these), so pydantic requiring them outright rejected real, usable
+    # patient records before they ever reached the model. See
+    # WEAKNESS_REGISTER.md HM-5. A missing value among these that also ranks
+    # high in SHAP importance (Oldpeak, Cholesterol) surfaces as
+    # data_completeness_warning in the prediction response instead of being
+    # silently imputed — see ModelLoader._completeness_warning().
+    RestingBP: Optional[int] = Field(None, description="Resting blood pressure (mm Hg)", ge=80, le=220)
+    Cholesterol: Optional[int] = Field(None, description="Serum cholesterol (mg/dl)", ge=100, le=600)
+    FastingBS: Optional[int] = Field(None, description="Fasting blood sugar > 120 mg/dl (1=True, 0=False)", ge=0, le=1)
+    MaxHR: Optional[int] = Field(None, description="Maximum heart rate achieved", ge=60, le=220)
     # Bounds verified against the real training data (data/heart_disease/processed/
     # uci_heart_by_site.csv, 920 rows, 4 UCI sites): observed range is -2.6 to 6.2.
     # ge/le with a margin above/below that range also rejects inf and nan outright
-    # (any comparison against nan is False in Python, so nan fails both bounds) --
-    # this was the only numeric field on this schema with no bounds at all; Age,
-    # RestingBP, Cholesterol, FastingBS and MaxHR were already constrained.
-    Oldpeak: float = Field(..., description="ST depression induced by exercise relative to rest", ge=-3.0, le=10.0)
-    ST_Slope: Literal['Up', 'Flat', 'Down'] = Field(..., description="ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)")
+    # (any comparison against nan is False in Python, so nan fails both bounds).
+    Oldpeak: Optional[float] = Field(None, description="ST depression induced by exercise relative to rest", ge=-3.0, le=10.0)
+    ST_Slope: Optional[Literal['Up', 'Flat', 'Down']] = Field(None, description="ST slope: 'Up', 'Flat', or 'Down' (or encoded 0-2)")
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -234,6 +247,15 @@ class PredictResponse(BaseModel):
         None, description="Std of base-model probabilities (training-prior scale)", ge=0.0
     )
     model_agreement: Optional[str] = Field(None, description="'high' | 'moderate' | 'low'")
+    data_completeness_warning: Optional[str] = Field(
+        None,
+        description=(
+            "Present only when a high-SHAP-importance input feature was missing and the "
+            "model imputed it automatically instead of using the patient's actual value. "
+            "Names the missing feature(s); the prediction should be treated with extra "
+            "caution. See WEAKNESS_REGISTER.md HM-5."
+        ),
+    )
 
 
 class ExplainResponse(BaseModel):

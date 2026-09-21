@@ -36,7 +36,8 @@ function downloadCsv(rows, disease, threshold = null) {
   // an error.
   const headers = [
     'row', 'status', 'prediction',
-    'risk_probability_corrected', 'decision_threshold', 'diagnosis', 'error',
+    'risk_probability_corrected', 'decision_threshold', 'diagnosis',
+    'data_completeness_warning', 'error',
   ]
   const lines = [headers.join(',')]
   for (const r of rows) {
@@ -47,6 +48,7 @@ function downloadCsv(rows, disease, threshold = null) {
       r.confidence != null ? (r.confidence * 100).toFixed(1) + '%' : '',
       threshold != null ? (threshold * 100).toFixed(2) + '%' : '',
       r.diagnosis ?? '',
+      r.data_completeness_warning ? `"${r.data_completeness_warning.replace(/"/g, '""')}"` : '',
       r.error ? `"${r.error.replace(/"/g, '""')}"` : '',
     ].join(','))
   }
@@ -141,14 +143,14 @@ function ResultsTable({ results, threshold = null }) {
                 threshold != null
                   ? `Risk Probability (threshold ${(threshold * 100).toFixed(1)}%)`
                   : 'Risk Probability',
-                'Diagnosis', 'Error'].map(h => (
+                'Diagnosis', 'Data Quality', 'Error'].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-gray-500 font-medium uppercase tracking-wide text-[10px]">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-clinical-border">
             {visible.slice(0, 200).map(r => (
-              <tr key={r.row} className={`${r.status === 'error' ? 'bg-red-50' : 'hover:bg-slate-50'} transition-colors`}>
+              <tr key={r.row} className={`${r.status === 'error' ? 'bg-red-50' : r.data_completeness_warning ? 'bg-amber-50' : 'hover:bg-slate-50'} transition-colors`}>
                 <td className="px-4 py-2 text-gray-500 font-mono">{r.row}</td>
                 <td className="px-4 py-2">
                   {r.status === 'ok'
@@ -166,6 +168,17 @@ function ResultsTable({ results, threshold = null }) {
                   {r.confidence != null ? `${Math.round(r.confidence * 100)}%` : '—'}
                 </td>
                 <td className="px-4 py-2 text-gray-700">{r.diagnosis ?? '—'}</td>
+                <td className="px-4 py-2">
+                  {r.data_completeness_warning ? (
+                    <span
+                      className="flex items-center gap-1 text-amber-700 max-w-[220px]"
+                      title={r.data_completeness_warning}
+                    >
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">Incomplete input — imputed</span>
+                    </span>
+                  ) : '—'}
+                </td>
                 <td className="px-4 py-2 text-red-600 max-w-[200px] truncate" title={r.error ?? ''}>
                   {r.error ?? '—'}
                 </td>
@@ -173,7 +186,7 @@ function ResultsTable({ results, threshold = null }) {
             ))}
             {visible.length > 200 && (
               <tr>
-                <td colSpan={6} className="px-4 py-3 text-center text-xs text-gray-400">
+                <td colSpan={7} className="px-4 py-3 text-center text-xs text-gray-400">
                   Showing first 200 of {visible.length} rows. Download CSV for full results.
                 </td>
               </tr>

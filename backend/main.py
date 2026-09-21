@@ -629,6 +629,7 @@ class BatchRowResult(BaseModel):
     confidence: float | None = None
     diagnosis: str | None = None
     error: str | None = None
+    data_completeness_warning: str | None = None
 
 
 class BatchResponse(BaseModel):
@@ -687,7 +688,13 @@ async def batch_predict(
         coerced: Dict[str, Any] = {}
         for k, v in raw_row.items():
             if v is None or v == "":
-                coerced[k] = v
+                # An empty CSV cell must become None, not "" -- Optional
+                # fields (HeartDiseaseInput.Oldpeak etc., see HM-5) only
+                # default correctly for an absent key or an explicit None;
+                # pydantic still rejects "" as an invalid int/Literal, which
+                # would silently undo the whole point of making them
+                # Optional for real, incomplete UCI-site data.
+                coerced[k] = None
                 continue
             try:
                 # Try int first, then float
@@ -722,6 +729,7 @@ async def batch_predict(
                     prediction=pred.get("prediction"),
                     confidence=pred.get("confidence"),
                     diagnosis=pred.get("diagnosis"),
+                    data_completeness_warning=pred.get("data_completeness_warning"),
                 ))
                 succeeded += 1
         except Exception as exc:
@@ -741,6 +749,7 @@ async def batch_predict(
                     prediction=pred.get("prediction"),
                     confidence=pred.get("confidence"),
                     diagnosis=pred.get("diagnosis"),
+                    data_completeness_warning=pred.get("data_completeness_warning"),
                 ))
                 succeeded += 1
             except Exception as exc:
