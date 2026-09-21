@@ -392,10 +392,27 @@ class ModelLoader:
         """
         Generate What-If counterfactual scenarios for heart disease.
 
-        Uses random perturbation of mutable clinical features to find the
-        minimal changes that flip the prediction from Positive to Negative.
+        Random perturbation of the MODIFIABLE features only, each in its one
+        clinically allowed direction (HEART_POLICY below), looking for the
+        smallest changes that move the prediction from Positive to Negative.
+        Every other feature — Age, Sex, ChestPainType, RestingECG,
+        ExerciseAngina, Oldpeak, ST_Slope, MaxHR — is immutable. A lever the
+        patient did not supply (None; the Optional schema fields) is skipped,
+        never guessed. When no allowed change crosses the threshold, the
+        response still reports `best_achievable`: every allowed lever
+        improved at once, with `crosses_threshold: false`.
         """
         import random
+        from backend.counterfactual_generator import all_improvements, policy_violations
+
+        # Mutability policy — the only way each feature may change:
+        #   ("decrease", floor) may only go down, never below floor
+        #   ("to", value)       may only move to value
+        HEART_POLICY = {
+            "RestingBP":   ("decrease", 110),
+            "Cholesterol": ("decrease", 150),
+            "FastingBS":   ("to", 0),
+        }
 
         baseline_result = self.predict(patient_data)
         baseline_pred = baseline_result["prediction"]
@@ -409,51 +426,70 @@ class ModelLoader:
                 "message": "Patient is already at low risk. No counterfactuals needed.",
             }
 
-        # Heart disease mutable features and their perturbation ranges
-        MUTABLE = {
-            "RestingBP":   (90,  180,  False),   # (min, max, is_binary)
-            "Cholesterol": (100, 400,  False),
-            "MaxHR":       (60,  200,  False),
-            "Oldpeak":     (0.0, 6.2,  False),
-            "FastingBS":   (0,   1,    True),
-            "ExerciseAngina": (None, None, True),  # Y/N toggle
-        }
+        # Levers this patient actually has room to move, in a fixed order.
+        levers = []
+        for feat, (kind, bound) in HEART_POLICY.items():
+            value = patient_data.get(feat)
+            if value is None:
+                continue
+            if kind == "decrease" and float(value) > bound:
+                levers.append(feat)
+            elif kind == "to" and float(value) != float(bound):
+                levers.append(feat)
+
+        def _changed(cf: Dict[str, Any]) -> List[str]:
+            # Every feature that differs — not just policy features — so a
+            # candidate that touched an immutable feature is caught by
+            # policy_violations() instead of being scored with a hidden change.
+            return [f for f in cf if cf.get(f) != patient_data.get(f)]
+
+        def _scenario_changes(cf: Dict[str, Any]) -> List[Dict[str, Any]]:
+            return [
+                {
+                    "feature": feat,
+                    "original_value": patient_data.get(feat),
+                    "counterfactual_value": cf[feat],
+                    "direction": (
+                        "decrease"
+                        if isinstance(cf[feat], (int, float)) and isinstance(patient_data.get(feat), (int, float))
+                        and cf[feat] < patient_data[feat]
+                        else "increase"
+                    ),
+                }
+                for feat in _changed(cf)
+            ]
 
         rng = random.Random(42)
         candidates = []
-
-        for _ in range(800):
-            cf = dict(patient_data)
-            changed: List[str] = []
-
-            for feat, (lo, hi, is_binary) in MUTABLE.items():
-                if feat not in cf:
-                    continue
-                if rng.random() < 0.4:
-                    original = cf[feat]
-                    if feat == "ExerciseAngina":
-                        cf[feat] = "N" if str(original).upper() == "Y" else "Y"
-                    elif is_binary:
-                        cf[feat] = 1 - int(original)
-                    else:
-                        cf[feat] = round(rng.uniform(lo, hi), 1)
-                    if cf[feat] != original:
-                        changed.append(feat)
-
-            if not changed:
+        seen = set()
+        trials = [None] * 800 + ["all"]   # always also try every lever at once
+        for trial in trials:
+            if trial == "all":
+                cf = all_improvements(patient_data, HEART_POLICY)
+            else:
+                cf = dict(patient_data)
+                for feat in levers:
+                    if rng.random() < 0.4:
+                        kind, bound = HEART_POLICY[feat]
+                        if kind == "decrease":
+                            cf[feat] = int(round(rng.uniform(bound, float(patient_data[feat]))))
+                        else:
+                            cf[feat] = bound
+            changed = _changed(cf)
+            key = tuple(sorted((f, str(cf[f])) for f in changed))
+            if not changed or key in seen:
                 continue
-
-            try:
-                result = self.predict(cf)
-                if result["prediction"] == 0:
-                    candidates.append({
-                        "features": cf,
-                        "changed": changed,
-                        "probability": result["confidence"],
-                        "distance": len(changed),
-                    })
-            except Exception:
+            seen.add(key)
+            if policy_violations(patient_data, {f: cf[f] for f in changed}, HEART_POLICY):
                 continue
+            result = self.predict(cf)
+            if result["prediction"] == 0:
+                candidates.append({
+                    "features": cf,
+                    "changed": changed,
+                    "probability": result["confidence"],
+                    "distance": len(changed),
+                })
 
         # Sort by fewest changes, then by lowest probability
         candidates.sort(key=lambda c: (c["distance"], c["probability"]))
@@ -471,29 +507,53 @@ class ModelLoader:
 
         counterfactuals = []
         for c in selected:
-            scenario_changes = []
-            for feat in c["changed"]:
-                original_val = patient_data.get(feat)
-                new_val = c["features"].get(feat)
-                scenario_changes.append({
-                    "feature": feat,
-                    "original_value": original_val,
-                    "counterfactual_value": new_val,
-                    "direction": "decrease" if (
-                        isinstance(new_val, (int, float)) and isinstance(original_val, (int, float))
-                        and new_val < original_val
-                    ) else "increase",
-                })
+            changes = _scenario_changes(c["features"])
+            # Final filter (defence in depth): never emit a policy violation.
+            if policy_violations(
+                patient_data,
+                {ch["feature"]: ch["counterfactual_value"] for ch in changes},
+                HEART_POLICY,
+            ):
+                continue
             counterfactuals.append({
                 "scenario_id": len(counterfactuals) + 1,
                 "probability": c["probability"],
-                "changes": scenario_changes,
+                "changes": changes,
+                "crosses_threshold": True,
             })
 
+        best_achievable = None
+        if not counterfactuals and levers:
+            improved = all_improvements(patient_data, HEART_POLICY)
+            after = self.predict(improved)["confidence"]
+            changes = _scenario_changes(improved)
+            if not policy_violations(
+                patient_data,
+                {ch["feature"]: ch["counterfactual_value"] for ch in changes},
+                HEART_POLICY,
+            ):
+                best_achievable = {
+                    "scenario_id": 1,
+                    "probability": after,
+                    "changes": changes,
+                    "risk_reduction_relative_pct": round(
+                        max(0.0, (baseline_prob - after) / max(baseline_prob, 0.001) * 100), 2
+                    ),
+                    "risk_reduction_absolute_pp": round(max(0.0, (baseline_prob - after) * 100), 2),
+                    "crosses_threshold": bool(after < float(self.model["threshold"])),
+                }
+
         return {
-            "status": "success",
+            "status": "success" if counterfactuals else "no_valid_counterfactuals",
             "counterfactuals": counterfactuals,
+            "crosses_threshold": bool(counterfactuals),
+            "best_achievable": best_achievable,
             "baseline_probability": baseline_prob,
+            "message": None if counterfactuals else (
+                "Even with every modifiable factor improved, the estimated risk "
+                "remains above the threshold. The dominant factors are not "
+                "modifiable. Referral is recommended."
+            ),
         }
 
     # ------------------------------------------------------------------
