@@ -254,7 +254,7 @@ def diff(a, b, path="$", out=None):
     return out
 
 
-def normalise(doc):
+def normalise(doc, strict=False):
     """
     What the comparison is allowed to see.
 
@@ -267,7 +267,10 @@ def normalise(doc):
     - request_id: a fresh uuid4 per error response.
     """
     doc = json.loads(json.dumps(doc))
-    for disease in doc.get("cases", {}):
+    # --strict keeps the full counterfactual content: only meaningful when
+    # both captures ran with the same PYTHONHASHSEED (set iteration order in
+    # the generator depends on it).
+    for disease in ([] if strict else doc.get("cases", {})):
         for cf in doc[disease]["counterfactuals"].values():
             cf.pop("body", None)
 
@@ -299,7 +302,8 @@ if __name__ == "__main__":
             a = json.load(f)
         with open(sys.argv[3]) as f:
             b = json.load(f)
-        a, b = normalise(a), normalise(b)
+        strict = "--strict" in sys.argv
+        a, b = normalise(a, strict), normalise(b, strict)
         problems = diff(a, b)
         print(f"compared {count_leaves(a)} leaf values (float tol {TOL})")
         if problems:
