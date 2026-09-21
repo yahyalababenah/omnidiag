@@ -1,0 +1,14 @@
+{
+  "model": "heart_reduced_tuned.pkl (Optuna-tuned, 7 shared features, threshold 0.4237)",
+  "roc_auc": 76.34,
+  "ci95": null,
+  "sensitivity": 55.09,
+  "specificity": 81.61,
+  "fn": 97,
+  "fp": 16,
+  "n": 303,
+  "compared_to_untuned_reduced_auc": 72.17,
+  "delta": 4.17,
+  "full_model_note": "heart_full_tuned.pkl (11 features, deployed threshold 0.3695) cannot be evaluated on the Tehran/Z-Alizadeh Sani cohort directly -- 4 of its 11 features (MaxHR, Oldpeak, ST_Slope, ExerciseAngina) are UNAVAILABLE in that dataset, documented in evaluation_evidence/heart/external_validation.json's feature-mapping table. This figure is the best available external-validation approximation for the tuned model family, measured on the 7-feature reduced variant that Tehran's data can actually populate -- not a direct measurement of the 11-feature model that is actually shipped to production.",
+  "note": "Supersedes the external_validation.json figure from omnidiag_heart_kaggle, which used heart_reduced.pkl (pre-tuning). Both the old and new figures are for the reduced (7-feature) model -- the model family evaluable on Tehran -- not the full 11-feature model."
+}

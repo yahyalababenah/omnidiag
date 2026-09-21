@@ -1133,7 +1133,7 @@ Every finding was produced by reading the file or executing the code. Two scope 
 | بيانات القلب | `final_ready_data.csv`، 605 صف، Cleveland فقط | UCI 4 مواقع مدموجة، 920 مريضاً (Cleveland 303 + Hungarian 294 + Switzerland 123 + Long Beach VA 200) |
 | عتبة القلب | لا توجد في الكود — argmax 0.5 فعلياً | **0.3695**، مكتوبة في `configs/heart_disease.yaml` ومطبَّقة فعلياً |
 | LOSO ROC-AUC (القلب) | غير مقاس بهذا الشكل | **81.30%** (nested، تقدير أمين) |
-| تحقق طهران الخارجي (القلب) | 72.17% (على checkpoint قبل الضبط) | **72.17% — لم يُعَد قياسه بعد على النموذج المضبوط `heart_full_tuned.pkl`** — قيد صريح، سجّل `WEAKNESS_REGISTER.md` HM-6 |
+| تحقق طهران الخارجي (القلب) | 72.17% (نموذج مخفَّض غير مضبوط، على checkpoint قبل الضبط) | **76.34%** (النموذج المخفَّض بعد الضبط — 7 ميزات مشتركة، عتبة 0.4237) — أفضل تقريب مُتاح؛ النموذج الكامل المنشور فعلياً (11 ميزة، عتبة 0.3695) لا يمكن تقييمه على طهران مباشرة لغياب 4 من ميزاته فيها. التفاصيل في `WEAKNESS_REGISTER.md` HM-6 (**RESOLVED**) |
 | معالجة القلب المسبقة | `label_encoders.pkl` + `standard_scaler.pkl` منفصلان، fit على كامل البيانات قبل التقسيم (C-8) | لا ملفات معالجة منفصلة إطلاقاً — الـPipeline يتضمّن `IterativeImputer`/`StandardScaler`/`OrdinalEncoder` داخلياً |
 | انتشار السكري المنشور | 0.14 (افتراض أمريكي/BRFSS مؤقت) | **0.237** (انتشار السكري الفعلي في الأردن) |
 | عتبة السكري المصحَّحة | 0.059776 | **0.108184** |

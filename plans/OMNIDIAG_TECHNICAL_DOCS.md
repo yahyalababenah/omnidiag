@@ -407,8 +407,8 @@ This protocol is documented in [`plans/adding_new_disease_guide.md`](plans/addin
 |---|---|
 | Leave-one-site-out ROC-AUC (nested, honest estimate) | 81.30% |
 | Pooled cross-validation ROC-AUC (contaminated — sites mixed across folds, optimistic) | 88.86% |
-| External validation, Tehran (Z-Alizadeh Sani) cohort ROC-AUC | 72.17% ⚠️ measured on the pre-tuning model checkpoint, not yet re-run against the shipped `heart_full_tuned.pkl` — see `WEAKNESS_REGISTER.md` HM-6 |
-| Deployed decision threshold | 0.3695 |
+| External validation, Tehran (Z-Alizadeh Sani) cohort ROC-AUC | **76.34%** (reduced model, 7 shared features, tuned, threshold 0.4237) — up from 72.17% pre-tuning. ⚠️ Tehran's data lacks 4 of the deployed 11-feature model's fields, so this is the best available approximation, not a direct measurement of the shipped `heart_full_tuned.pkl` (threshold 0.3695) — see `WEAKNESS_REGISTER.md` HM-6 |
+| Deployed decision threshold | 0.3695 (11-feature model actually shipped) |
 
 **Threshold selection rationale:** The threshold is selected by minimizing a clinical cost function `Cost = 2.0×FN + 1.0×FP` (false negatives weighted twice false positives) on out-of-fold predictions from training data — not on the test/validation split. This produced 0.3695, well below sklearn's default `argmax` cut-point of 0.5, reflecting the higher cost of a missed diagnosis in a screening context.
 
@@ -963,7 +963,7 @@ The [`medicalDictionary.js`](frontend/src/utils/medicalDictionary.js) front-end 
 | ROC-AUC | 81.30% (nested leave-one-site-out, honest estimate); 88.86% pooled CV (contaminated — sites mixed across folds, optimistic) | 83.05% |
 | Sensitivity | 91.7% (LOSO, at the chosen cost-rule threshold) | 91.31% |
 | Specificity | 48.2% (LOSO, at the chosen cost-rule threshold) | 55.42% |
-| External validation | 72.17% ROC-AUC, Tehran (Z-Alizadeh Sani) cohort ⚠️ pre-tuning checkpoint, not yet re-run on the shipped model — see `WEAKNESS_REGISTER.md` HM-6 | — (no second cohort; see `WEAKNESS_REGISTER.md` D-5) |
+| External validation | **76.34%** ROC-AUC, Tehran (Z-Alizadeh Sani) cohort, reduced model (7 shared features, tuned, threshold 0.4237) — up from 72.17% pre-tuning. ⚠️ Approximation, not a direct measurement of the shipped 11-feature model (threshold 0.3695) — Tehran's data lacks 4 of its fields; see `WEAKNESS_REGISTER.md` HM-6 | — (no second cohort; see `WEAKNESS_REGISTER.md` D-5) |
 | Inference Threshold | 0.3695 | 0.108184 (deployed prevalence-corrected); 0.280854 raw |
 | Base Features | 11 (`ca`/`thal` excluded — invasive, absent from production) | 21 |
 | Engineered Features | 0 — imputation/scaling/encoding happen inside the shipped Pipeline, no derived features | 5 |
