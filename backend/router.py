@@ -11,9 +11,9 @@ Key Design:
     - Lazy model loading: models are loaded on first request, not at startup.
     - Consistent API: all diseases use the same predict() and explain() interface.
     - Config-driven model families: `model.family` in the YAML names a
-      ModelBackend registered in backend/model_backends/ (e.g.
-      "sklearn_pipeline" for heart, "stacking_ensemble" for diabetes). An
-      unknown or missing family fails at startup, naming the registered ones.
+      ModelBackend registered in backend/model_backends/. The router never
+      names a family itself. An unknown or missing family fails at startup,
+      naming the registered ones.
 
 Usage:
     router = OmniDiagRouter()
