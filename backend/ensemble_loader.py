@@ -521,17 +521,23 @@ class EnsembleModelLoader:
             patient_data=patient_data,
             desired_class=0,  # Flip Positive → Negative
         )
-        
+
+        # No allowed change crosses the threshold: still report what every
+        # allowed improvement together would do, flagged as not crossing.
+        best_achievable = None if counterfactuals else generator.best_achievable(patient_data)
+
         return {
             "counterfactuals": counterfactuals,
             "status": "generated" if counterfactuals else "no_valid_counterfactuals",
+            "crosses_threshold": bool(counterfactuals),
+            "best_achievable": best_achievable,
             "baseline_probability": baseline_proba_corrected,
             "baseline_probability_corrected": baseline_proba_corrected,
             "probability_scale": "corrected",
             "message": None if counterfactuals else (
-                "Could not find valid counterfactuals for this patient. "
-                "The patient may need more significant lifestyle or medical changes "
-                "than typical recommendations can provide."
+                "Even with every modifiable factor improved, the estimated risk "
+                "remains above the threshold. The dominant factors are not "
+                "modifiable. Referral is recommended."
             ),
         }
     
