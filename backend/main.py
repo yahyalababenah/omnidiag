@@ -679,6 +679,9 @@ async def batch_predict(
     succeeded = 0
     failed = 0
 
+    # Validation is always per-row: a malformed row must never affect any
+    # other row's result, whichever prediction path runs below.
+    validated_rows: List[tuple] = []  # (original CSV row number, validated patient dict)
     for i, raw_row in enumerate(rows, start=1):
         # Convert numeric strings to appropriate types
         coerced: Dict[str, Any] = {}
@@ -696,19 +699,55 @@ async def batch_predict(
                 coerced[k] = v
 
         try:
-            validated = _validate_patient_input(disease, coerced)
-            pred = router.predict(disease, validated)
-            results.append(BatchRowResult(
-                row=i,
-                status="ok",
-                prediction=pred.get("prediction"),
-                confidence=pred.get("confidence"),
-                diagnosis=pred.get("diagnosis"),
-            ))
-            succeeded += 1
+            validated_rows.append((i, _validate_patient_input(disease, coerced)))
         except Exception as exc:
             results.append(BatchRowResult(row=i, status="error", error=str(exc)))
             failed += 1
+
+    # Prediction: one vectorized model call for every validated row when the
+    # loader supports it (heart's ModelLoader.predict_batch -- see
+    # WEAKNESS_REGISTER.md HM-2; IterativeImputer inside the Pipeline is
+    # ~300x slower called once per row than once on the whole batch). Falls
+    # back to one predict() call per row for any loader without it
+    # (diabetes' EnsembleModelLoader) -- identical to this endpoint's
+    # behaviour before this change.
+    loader = router._get_loader(disease)
+    if hasattr(loader, "predict_batch") and validated_rows:
+        try:
+            preds = loader.predict_batch([patient for _, patient in validated_rows])
+            for (i, _), pred in zip(validated_rows, preds):
+                results.append(BatchRowResult(
+                    row=i,
+                    status="ok",
+                    prediction=pred.get("prediction"),
+                    confidence=pred.get("confidence"),
+                    diagnosis=pred.get("diagnosis"),
+                ))
+                succeeded += 1
+        except Exception as exc:
+            # The vectorized call failed for the whole validated group --
+            # report it per row, same as each row individually raising
+            # would have been reported in the per-row path below.
+            for i, _ in validated_rows:
+                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
+                failed += 1
+    else:
+        for i, validated in validated_rows:
+            try:
+                pred = router.predict(disease, validated)
+                results.append(BatchRowResult(
+                    row=i,
+                    status="ok",
+                    prediction=pred.get("prediction"),
+                    confidence=pred.get("confidence"),
+                    diagnosis=pred.get("diagnosis"),
+                ))
+                succeeded += 1
+            except Exception as exc:
+                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
+                failed += 1
+
+    results.sort(key=lambda r: r.row)
 
     # Record Prometheus batch metrics
     try:

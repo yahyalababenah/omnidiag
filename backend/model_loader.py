@@ -208,6 +208,53 @@ class ModelLoader:
             "inference_threshold": threshold,
         }
 
+    def predict_batch(self, patients_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Vectorized prediction for multiple patients in one Pipeline call.
+
+        Same math as calling predict() once per patient -- verified to
+        return identical probabilities (float equality) -- but the
+        Pipeline's ColumnTransformer (IterativeImputer + StandardScaler +
+        OrdinalEncoder) and XGBClassifier each run once on the whole batch
+        instead of once per single-row DataFrame. IterativeImputer is the
+        dominant cost of a single predict() call regardless of whether
+        that row has any missing values, so calling it 303 times on one
+        row each is far slower than calling it once on 303 rows (measured
+        ~300x on the real batch endpoint's traffic shape; see
+        WEAKNESS_REGISTER.md HM-2). Used by /batch (backend/main.py) when
+        the loader supports it; predict() is unchanged and still used by
+        /predict.
+
+        Args:
+            patients_data: List of feature_name -> value dicts, one per
+                patient. Raises the same way predict() would if any patient
+                is missing a required feature -- there is no per-patient
+                isolation inside this call; the caller decides how to
+                handle a whole-batch failure.
+
+        Returns:
+            List of result dicts (same shape as predict()'s return value),
+            in the same order as patients_data.
+        """
+        if not patients_data:
+            return []
+        bundle = self.model
+        features = bundle["features"]
+        threshold = float(bundle["threshold"])
+        df = pd.DataFrame(patients_data)[features]
+        probas = bundle["pipeline"].predict_proba(df)[:, 1]
+        results = []
+        for proba in probas:
+            proba = float(proba)
+            has_disease = proba >= threshold
+            results.append({
+                "prediction": 1 if has_disease else 0,
+                "confidence": proba,
+                "diagnosis": "Positive" if has_disease else "Negative",
+                "inference_threshold": threshold,
+            })
+        return results
+
     def explain(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Run SHAP explanation on a single patient's data.
