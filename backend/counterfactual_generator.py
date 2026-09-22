@@ -176,6 +176,63 @@ def all_improvements(
     return improved
 
 
+def lowest_achievable(
+    patient_data: Dict[str, Any],
+    policy: Dict[str, Tuple[str, float]],
+    score_fn: Callable[[Dict[str, Any]], float],
+    baseline: float,
+) -> Optional[Tuple[Dict[str, Any], float]]:
+    """
+    The allowed combination of levers with the LOWEST estimate, or None when
+    no allowed change lowers it below `baseline`.
+
+    "Every lever at once" is not necessarily the lowest: a lever can raise
+    the model's estimate (PhysActivity does in the diabetes model), and
+    reporting that combination as "best achievable" showed an estimate above
+    the baseline. Candidates, all pushed to their favourable values:
+      - each lever alone,
+      - every lever together,
+      - only the levers that lowered the estimate on their own.
+    That is n + 2 model calls, not 2**n.
+    """
+    full = all_improvements(patient_data, policy)
+    levers = [f for f in sorted(policy) if full.get(f) != patient_data.get(f)]
+    if not levers:
+        return None
+
+    scored: List[Tuple[float, Dict[str, Any]]] = []
+    helpful = []
+    for feat in levers:
+        cand = dict(patient_data)
+        cand[feat] = full[feat]
+        p = float(score_fn(cand))
+        scored.append((p, cand))
+        if p < baseline:
+            helpful.append(feat)
+    scored.append((float(score_fn(full)), full))
+    if len(helpful) > 1 and len(helpful) < len(levers):
+        cand = dict(patient_data)
+        for feat in helpful:
+            cand[feat] = full[feat]
+        scored.append((float(score_fn(cand)), cand))
+
+    # Lowest estimate first; on a tie, fewer changes.
+    best_p, best = min(
+        scored,
+        key=lambda t: (t[0], sum(t[1].get(f) != patient_data.get(f) for f in policy)),
+    )
+    if not best_p < baseline:
+        return None
+    return best, best_p
+
+
+NO_IMPROVEMENT_MESSAGE = (
+    "No change to the modifiable factors lowers the estimated risk for this "
+    "patient. The estimated risk remains above the threshold. Referral is "
+    "recommended."
+)
+
+
 class CounterfactualGenerator:
     """
     DiCE-inspired counterfactual generator using random sampling + diversity selection.
@@ -353,19 +410,24 @@ class CounterfactualGenerator:
 
     def best_achievable(self, patient_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        What the model estimates with EVERY allowed lever improved at once,
-        whether or not that crosses the threshold. None when the patient has
-        no lever left to move. Same fields as a generate() scenario, with
-        `crosses_threshold` saying whether it gets below the threshold.
+        The lowest estimate reachable with the allowed levers (see
+        lowest_achievable), whether or not it crosses the threshold. None
+        when the patient has no lever left to move OR no allowed change
+        lowers the estimate — it is never above the baseline. Same fields as
+        a generate() scenario, with `crosses_threshold` saying whether it
+        gets below the threshold.
         """
-        improved = all_improvements(patient_data, DIABETES_POLICY)
+        score = lambda row: self._get_proba_corrected(self.pipeline_fn(pd.DataFrame([row])))
+        baseline = score(patient_data)
+        found = lowest_achievable(patient_data, DIABETES_POLICY, score, baseline)
+        if found is None:
+            return None
+        improved, after = found
         changes = self._compute_changes(patient_data, improved)
         if not changes or policy_violations(patient_data, changes, DIABETES_POLICY):
             return None
-        baseline = self._get_proba_corrected(self.pipeline_fn(pd.DataFrame([patient_data])))
-        after = self._get_proba_corrected(self.pipeline_fn(pd.DataFrame([improved])))
-        relative_pct = max(0.0, (baseline - after) / max(baseline, 0.001) * 100)
-        absolute_pp = max(0.0, (baseline - after) * 100)
+        relative_pct = (baseline - after) / max(baseline, 0.001) * 100
+        absolute_pp = (baseline - after) * 100
         return {
             "scenario": self._build_scenario(changes),
             "changes": changes,
