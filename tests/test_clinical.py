@@ -62,8 +62,24 @@ class TestPredict:
         )
         assert resp.headers.get("cache-hit") in ("true", "false")
 
-    async def test_predict_with_patient_id_skips_cache(self, client, doctor_token, seeded_db):
-        # Create a patient first
+    async def test_predict_with_patient_id_uses_the_cache_and_still_records(
+        self, client, doctor_token, seeded_db
+    ):
+        """
+        A patient-linked prediction is cached like any other.
+
+        This used to assert the opposite -- the cache was bypassed whenever
+        patient_id was given, "for accurate audit". That was a workaround for
+        X-7: a cache hit returned before the predictions row was written, so
+        the only way to be sure a linked screening was recorded was to never
+        serve one from cache. Now the recording happens on hits too, so the
+        bypass is unnecessary, and paying 9-14 s per EMR screening to keep it
+        would be the wrong trade at a booth.
+        """
+        from sqlalchemy import func, select
+        from backend.db_models.prediction import Prediction
+        from tests.conftest import TestSessionLocal
+
         create_resp = await client.post(
             "/api/v4/patients/",
             json={
@@ -77,14 +93,33 @@ class TestPredict:
         )
         patient_id = create_resp.json()["id"]
 
-        resp = await client.post(
-            f"/api/v4/heart_disease/predict?patient_id={patient_id}",
-            json=HEART_PAYLOAD,
-            headers={"Authorization": f"Bearer {doctor_token}"},
+        async def linked_rows():
+            async with TestSessionLocal() as session:
+                return (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(Prediction)
+                        .where(Prediction.patient_id == patient_id)
+                    )
+                ).scalar_one()
+
+        url = f"/api/v4/heart_disease/predict?patient_id={patient_id}"
+        first = await client.post(
+            url, json=HEART_PAYLOAD, headers={"Authorization": f"Bearer {doctor_token}"}
         )
-        assert resp.status_code == 200
-        # Cache is always bypassed when patient_id is provided
-        assert resp.headers.get("cache-hit") == "false"
+        after_first = await linked_rows()
+        second = await client.post(
+            url, json=HEART_PAYLOAD, headers={"Authorization": f"Bearer {doctor_token}"}
+        )
+        after_second = await linked_rows()
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first.json() == second.json()
+        # Both screenings are on the patient's record, whether or not the
+        # model was re-run for them.
+        assert after_first == 1
+        assert after_second == 2
 
 
 class TestExplain:

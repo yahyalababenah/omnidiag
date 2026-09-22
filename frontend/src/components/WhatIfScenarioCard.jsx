@@ -1,5 +1,9 @@
 import { Zap, Lightbulb, TrendingDown, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 import { normaliseScenario } from '../utils/counterfactuals';
+import {
+  SUBTITLE, NO_CROSSING_MESSAGE, NO_IMPROVEMENT_MESSAGE, NO_LEVERS_MESSAGE,
+  LOW_RISK_HEADLINE, LOW_RISK_MESSAGE,
+} from '../utils/whatIfSummary';
 import MedicalTooltip from './MedicalTooltip';
 
 /**
@@ -18,15 +22,6 @@ import MedicalTooltip from './MedicalTooltip';
  * placeholder or illustrative data: when the backend has no answer the card
  * says so instead of inventing one.
  */
-const SUBTITLE =
-  "Scenarios show how the model's estimate responds to modifiable factors. " +
-  'They are not a predicted treatment effect.';
-const NO_CROSSING_MESSAGE =
-  'Even with every modifiable factor improved, the estimated risk remains above the threshold. ' +
-  'The dominant factors are not modifiable. Referral is recommended.';
-const NO_IMPROVEMENT_MESSAGE =
-  'No change to the modifiable factors lowers the estimated risk for this patient. ' +
-  'Referral is recommended.';
 
 function Header({ icon: Icon, iconClass }) {
   return (
@@ -155,10 +150,7 @@ export default function WhatIfScenarioCard({
                 </p>
               </div>
             ) : !best && !message ? (
-              <p className="text-xs text-gray-600 mt-2">
-                No modifiable factor is available to change for this patient (none of the
-                modifiable inputs was supplied, or each is already at its target).
-              </p>
+              <p className="text-xs text-gray-600 mt-2">{NO_LEVERS_MESSAGE}</p>
             ) : null}
           </div>
         </div>
@@ -183,13 +175,8 @@ export default function WhatIfScenarioCard({
             <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
               <CheckCircle2 className="w-6 h-6 text-green-600" />
             </div>
-            <p className="text-sm font-medium text-green-800 mb-1">
-              Low Clinical Risk
-            </p>
-            <p className="text-sm text-green-700 leading-relaxed max-w-md">
-              Patient is currently at low clinical risk. No counterfactual
-              interventions are necessary.
-            </p>
+            <p className="text-sm font-medium text-green-800 mb-1">{LOW_RISK_HEADLINE}</p>
+            <p className="text-sm text-green-700 leading-relaxed max-w-md">{LOW_RISK_MESSAGE}</p>
           </div>
         </div>
       </div>

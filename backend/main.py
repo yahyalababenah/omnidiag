@@ -434,26 +434,29 @@ async def predict_disease(
         result = None
         cache_hit = False
 
-        # Cache read is skipped when linking to a specific patient, for
-        # accurate audit.
-        if not patient_id:
-            cached = await cache_get(cache_key)
-            # A payload written by an older release can still be live for up
-            # to the predict TTL after a deploy. Serving it would hand back a
-            # raw-scale probability under a corrected-scale contract, so the
-            # scale is checked rather than assumed; a mismatch is a miss.
-            if cached is not None and not cached_payload_matches_scale(
-                cached, router.disease_configs.get(disease)
-            ):
-                log.warning(
-                    "predict: discarding cached payload for disease=%s — "
-                    "probability scale does not match the current contract",
-                    disease,
-                )
-                cached = None
-            if cached is not None:
-                result = cached
-                cache_hit = True
+        # The cache is consulted whether or not a patient is linked. It used
+        # to be skipped for patient-linked calls "for accurate audit", which
+        # was really a workaround for the X-7 bug above: a cache hit skipped
+        # the record. Now that every served prediction is recorded, a hit is
+        # audited exactly like a miss, so the EMR can link its screenings to
+        # a patient without paying 9-14 s for each one.
+        cached = await cache_get(cache_key)
+        # A payload written by an older release can still be live for up to
+        # the predict TTL after a deploy. Serving it would hand back a
+        # raw-scale probability under a corrected-scale contract, so the
+        # scale is checked rather than assumed; a mismatch is a miss.
+        if cached is not None and not cached_payload_matches_scale(
+            cached, router.disease_configs.get(disease)
+        ):
+            log.warning(
+                "predict: discarding cached payload for disease=%s — "
+                "probability scale does not match the current contract",
+                disease,
+            )
+            cached = None
+        if cached is not None:
+            result = cached
+            cache_hit = True
 
         if result is None:
             # Off the event loop: router.predict() is synchronous CPU work
@@ -463,8 +466,7 @@ async def predict_disease(
             # on a 150-row diabetes batch (X-3). run_in_threadpool hands it to
             # the anyio worker pool; the returned value is byte-identical.
             result = await run_in_threadpool(router.predict, disease, patient_data)
-            if not patient_id:
-                await cache_set(cache_key, result, ttl=PREDICT_TTL_SECONDS)
+            await cache_set(cache_key, result, ttl=PREDICT_TTL_SECONDS)
 
         response.headers["Cache-Hit"] = "true" if cache_hit else "false"
 

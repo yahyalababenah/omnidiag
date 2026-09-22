@@ -16,14 +16,15 @@ Design decisions:
     - status tracks the lifecycle: "pending" → "reviewed" | "skipped".
     - reviewer_id is nullable until a reviewer picks up the case.
     - label stores the expert's annotation (0 or 1) separately from the
-      model's original prediction.
+      model's original prediction; notes stores the reviewer's reasoning for
+      it, which is recorded and shown back but never fed to a model.
     - uncertainty_scale / decision_threshold record how uncertainty_score was
       computed, so scores from different releases are never averaged blindly.
 """
 
 import uuid
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -59,6 +60,13 @@ class ReviewQueue(Base):
         nullable=True,
     )
     label = Column(Integer, nullable=True)  # 0 or 1 (expert annotation)
+    # Why the reviewer chose that label. The annotate endpoint has always
+    # accepted a `notes` field and silently dropped it for want of a column,
+    # which threw away the most informative part of an annotation: a bare 0/1
+    # says what the expert decided, the note says what they saw. Never a
+    # model input — retrain.get_annotated_samples reads `label` and the
+    # prediction's own input_features, not this.
+    notes = Column(Text, nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String(20), nullable=False, default="pending")  # pending | reviewed | skipped
     created_at = Column(

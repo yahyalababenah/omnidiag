@@ -61,6 +61,8 @@ class PredictionOut(BaseModel):
     probability_scale: Optional[str] = None
     diagnosis: Optional[str]
     input_features: Dict[str, Any]
+    # The clinician's free-text note for this screening, if one was saved.
+    notes: Optional[str] = None
     shap_chart_data: Optional[Any]
     created_at: datetime
 

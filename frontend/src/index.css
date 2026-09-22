@@ -141,6 +141,23 @@
     display: none !important;
   }
 
+  /* ...except a button that is only a button for layout reasons.
+     The patient's NAME sits inside the patient-select dropdown trigger, so
+     blanket `button { display: none }` printed a clinical report with no
+     patient on it -- the one field a printed report cannot omit. Anything
+     marked data-print-keep is shown as plain text, with its own interactive
+     chrome (chevrons, hover affordances) hidden separately. */
+  button[data-print-keep],
+  [data-print-keep] {
+    display: block !important;
+    pointer-events: none;
+  }
+
+  [data-print-keep] [data-no-print],
+  [data-print-keep] svg {
+    display: none !important;
+  }
+
   body {
     background: white;
     color: black;

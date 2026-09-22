@@ -17,6 +17,8 @@ Design decisions:
       past prediction.
     - shap_chart_data is stored as nullable JSON since /explain is an
       optional separate call after /predict.
+    - notes holds the clinician's own free text for this screening. It is
+      recorded, shown back and exported; it is never an input to anything.
     - probability_scale says which scale `confidence` is on. Diabetes rows
       written before the prevalence correction hold a raw-prior probability
       in the same column as rows written after it hold a corrected one; the
@@ -28,7 +30,7 @@ Design decisions:
 
 import uuid
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import relationship
 
@@ -56,6 +58,12 @@ class Prediction(Base):
     # existed, scale unknown".
     probability_scale = Column(String(16), nullable=True)
     diagnosis = Column(String(100), nullable=True)  # "Positive" / "Negative"
+    # Free text the clinician wrote about this screening. Stored verbatim and
+    # used for nothing else: it never reaches a model, a feature vector, the
+    # retraining set or the LLM report. It exists so the note the doctor made
+    # at the time travels with the record into History and the PDF, which is
+    # where the previous build lost it entirely.
+    notes = Column(Text, nullable=True)
     shap_chart_data = Column(JSON, nullable=True)
     created_by = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(

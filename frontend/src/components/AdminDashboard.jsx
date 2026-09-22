@@ -313,6 +313,10 @@ function AnnotationQueueTable({ token }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [annotating, setAnnotating] = useState({}) // { [itemId]: 0|1|'skip' }
+  // The reviewer's reasoning, per row. The endpoint has always accepted a
+  // `notes` field; until now nothing sent one and nothing stored it, so the
+  // most informative part of an annotation was lost (11).
+  const [notes, setNotes] = useState({})           // { [itemId]: string }
 
   const load = useCallback(async (p = 1) => {
     setLoading(true)
@@ -337,11 +341,13 @@ function AnnotationQueueTable({ token }) {
     setAnnotating(a => ({ ...a, [itemId]: label }))
     try {
       const isSkip = label === 'skip'
+      const note = (notes[itemId] ?? '').trim()
       await fetch(`${API_V4}/review/${itemId}/${isSkip ? 'skip' : 'annotate'}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        ...(isSkip ? {} : { body: JSON.stringify({ label }) }),
+        ...(isSkip ? {} : { body: JSON.stringify({ label, notes: note || null }) }),
       })
+      setNotes(n => { const next = { ...n }; delete next[itemId]; return next })
       load(page)
     } catch {
       // silently retry on next refresh
@@ -383,6 +389,7 @@ function AnnotationQueueTable({ token }) {
                   <th className="py-2 px-2 text-gray-500 font-medium">Risk Probability</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Entropy</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Queued</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">Note</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -430,6 +437,17 @@ function AnnotationQueueTable({ token }) {
                       <td className="py-2 px-2 font-mono">{(item.entropy ?? item.uncertainty_score) != null ? (item.entropy ?? item.uncertainty_score).toFixed(3) : '—'}</td>
                       <td className="py-2 px-2 text-gray-400">
                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="py-2 px-2">
+                        {/* Optional. Saved with the label, not instead of it. */}
+                        <input
+                          type="text"
+                          value={notes[item.id] ?? ''}
+                          onChange={(e) => setNotes(n => ({ ...n, [item.id]: e.target.value }))}
+                          disabled={busy}
+                          placeholder="Why this label? (optional)"
+                          className="w-44 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-300 disabled:opacity-50"
+                        />
                       </td>
                       <td className="py-2 px-2">
                         <div className="flex items-center gap-1">

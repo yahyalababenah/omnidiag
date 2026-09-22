@@ -143,6 +143,16 @@ function PredictionCard({ prediction, index }) {
                 )}
               </div>
 
+              {/* The clinician's own note for this screening (7). Stored on
+                  the prediction record; this is one of the two places it has
+                  to surface, the other being the exported PDF. */}
+              {prediction.notes && (
+                <div className="mt-4 border-t border-clinical-border pt-3">
+                  <p className="text-xs font-medium text-gray-700 mb-1">Clinical Note</p>
+                  <p className="text-xs text-gray-800 whitespace-pre-wrap">{prediction.notes}</p>
+                </div>
+              )}
+
               {prediction.shap_chart_data && (
                 <div className="mt-4">
                   <p className="text-xs font-medium text-gray-700 mb-2">Top SHAP Features</p>
