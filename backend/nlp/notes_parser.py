@@ -25,116 +25,168 @@ log = logging.getLogger("omnidiag.nlp")
 # ---------------------------------------------------------------------------
 # Regex patterns for the rule-based fallback
 # ---------------------------------------------------------------------------
+#
+# Numeric patterns capture the value in group 1. Condition patterns mark the
+# condition word itself with the named group `k`; negation is judged from
+# the text between the start of the clause and `k` (see _negated). A negated
+# condition is extracted as an explicit 0 — "non-smoker" is information, not
+# an absence of it. Before negation handling, "No stroke, no heart disease,
+# non-smoker" was extracted as stroke = heart disease = smoker = 1.
 
-_PATTERNS: Dict[str, list] = {
+_NUMERIC: Dict[str, list] = {
     "age": [
         r"\b(\d{1,3})[- ]?(?:year[s]?[- ]?old|y/?o|yr[s]?)\b",
         r"\bage[:\s]+(\d{1,3})\b",
-        # "45 male" / "45-year-old female" / "Patient: 45, female"
         r"\b(\d{2,3})\s*[-,]?\s*(?:year[s]?[-\s]?old\s+)?(?:male|female|man|woman)\b",
     ],
-    "sex_male": [r"\b(male|man|he|his|gentleman|boy)\b"],
-    "sex_female": [r"\b(female|woman|she|her|lady|girl)\b"],
     "bp_systolic": [
-        r"(?:bp|blood pressure)[:\s]*(\d{2,3})\s*/\s*\d{2,3}",
-        r"(?:systolic|sbp)[:\s]*(\d{2,3})",
-        # Standalone: "BP 140" or "BP: 140" without diastolic
-        r"(?:bp|blood pressure)[:\s]+(\d{2,3})\b",
+        r"\b(?:bp|blood pressure)[:\s]*(\d{2,3})\s*/\s*\d{2,3}",
+        r"\b(?:systolic|sbp)[:\s]*(\d{2,3})",
+        r"\b(?:bp|blood pressure)[:\s]+(\d{2,3})\b",
     ],
     "bp_diastolic": [
-        r"(?:bp|blood pressure)[:\s]*\d{2,3}\s*/\s*(\d{2,3})",
-        r"(?:diastolic|dbp)[:\s]*(\d{2,3})",
+        r"\b(?:bp|blood pressure)[:\s]*\d{2,3}\s*/\s*(\d{2,3})",
+        r"\b(?:diastolic|dbp)[:\s]*(\d{2,3})",
     ],
+    # Total cholesterol only: "LDL 160" is not the Cholesterol field.
     "cholesterol": [
-        r"(?:cholesterol|ldl|hdl|total chol)[:\s]*(\d{2,3})\s*(?:mg/dl|mg)?",
+        r"\b(?:total\s+cholesterol|total\s+chol|cholesterol)\b(?:\s+checked[^:\d]*)?[:\s]*(\d{2,3})",
     ],
-    "glucose": [
-        r"(?:glucose|blood sugar|fbs|rbs|bgr)[:\s]*(\d{2,3})\s*(?:mg/dl|mg)?",
+    "fasting_glucose": [
+        r"\b(?:fasting\s+(?:blood\s+)?(?:sugar|glucose)|fbs|fpg)[:\s]*(\d{2,3})",
     ],
     "bmi": [
-        r"(?:bmi|body mass index)[:\s]*(\d{1,2}(?:\.\d)?)",
+        r"\b(?:bmi|body mass index)[:\s]*(\d{1,2}(?:\.\d)?)",
     ],
-    "heart_rate": [
-        r"(?:hr|heart rate|pulse)[:\s]*(\d{2,3})\s*(?:bpm)?",
-    ],
-    "creatinine": [
-        r"(?:creatinine|cr|scr)[:\s]*(\d+(?:\.\d+)?)\s*(?:mg/dl|mg)?",
-    ],
-    "hemoglobin": [
-        r"(?:hemoglobin|hgb|hb)[:\s]*(\d+(?:\.\d+)?)\s*(?:g/dl|gms?)?",
-    ],
-    "smoking": [
-        r"\b(smok(?:er|ing|ed)|smoker|cigarette|tobacco)\b",
-    ],
-    "hypertension": [
-        r"\b(hypertension|htn|high blood pressure)\b",
-    ],
-    "diabetes": [
-        r"\b(diabetes|diabetic|dm|t2dm|t1dm)\b",
-    ],
-    "heart_disease_history": [
-        r"\b(heart disease|cad|coronary artery disease|mi|myocardial infarction|chd)\b",
-    ],
-    "stroke_history": [
-        r"\b(stroke|cva|tia|cerebrovascular)\b",
-    ],
-    "chest_pain": [
-        r"\b(chest pain|angina|ata|typical angina|atypical angina)\b",
-    ],
-    "exercise_angina": [
-        r"\b(exercise.?induced angina|angina on exertion|exertional angina)\b",
+    # Maximum heart rate only. A resting "HR 72" or "pulse 88" is not MaxHR.
+    "max_heart_rate": [
+        r"\b(?:max(?:imum|imal)?|peak)\s+(?:heart\s+rate|hr)\s*(?:achieved|reached)?[:\s]*(?:of\s+)?(\d{2,3})",
+        r"\b(?:heart\s+rate|hr)\s+max(?:imum)?[:\s]*(\d{2,3})",
     ],
     "oldpeak": [
-        r"(?:st depression|oldpeak|st.?segment)[:\s]*(\d+(?:\.\d+)?)",
+        r"\b(?:st\s+depression|oldpeak)[:\s]*(?:of\s+)?(\d+(?:\.\d+)?)",
     ],
-    "marriage": [r"\b(married|spouse|husband|wife)\b"],
-    "edema": [r"\b(edema|oedema|swelling|pedal edema)\b"],
-    "appetite": [r"\b(poor appetite|anorexia|not eating|reduced appetite)\b"],
-    "anemia": [r"\b(anemia|anaemia|low haemoglobin|iron deficiency)\b"],
 }
+
+_CONDITIONS: Dict[str, list] = {
+    "smoking": [
+        r"\b(?P<k>smok(?:er|ing|es|ed)?|cigarettes?|tobacco)\b",
+    ],
+    "hypertension": [
+        r"\b(?P<k>hypertension|htn|high\s+blood\s+pressure)\b",
+    ],
+    "diabetes": [
+        r"\b(?P<k>diabetes|diabetic|t2dm|t1dm|dm)\b",
+    ],
+    "heart_disease_history": [
+        r"\b(?P<k>heart\s+disease|cad|coronary\s+artery\s+disease|mi|myocardial\s+infarction|chd|heart\s+attack)\b",
+    ],
+    "stroke_history": [
+        r"\b(?P<k>stroke|cva|tia|cerebrovascular)\b",
+    ],
+    "exercise_angina": [
+        r"\b(?P<k>exercise.?induced\s+angina|angina\s+on\s+exertion|exertional\s+angina)\b",
+        r"\b(?:exercise|treadmill|stress|tolerance)\b[^.;]*?\b(?P<k>angina)\b",
+    ],
+}
+
+# Chest pain type, most specific first ("atypical angina" contains "typical angina").
+_CHEST_PAIN = [
+    ("ATA", r"\batypical\s+(?:chest\s+pain|angina)\b"),
+    ("NAP", r"\bnon[-\s]?anginal\s+(?:chest\s+)?pain\b"),
+    ("TA", r"(?<!a)\btypical\s+angina\b|\btypical\s+chest\s+pain\b"),
+    ("ASY", r"\b(?:denies|denied|no)\s+(?:any\s+)?chest\s+pain\b|\basymptomatic\b"),
+]
+
+_RESTING_ECG = [
+    ("LVH", r"\blvh\b|left\s+ventricular\s+hypertrophy"),
+    ("ST", r"\bst[-\s]?t\s+(?:wave\s+)?(?:abnormalit\w*|changes)"),
+    ("Normal", r"\bnormal\s+(?:resting\s+)?(?:ecg|ekg)\b|\b(?:ecg|ekg)[:\s]+normal\b"),
+]
+
+_NEGATION_CUES = re.compile(
+    r"\b(?:no|not|denies|denied|deny|without|negative\s+for|never|free\s+of|absence\s+of|absent)\b",
+    re.IGNORECASE,
+)
+
+
+def _negated(text: str, start: int) -> bool:
+    """
+    True when the term starting at `start` is negated: it is prefixed by
+    "non-"/"non " (non-smoker), or a negation cue appears earlier in the
+    same clause (clauses end at . ; , : newline or " but ").
+    """
+    if re.search(r"\bnon[-\s]?$", text[max(0, start - 4):start], re.IGNORECASE):
+        return True
+    clause_start = max(
+        text.rfind(ch, 0, start) for ch in (".", ";", ",", ":", "\n")
+    ) + 1
+    but = text.lower().rfind(" but ", clause_start, start)
+    if but >= 0:
+        clause_start = but + 5
+    return bool(_NEGATION_CUES.search(text[clause_start:start]))
+
+
+def _condition(text: str, patterns: list) -> Optional[int]:
+    """1 if any affirmed mention, 0 if every mention is negated, None if absent."""
+    seen = False
+    for pat in patterns:
+        for m in re.finditer(pat, text, re.IGNORECASE):
+            seen = True
+            start = m.start("k") if "k" in m.re.groupindex else m.start()
+            if not _negated(text, start):
+                return 1
+    return 0 if seen else None
 
 
 def _regex_extract(text: str) -> Dict[str, Any]:
     text_lower = text.lower()
     extracted: Dict[str, Any] = {}
 
-    def first_match(patterns):
+    for key, patterns in _NUMERIC.items():
         for pat in patterns:
             m = re.search(pat, text_lower, re.IGNORECASE)
             if m:
-                return m
-        return None
+                try:
+                    extracted[key] = float(m.group(1))
+                    break
+                except (IndexError, ValueError):
+                    pass
 
-    # Numeric extractions
-    for key in ("age", "bp_systolic", "bp_diastolic", "cholesterol", "glucose",
-                "bmi", "heart_rate", "creatinine", "hemoglobin", "oldpeak"):
-        m = first_match(_PATTERNS[key])
-        if m:
-            try:
-                extracted[key] = float(m.group(1))
-            except (IndexError, ValueError):
-                pass
-
-    # Boolean / categorical extractions
-    if first_match(_PATTERNS["sex_male"]):
-        extracted["sex"] = "Male"
-    elif first_match(_PATTERNS["sex_female"]):
+    # Sex: explicit words first; pronouns only when no explicit word exists.
+    if re.search(r"\b(?:female|woman|lady|girl|mrs|ms)\b", text_lower):
         extracted["sex"] = "Female"
+    elif re.search(r"\b(?:male|man|gentleman|boy|mr)\b", text_lower):
+        extracted["sex"] = "Male"
+    elif re.search(r"\b(?:she|her)\b", text_lower):
+        extracted["sex"] = "Female"
+    elif re.search(r"\b(?:he|his|him)\b", text_lower):
+        extracted["sex"] = "Male"
 
-    extracted["hypertension"] = 1 if first_match(_PATTERNS["hypertension"]) else None
-    extracted["diabetes_flag"] = 1 if first_match(_PATTERNS["diabetes"]) else None
-    extracted["heart_disease_flag"] = 1 if first_match(_PATTERNS["heart_disease_history"]) else None
-    extracted["stroke_flag"] = 1 if first_match(_PATTERNS["stroke_history"]) else None
-    extracted["smoking_flag"] = 1 if first_match(_PATTERNS["smoking"]) else None
-    extracted["chest_pain_flag"] = 1 if first_match(_PATTERNS["chest_pain"]) else None
-    extracted["exercise_angina"] = "Y" if first_match(_PATTERNS["exercise_angina"]) else None
-    extracted["ever_married"] = "Yes" if first_match(_PATTERNS["marriage"]) else None
-    extracted["edema_flag"] = 1 if first_match(_PATTERNS["edema"]) else None
-    extracted["poor_appetite"] = 1 if first_match(_PATTERNS["appetite"]) else None
-    extracted["anemia_flag"] = 1 if first_match(_PATTERNS["anemia"]) else None
+    flags = {
+        "hypertension": "hypertension",
+        "diabetes": "diabetes_flag",
+        "heart_disease_history": "heart_disease_flag",
+        "stroke_history": "stroke_flag",
+        "smoking": "smoking_flag",
+        "exercise_angina": "exercise_angina",
+    }
+    for cond, key in flags.items():
+        value = _condition(text_lower, _CONDITIONS[cond])
+        if value is not None:
+            extracted[key] = value
 
-    # Remove None values
-    return {k: v for k, v in extracted.items() if v is not None}
+    for code, pat in _CHEST_PAIN:
+        if re.search(pat, text_lower, re.IGNORECASE):
+            extracted["chest_pain_type"] = code
+            break
+
+    for code, pat in _RESTING_ECG:
+        if re.search(pat, text_lower, re.IGNORECASE):
+            extracted["resting_ecg"] = code
+            break
+
+    return extracted
 
 
 # ---------------------------------------------------------------------------
@@ -208,28 +260,39 @@ def _bert_extract(text: str) -> Dict[str, Any]:
 # Maps generic extracted keys → schema field names for each disease
 # ---------------------------------------------------------------------------
 
+def _brfss_age_bucket(age: float) -> int:
+    """BRFSS _AGEG5YR: 1 = 18-24, 2 = 25-29, ... 12 = 75-79, 13 = 80+."""
+    age = int(age)
+    if age < 25:
+        return 1
+    return min(13, (age - 25) // 5 + 2)
+
+
 _HEART_DISEASE_MAP = {
     "age":             ("Age",            lambda v: int(v)),
     "sex":             ("Sex",            lambda v: "M" if str(v).lower().startswith("m") else "F"),
     "bp_systolic":     ("RestingBP",      lambda v: int(v)),
     "cholesterol":     ("Cholesterol",    lambda v: int(v)),
-    "heart_rate":      ("MaxHR",          lambda v: int(v)),
+    "max_heart_rate":  ("MaxHR",          lambda v: int(v)),
     "oldpeak":         ("Oldpeak",        lambda v: float(v)),
-    "hypertension":    ("FastingBS",      lambda v: 1),
-    "chest_pain_flag": ("ChestPainType",  lambda v: "ASY"),
-    "exercise_angina": ("ExerciseAngina", lambda v: "Y"),
+    "fasting_glucose": ("FastingBS",      lambda v: 1 if float(v) > 120 else 0),
+    "chest_pain_type": ("ChestPainType",  lambda v: v),
+    "resting_ecg":     ("RestingECG",     lambda v: v),
+    "exercise_angina": ("ExerciseAngina", lambda v: "Y" if int(v) else "N"),
 }
 
+# Order matters: a later key overwrites an earlier one mapped to the same
+# field, so a stated hypertension history wins over a single BP reading.
 _DIABETES_MAP = {
-    "age":                   ("Age",                 lambda v: max(1, min(13, round(int(v) / 7)))),
+    "age":                   ("Age",                 _brfss_age_bucket),
     "bmi":                   ("BMI",                 lambda v: float(v)),
     "bp_systolic":           ("HighBP",              lambda v: 1 if int(v) >= 130 else 0),
     "cholesterol":           ("HighChol",            lambda v: 1 if int(v) >= 200 else 0),
     "sex":                   ("Sex",                 lambda v: 1 if str(v).lower().startswith("m") else 0),
-    "hypertension":          ("HighBP",              lambda v: 1),
-    "heart_disease_flag":    ("HeartDiseaseorAttack",lambda v: 1),
-    "stroke_flag":           ("Stroke",              lambda v: 1),
-    "smoking_flag":          ("Smoker",              lambda v: 1),
+    "hypertension":          ("HighBP",              lambda v: int(v)),
+    "heart_disease_flag":    ("HeartDiseaseorAttack",lambda v: int(v)),
+    "stroke_flag":           ("Stroke",              lambda v: int(v)),
+    "smoking_flag":          ("Smoker",              lambda v: int(v)),
 }
 
 
@@ -244,6 +307,21 @@ def map_to_disease_schema(extracted: Dict[str, Any], disease: str) -> Dict[str, 
             except Exception:
                 pass
     return result
+
+
+def bert_status() -> Dict[str, Any]:
+    """
+    Whether the BERT NER path can run in this environment, WITHOUT loading
+    the model: `transformers` and a backend (`torch`) must both import. The
+    model itself is downloaded on first use.
+    """
+    import importlib.util
+    missing = [m for m in ("transformers", "torch") if importlib.util.find_spec(m) is None]
+    return {
+        "available": not missing,
+        "model": _NER_MODEL,
+        "reason": None if not missing else f"not installed: {', '.join(missing)}",
+    }
 
 
 def parse_clinical_note(note: str, use_bert: bool = True) -> Dict[str, Any]:
