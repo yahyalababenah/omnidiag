@@ -64,7 +64,7 @@ export function DiseaseProvider({ children }) {
       } catch (err) {
         if (!cancelled) {
           console.error('[DiseaseContext] Failed to load diseases:', err);
-          setError(err.message || 'Failed to connect to the diagnostic engine.');
+          setError(err.message || 'Failed to connect to the screening service.');
         }
       } finally {
         if (!cancelled) setLoading(false);

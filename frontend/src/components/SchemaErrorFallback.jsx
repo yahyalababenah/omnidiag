@@ -45,7 +45,7 @@ export default function SchemaErrorFallback({ error, onRetry, disease }) {
           {/* Description */}
           <p className="text-sm text-gray-600 max-w-md mb-1">
             {isConnectionError
-              ? `The diagnostic engine could not be reached. This is normal during cold starts (first scan of the day).`
+              ? `The screening service could not be reached. This is normal during cold starts (first scan of the day).`
               : `Failed to load the form configuration for "${disease || 'this disease'}".`}
           </p>
 

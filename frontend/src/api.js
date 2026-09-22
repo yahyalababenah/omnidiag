@@ -62,7 +62,7 @@ class OmniDiagApi {
     } catch (err) {
       if (err.name === 'AbortError') {
         throw new Error(
-          'The diagnostic engine is waking up — this can take a minute or two on the first scan of the day. Please try again.'
+          'The screening service is waking up — this can take a minute or two on the first scan of the day. Please try again.'
         );
       }
       throw err;
