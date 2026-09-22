@@ -972,8 +972,13 @@ async def parse_notes(
 ) -> Dict[str, Any]:
     if _parse_clinical_note is None:
         return {"extracted_features": {}, "mapped_features": {}, "field_count": 0, "engine": "none"}
-    from backend.nlp.notes_parser import bert_status
+    from backend.nlp.notes_parser import bert_status, language_support
     bert = bert_status()
+    # Every pattern in the parser is an English regex, so an Arabic note
+    # extracts nothing. Reporting that as "0 fields extracted" told the
+    # clinician their note was empty rather than that the tool cannot read
+    # their language.
+    language = language_support(body.note)
     use_bert = body.use_bert and bert["available"]
     extracted = _parse_clinical_note(body.note, use_bert=use_bert)
     mapped: Dict[str, Any] = {}
@@ -991,4 +996,8 @@ async def parse_notes(
         # when only the regex rules ran.
         "engine": "regex+bert" if use_bert else "regex",
         "bert": bert,
+        # {script, supported, message}. False for anything containing Arabic,
+        # including a mixed note: a partial read of a clinical note is not a
+        # supported read.
+        "language": language,
     }

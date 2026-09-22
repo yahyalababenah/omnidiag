@@ -16,6 +16,11 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.s
  * Only disease-mapped fields (schema names) are ever applied; the parser's
  * raw keys (e.g. `bp_diastolic`) are not model inputs.
  *
+ * The parser is English-only. When the note contains Arabic, the server says
+ * so (`language.supported === false`) and that is shown prominently instead
+ * of the generic "no fields recognised" note — which told a clinician their
+ * note was empty rather than that the tool cannot read their language.
+ *
  * Props:
  *   onExtracted — (fields: object) => void, called with the confirmed fields
  *   disease     — string (e.g. "heart_disease", "diabetes")
@@ -81,7 +86,7 @@ export default function ClinicalNotesInput({ onExtracted, disease }) {
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
           Clinical Notes Parser
           <span className="ml-2 text-xs font-normal text-purple-600 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">
-            Rule-based · English
+            Rule-based · English only
           </span>
         </h3>
       </div>
@@ -113,7 +118,29 @@ export default function ClinicalNotesInput({ onExtracted, disease }) {
         </div>
       )}
 
-      {result && fieldNames.length === 0 && (
+      {/* Language first: an Arabic note that extracted nothing is not the
+          same event as an English note that extracted nothing. */}
+      {result?.language && result.language.supported === false && (
+        <div
+          dir="auto"
+          className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 p-3 text-sm text-amber-900 dark:text-amber-200"
+        >
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">
+              {result.language.script === 'arabic'
+                ? 'Arabic notes are not supported'
+                : 'Mixed-language note — only the English parts were read'}
+            </p>
+            <p className="mt-0.5">{result.language.message}</p>
+            <p className="mt-1 text-xs" lang="ar" dir="rtl">
+              هذا المحلّل يقرأ الملاحظات الإنجليزية فقط؛ النص العربي لم يُقرأ.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {result && fieldNames.length === 0 && result.language?.supported !== false && (
         <p className="text-xs text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
           No fields recognised — nothing was changed. The parser reads English notes with explicit
           values (e.g. &quot;BP 140/90&quot;, &quot;age 55&quot;, &quot;non-smoker&quot;).
