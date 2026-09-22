@@ -4,7 +4,9 @@
 # Build v4 — bakes model + preprocessors into image at build time
 # =============================================================================
 
-FROM python:3.10-slim
+# Same interpreter as the validated local environment: the pinned numeric
+# stack (numpy 2.4 / scikit-learn 1.9) requires Python >= 3.11.
+FROM python:3.13-slim
 
 # Set working directory
 WORKDIR /app
