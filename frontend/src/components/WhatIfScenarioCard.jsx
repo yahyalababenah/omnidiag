@@ -3,31 +3,20 @@ import { normaliseScenario } from '../utils/counterfactuals';
 import MedicalTooltip from './MedicalTooltip';
 
 /**
- * WhatIfScenarioCard — DiCE Counterfactuals Viewer
+ * WhatIfScenarioCard — counterfactual scenarios from the backend
  *
- * Four-state rendering logic:
- * 1. loading=true           → Loading spinner
- * 2. counterfactuals === null         → Mock data with "Coming Soon" badge
- *    (API error or unsupported disease)
- * 3. prediction === 0 && counterfactuals !== null && counterfactuals.length === 0
- *    → Green "Low Risk" message (truly negative patient — no interventions needed)
- * 4. prediction === 1 && (counterfactuals === null || counterfactuals.length === 0)
- *    → Mock data with "Coming Soon" (positive patient, counterfactuals pending/failed)
- * 5. counterfactuals.length > 0       → Real scenarios from backend DiCE engine
+ * Rendering states, in order:
+ * 1. loading                         → spinner
+ * 2. error, or no response at all    → "could not be computed" — no numbers
+ * 3. empty list + flagged patient    → no allowed change crosses the threshold:
+ *    a. best_achievable lowers the estimate → show it, recommend referral
+ *    b. nothing lowers the estimate          → say so, recommend referral
+ * 4. empty list + not flagged        → below threshold, nothing to do
+ * 5. non-empty list                  → the backend's scenarios
  *
- * The `prediction` prop (binary 0|1|undefined) decouples logic from presentation:
- * - If the patient is truly negative (prediction=0), counterfactuals are irrelevant → show green card.
- * - If the patient is positive (prediction=1), ALWAYS show actionable scenarios (real or mock).
- * - Never let a missing/empty counterfactuals array suppress the What-If UI for a positive case.
- *
- * Real backend scenario shape (POST /api/v4/{disease}/counterfactuals):
- *   { scenario_id, probability, changes: [{ feature, original_value, counterfactual_value, direction }] }
- * `baselineProbability` (the request's `baseline_probability`) is required to turn a scenario's
- * `probability` into a risk-reduction percentage; pass it whenever available.
- *
- * `bestAchievable` (the response's `best_achievable`) is set when NO allowed change crosses the
- * threshold: every modifiable factor improved at once, flagged `crosses_threshold: false`. That
- * case renders its own explicit state — never an empty card or an unexplained "0%".
+ * Every number shown comes from the /counterfactuals response. There is no
+ * placeholder or illustrative data: when the backend has no answer the card
+ * says so instead of inventing one.
  */
 const SUBTITLE =
   "Scenarios show how the model's estimate responds to modifiable factors. " +
@@ -35,6 +24,20 @@ const SUBTITLE =
 const NO_CROSSING_MESSAGE =
   'Even with every modifiable factor improved, the estimated risk remains above the threshold. ' +
   'The dominant factors are not modifiable. Referral is recommended.';
+const NO_IMPROVEMENT_MESSAGE =
+  'No change to the modifiable factors lowers the estimated risk for this patient. ' +
+  'Referral is recommended.';
+
+function Header({ icon: Icon, iconClass }) {
+  return (
+    <div className="card-header">
+      <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        <Icon className={`w-5 h-5 ${iconClass}`} />
+        What-If Scenarios
+      </h2>
+    </div>
+  );
+}
 
 export default function WhatIfScenarioCard({
   counterfactuals,
@@ -43,35 +46,9 @@ export default function WhatIfScenarioCard({
   baselineProbability,
   patientData = null,
   bestAchievable = null,
+  error = null,
+  message = null,
 }) {
-  /* ── Mock placeholder data (fallback when API unavailable) ── */
-  const mockScenarios = [
-    {
-      feature: 'BMI',
-      current: 32.4,
-      proposed: 27.0,
-      riskReduction: 44,
-      description:
-        'Reducing BMI into the overweight range significantly lowers cardiovascular strain.',
-    },
-    {
-      feature: 'RestingBP',
-      current: 158,
-      proposed: 130,
-      riskReduction: 28,
-      description:
-        'Controlling systolic BP under 130 mmHg reduces hypertensive stress on the heart.',
-    },
-    {
-      feature: 'Cholesterol',
-      current: 340,
-      proposed: 200,
-      riskReduction: 31,
-      description:
-        'Lowering total cholesterol to normal range reduces plaque formation risk.',
-    },
-  ];
-
   /* ════════════════════════════════════════
      State 1 — Loading spinner
      ════════════════════════════════════════ */
@@ -94,6 +71,18 @@ export default function WhatIfScenarioCard({
     );
   }
 
+  if (error || !Array.isArray(counterfactuals)) {
+    return (
+      <div className="card border border-gray-200">
+        <Header icon={AlertTriangle} iconClass="text-gray-400" />
+        <div className="card-body">
+          <p className="text-sm text-gray-600">What-If scenarios could not be computed for this patient.</p>
+          {error && <p className="text-xs text-gray-400 mt-1">{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
   /* ════════════════════════════════════════
      State 1b — Flagged patient, but no allowed change crosses the threshold
      (backend returned an empty list, with or without best_achievable)
@@ -109,6 +98,11 @@ export default function WhatIfScenarioCard({
         : typeof best.new_probability === 'number' ? best.new_probability
         : best.probability)
       : null;
+    // A "best achievable" that does not lower the estimate is not an
+    // improvement; showing "49.4% → 50.4%" under "best achievable" was wrong.
+    const improves =
+      typeof after === 'number' &&
+      (typeof baselineProbability !== 'number' || after < baselineProbability);
     const relative = best && typeof best.risk_reduction_relative_pct === 'number'
       ? best.risk_reduction_relative_pct
       : null;
@@ -126,8 +120,14 @@ export default function WhatIfScenarioCard({
         <div className="card-body space-y-4">
           <p className="text-xs text-gray-500 leading-relaxed">{SUBTITLE}</p>
           <div className="p-4 rounded-lg border border-amber-200 bg-white">
-            <p className="text-sm font-medium text-amber-900">{NO_CROSSING_MESSAGE}</p>
-            {best ? (
+            <p className="text-sm font-medium text-amber-900">
+              {best && !improves
+                ? NO_IMPROVEMENT_MESSAGE
+                : !best && message
+                  ? message
+                  : NO_CROSSING_MESSAGE}
+            </p>
+            {best && improves ? (
               <div className="mt-3">
                 <p className="text-xs text-gray-600">
                   Best achievable with every modifiable factor improved:
@@ -154,12 +154,12 @@ export default function WhatIfScenarioCard({
                   {' '}— still above the threshold.
                 </p>
               </div>
-            ) : (
+            ) : !best && !message ? (
               <p className="text-xs text-gray-600 mt-2">
                 No modifiable factor is available to change for this patient (none of the
                 modifiable inputs was supplied, or each is already at its target).
               </p>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -167,15 +167,9 @@ export default function WhatIfScenarioCard({
   }
 
   /* ════════════════════════════════════════
-     State 2 — Truly negative patient (prediction=0)
-     (prediction !== 1 && counterfactuals !== null && length === 0)
-
-     If prediction is 1 (positive), we NEVER show "Low Clinical Risk" —
-     the patient IS positive and deserves actionable scenarios even if
-     counterfactuals are empty (backend returned not_applicable).
-     Instead, fall through to mock data with "Coming Soon" badge.
+     State 4 — below threshold, empty list: nothing to change
      ════════════════════════════════════════ */
-  if (prediction !== 1 && counterfactuals !== null && counterfactuals.length === 0) {
+  if (counterfactuals.length === 0) {
     return (
       <div className="card border border-green-200 bg-green-50/40">
         <div className="card-header">
@@ -203,17 +197,10 @@ export default function WhatIfScenarioCard({
   }
 
   /* ════════════════════════════════════════
-     State 3 / 4 — Mock or real scenarios
-     counterfactuals === null  → mock + Coming Soon badge (API error)
-     counterfactuals.length > 0 → real backend data
+     State 5 — the backend's scenarios, normalised to one shape
+     (diabetes sends `changes` as an object and no scenario_id)
      ════════════════════════════════════════ */
-  const isMock = counterfactuals === null;
-  // Real scenarios are normalised to one shape: diabetes sends `changes` as
-  // an object and no scenario_id, which used to route it into the mock
-  // branch below and render "If undefined drops from undefined".
-  const scenarios = isMock
-    ? mockScenarios
-    : counterfactuals.map((s, i) => normaliseScenario(s, i, patientData));
+  const scenarios = counterfactuals.map((s, i) => normaliseScenario(s, i, patientData));
 
   /**
    * Post-intervention probability, on the scale the API returned it.
@@ -242,7 +229,6 @@ export default function WhatIfScenarioCard({
    *
    * - Backend (preferred): s.risk_reduction_relative_pct
    * - Backend (legacy string): s.risk_reduction, e.g. "92%"
-   * - Mock: s.riskReduction (number)
    * - Heart: derived, since that endpoint sends no precomputed reduction
    */
   const getReductionPct = (s) => {
@@ -253,7 +239,6 @@ export default function WhatIfScenarioCard({
       const parsed = parseFloat(s.risk_reduction);
       if (!Number.isNaN(parsed)) return Math.round(parsed);
     }
-    if (typeof s.riskReduction === 'number') return s.riskReduction;
     const prob = getScenarioProbability(s);
     if (prob !== null && typeof baselineProbability === 'number' && baselineProbability > 0) {
       return Math.round(((baselineProbability - prob) / baselineProbability) * 100);
@@ -270,89 +255,21 @@ export default function WhatIfScenarioCard({
 
   return (
     <div className="card border border-blue-100 bg-blue-50/30">
-      <div className="card-header flex items-center justify-between">
+      <div className="card-header">
         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <Zap className="w-5 h-5 text-amber-500" />
           What-If Scenarios
-          {isMock && (
-            <span className="text-[10px] font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full ml-1">
-              Coming Soon
-            </span>
-          )}
         </h2>
-        <span className="text-[10px] text-gray-400">Powered by DiCE</span>
       </div>
 
       <div className="card-body space-y-4">
         <p className="text-xs text-gray-500 leading-relaxed">
           {SUBTITLE}
-          {isMock &&
-            ' Below are illustrative examples — backend DiCE engine integration pending.'}
         </p>
 
         {scenarios.map((s, idx) => {
-          const isBackendFormat = s.scenario_id !== undefined;
           const reductionPct = getReductionPct(s);
           const isHighImpact = reductionPct >= 30;
-
-          /* ── Mock format: single-feature scenario ── */
-          if (!isBackendFormat) {
-            return (
-              <div
-                key={`cf-${idx}`}
-                className={`p-4 rounded-lg border transition-colors ${
-                  isHighImpact
-                    ? 'border-green-200 bg-green-50'
-                    : 'border-blue-100 bg-white'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <TrendingDown className="w-4 h-4 text-green-500 shrink-0" />
-                      <MedicalTooltip term={s.feature}>
-                        <span className="text-sm font-semibold text-gray-800">
-                          {s.feature}
-                        </span>
-                      </MedicalTooltip>
-                      {isHighImpact && (
-                        <span className="text-[10px] font-medium text-green-600 bg-green-100 px-1.5 py-0.5 rounded">
-                          High Impact
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-700">
-                      Scenario: If{' '}
-                      <strong className="text-gray-900">{s.feature}</strong>{' '}
-                      drops from{' '}
-                      <span className="text-red-600 font-semibold">
-                        {s.current}
-                      </span>
-                      {' → '}
-                      <span className="text-green-600 font-semibold">
-                        {s.proposed}
-                      </span>
-                      {' → '}Risk reduces by{' '}
-                      <strong className="text-green-600">
-                        {s.riskReduction}%
-                      </strong>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {s.description}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-lg font-bold text-green-600">
-                      -{reductionPct}%
-                    </div>
-                    <div className="text-[10px] text-gray-400">
-                      Risk Reduction
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          }
 
           /* ── Backend format: multi-feature counterfactual scenario ──
              s.changes is an array of { feature, original_value, counterfactual_value, direction } */

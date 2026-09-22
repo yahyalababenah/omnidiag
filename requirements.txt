@@ -1,9 +1,12 @@
 # =============================================================================
 # OmniDiag — Python Dependencies
 # =============================================================================
-# All libraries use minimum versions (>=) to balance reproducibility with
-# receiving security updates. The versions specified are the minimum required
-# for the APIs used by this project.
+# The ML / numeric stack is pinned EXACTLY (==) to the environment the models
+# were validated in (backend/.venv, Python 3.13). Unpinned, the HF Space
+# resolved scikit-learn 1.7.2 and served different diabetes probabilities
+# from the same pickles (Case C 63.7% local vs 49.4% live). Change these only
+# together with a re-run of scratch/verify_live.py. Everything else keeps a
+# minimum version (>=).
 # =============================================================================
 
 # ── Web framework ──────────────────────────────────────────────────────────
@@ -12,17 +15,22 @@ uvicorn>=0.20.0
 python-multipart>=0.0.6
 
 # ── Data processing ────────────────────────────────────────────────────────
-pandas>=2.0.0
-numpy>=1.24.0
+pandas==3.0.3
+numpy==2.4.6
+scipy==1.18.0
 
 # ── Machine learning ───────────────────────────────────────────────────────
-scikit-learn>=1.3.0
-xgboost>=2.0.0
-lightgbm>=4.0.0
-joblib>=1.3.0
+scikit-learn==1.9.0
+xgboost==3.3.0
+lightgbm==4.6.0
+joblib==1.5.3
+threadpoolctl==3.6.0
 
 # ── SHAP explainability ────────────────────────────────────────────────────
-shap>=0.42.0
+shap==0.52.0
+numba==0.65.1
+llvmlite==0.47.0
+cloudpickle==3.1.2
 
 # ── Configuration ──────────────────────────────────────────────────────────
 pyyaml>=6.0

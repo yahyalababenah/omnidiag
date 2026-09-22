@@ -525,6 +525,10 @@ class EnsembleModelLoader:
         # No allowed change crosses the threshold: still report what every
         # allowed improvement together would do, flagged as not crossing.
         best_achievable = None if counterfactuals else generator.best_achievable(patient_data)
+        from backend.counterfactual_generator import (
+            DIABETES_POLICY, NO_IMPROVEMENT_MESSAGE, all_improvements,
+        )
+        has_levers = all_improvements(patient_data, DIABETES_POLICY) != dict(patient_data)
 
         return {
             "counterfactuals": counterfactuals,
@@ -539,6 +543,8 @@ class EnsembleModelLoader:
                 "remains above the threshold. The dominant factors are not "
                 "modifiable. Referral is recommended."
                 if best_achievable else
+                NO_IMPROVEMENT_MESSAGE
+                if has_levers else
                 "No modifiable factor is available for this patient (none was "
                 "supplied, or each is already at its target). The estimated risk "
                 "remains above the threshold. Referral is recommended."

@@ -403,7 +403,9 @@ class ModelLoader:
         improved at once, with `crosses_threshold: false`.
         """
         import random
-        from backend.counterfactual_generator import all_improvements, policy_violations
+        from backend.counterfactual_generator import (
+            NO_IMPROVEMENT_MESSAGE, all_improvements, lowest_achievable, policy_violations,
+        )
 
         # Mutability policy — the only way each feature may change:
         #   ("decrease", floor) may only go down, never below floor
@@ -522,10 +524,17 @@ class ModelLoader:
                 "crosses_threshold": True,
             })
 
+        # Lowest estimate reachable with the allowed levers; None when no
+        # allowed change lowers it, so it is never above the baseline.
         best_achievable = None
+        found = None
         if not counterfactuals and levers:
-            improved = all_improvements(patient_data, HEART_POLICY)
-            after = self.predict(improved)["confidence"]
+            found = lowest_achievable(
+                patient_data, HEART_POLICY,
+                lambda row: self.predict(row)["confidence"], baseline_prob,
+            )
+        if found is not None:
+            improved, after = found
             changes = _scenario_changes(improved)
             if not policy_violations(
                 patient_data,
@@ -537,9 +546,9 @@ class ModelLoader:
                     "probability": after,
                     "changes": changes,
                     "risk_reduction_relative_pct": round(
-                        max(0.0, (baseline_prob - after) / max(baseline_prob, 0.001) * 100), 2
+                        (baseline_prob - after) / max(baseline_prob, 0.001) * 100, 2
                     ),
-                    "risk_reduction_absolute_pp": round(max(0.0, (baseline_prob - after) * 100), 2),
+                    "risk_reduction_absolute_pp": round((baseline_prob - after) * 100, 2),
                     "crosses_threshold": bool(after < float(self.model["threshold"])),
                 }
 
@@ -554,6 +563,8 @@ class ModelLoader:
                 "remains above the threshold. The dominant factors are not "
                 "modifiable. Referral is recommended."
                 if best_achievable else
+                NO_IMPROVEMENT_MESSAGE
+                if levers else
                 "No modifiable factor is available for this patient (none was "
                 "supplied, or each is already at its target). The estimated risk "
                 "remains above the threshold. Referral is recommended."

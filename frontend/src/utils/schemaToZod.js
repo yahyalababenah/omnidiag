@@ -135,6 +135,11 @@ export function buildZodSchema(fields) {
     if (!field.validation.required) {
       validator = validator.optional();
     }
+    // Optional[...] in the backend schema: an explicit null is a valid value
+    // (the model imputes it), not a validation error.
+    if (field.nullable) {
+      validator = validator.nullable();
+    }
 
     shape[field.name] = validator;
   }

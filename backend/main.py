@@ -897,8 +897,11 @@ async def parse_notes(
     body: NotesParseRequest,
 ) -> Dict[str, Any]:
     if _parse_clinical_note is None:
-        return {"extracted_features": {}, "mapped_features": {}, "field_count": 0}
-    extracted = _parse_clinical_note(body.note, use_bert=body.use_bert)
+        return {"extracted_features": {}, "mapped_features": {}, "field_count": 0, "engine": "none"}
+    from backend.nlp.notes_parser import bert_status
+    bert = bert_status()
+    use_bert = body.use_bert and bert["available"]
+    extracted = _parse_clinical_note(body.note, use_bert=use_bert)
     mapped: Dict[str, Any] = {}
     if body.disease and _HAS_NLP:
         try:
@@ -910,4 +913,8 @@ async def parse_notes(
         "extracted_features": extracted,
         "mapped_features": mapped,
         "field_count": len(mapped) or len(extracted),
+        # Which extractor produced these values, so the UI never claims BERT
+        # when only the regex rules ran.
+        "engine": "regex+bert" if use_bert else "regex",
+        "bert": bert,
     }

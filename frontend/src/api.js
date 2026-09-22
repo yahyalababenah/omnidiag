@@ -4,6 +4,22 @@ export const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidi
 const REQUEST_TIMEOUT_MS = 120_000;
 
 /**
+ * Turn an error body into readable text. `detail` can be a string, an
+ * object with `error`, or a pydantic list of {loc, msg}; passing the list
+ * straight to `new Error()` rendered as "[object Object],[object Object]".
+ */
+function errorMessage(body, res) {
+  const pick = body?.detail?.error ?? body?.error ?? body?.detail;
+  if (typeof pick === 'string') return pick;
+  if (Array.isArray(pick)) {
+    return pick
+      .map((e) => (typeof e === 'string' ? e : `${(e?.loc || []).join('.')}: ${e?.msg ?? ''}`))
+      .join('; ');
+  }
+  return res.statusText || `HTTP ${res.status}`;
+}
+
+/**
  * OmniDiag API client.
  * Call api.setToken(token) after login so all subsequent requests are authenticated.
  */
@@ -40,8 +56,7 @@ class OmniDiagApi {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        const msg = body?.detail?.error || body?.detail || res.statusText;
-        throw new Error(msg);
+        throw new Error(errorMessage(body, res));
       }
       return res.json();
     } catch (err) {

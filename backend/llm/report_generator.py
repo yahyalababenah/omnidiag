@@ -60,7 +60,48 @@ assessment. The report must be:
 - Under 350 words
 
 Do NOT add disclaimers about seeking medical advice (the audience is medical professionals).
-Do NOT hallucinate lab values or history not provided."""
+Do NOT hallucinate lab values or history not provided.
+
+This is a SCREENING estimate, not a diagnosis. Hard rules:
+- Never state or imply that the patient has, or is diagnosed with, any disease.
+  Do not write "diagnosis", "diagnosed", "confirms", "consistent with <disease>",
+  or interpret a value as proof of a condition (e.g. "indicates ischemia").
+  Describe only the estimated risk, the decision threshold and the risk drivers.
+- Never name a medication, drug class or dose, and never recommend starting,
+  stopping or changing any drug therapy. Recommended actions are limited to
+  confirmatory testing, referral, follow-up timing and lifestyle counselling."""
+
+# Output check. A report that breaks either rule above is replaced by the
+# deterministic report — the prompt asks, this enforces.
+import re as _re
+
+_FORBIDDEN_PATTERNS = [
+    # diagnosis wording
+    (r"\bdiagnos(?:ed|is\s+of|es\s+(?:of|the))\b", "diagnosis wording"),
+    (r"\b(?:has|have|with)\s+(?:established\s+|confirmed\s+|known\s+)?"
+     r"(?:type\s*[12]\s+)?(?:diabetes|diabetes\s+mellitus|coronary\s+artery\s+disease|CAD|"
+     r"heart\s+disease|ischemi\w*|ischaemi\w*)\b", "states the disease is present"),
+    (r"\bconsistent\s+with\s+(?:a\s+)?(?:diabetes|coronary|CAD|ischemi\w*|heart\s+disease)", "diagnosis wording"),
+    (r"\bconfirm(?:s|ed|ing)?\s+(?:the\s+)?(?:presence|diabetes|coronary|CAD|ischemi\w*|heart\s+disease)", "diagnosis wording"),
+    (r"\bindicat\w*\s+(?:inducible\s+|myocardial\s+)?ischemi\w*", "diagnosis wording"),
+    # medication / dose advice
+    (r"\b\d+(?:\.\d+)?\s*(?:mg|mcg|µg|g|units?|iu)\b(?!\s*/\s*dl)", "dose"),
+    (r"\b(?:statins?|atorvastatin|rosuvastatin|simvastatin|metformin|insulin|aspirin|"
+     r"clopidogrel|antiplatelet\w*|anticoagula\w*|beta[\s-]?blockers?|ace[\s-]?inhibitors?|"
+     r"arbs?|angiotensin|diuretics?|nitrates?|nitroglycerin|glp-?1|sglt-?2|sulfonylureas?|"
+     r"lisinopril|losartan|amlodipine|antihypertensive\w*|anti-?ischemic|pharmacotherap\w*|"
+     r"medications?|drugs?|prescri\w+)\b", "medication advice"),
+]
+
+
+def forbidden_content(text: str) -> list:
+    """Every rule the text breaks, as short labels. Empty list = acceptable."""
+    found = []
+    for pattern, label in _FORBIDDEN_PATTERNS:
+        m = _re.search(pattern, text or "", flags=_re.IGNORECASE)
+        if m:
+            found.append(f"{label}: '{m.group(0)}'")
+    return found
 
 _USER_PROMPT_TEMPLATE = """Generate a clinical assessment report for the following patient.
 
@@ -115,7 +156,7 @@ def _rule_based_report(
     top = sorted(shap_values, key=lambda x: abs(x.get("shap_value", 0)), reverse=True)[:3]
     top_names = [s["feature"] for s in top]
     actions = {
-        "HIGH": "- Urgent specialist referral recommended\n- Review medication adherence\n- Order confirmatory investigations",
+        "HIGH": "- Urgent specialist referral recommended\n- Order confirmatory investigations\n- Review the current care plan with the treating clinician",
         "MODERATE": "- Schedule follow-up within 4 weeks\n- Lifestyle modification counselling\n- Monitor key biomarkers",
         "LOW": "- Routine follow-up\n- Reinforce preventive measures\n- Rescreen in 12 months",
     }
@@ -231,6 +272,18 @@ async def generate_report(
         latency_ms = int((time.perf_counter() - t0) * 1000)
         report_text = response.choices[0].message.content
         log.info(f"DeepSeek report generated in {latency_ms}ms ({len(report_text)} chars)")
+
+        violations = forbidden_content(report_text)
+        if violations:
+            log.warning("LLM report rejected (%s) — using rule-based report", "; ".join(violations))
+            return {
+                "report": _rule_based_report(
+                    disease_display, probability_corrected, label, shap_values, features, bands
+                ),
+                "source": "rule_based",
+                "risk_band": band,
+                "fallback_reason": "LLM output contained " + "; ".join(violations),
+            }
 
         return {
             "report": report_text,
