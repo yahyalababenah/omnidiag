@@ -28,6 +28,8 @@ export default function EngineeringMode() {
   const [counterfactualsData, setCounterfactualsData] = useState(null);
   const [counterfactualsBaseline, setCounterfactualsBaseline] = useState(null);
   const [counterfactualsBest, setCounterfactualsBest] = useState(null);
+  const [counterfactualsError, setCounterfactualsError] = useState(null);
+  const [counterfactualsMessage, setCounterfactualsMessage] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
   const [lastFormData, setLastFormData] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -57,6 +59,8 @@ export default function EngineeringMode() {
     setCounterfactualsData(null);
     setCounterfactualsBaseline(null);
     setCounterfactualsBest(null);
+    setCounterfactualsError(null);
+    setCounterfactualsMessage(null);
     setLastFormData(formData);
 
     try {
@@ -76,18 +80,15 @@ export default function EngineeringMode() {
     if (currentDiseaseInfo?.supports_counterfactuals) {
       try {
         const cfResponse = await api.counterfactuals(selectedDisease, formData);
-        setCounterfactualsData(cfResponse?.counterfactuals ?? null);
+        setCounterfactualsData(cfResponse?.counterfactuals ?? []);
         setCounterfactualsBaseline(cfResponse?.baseline_probability ?? null);
         setCounterfactualsBest(cfResponse?.best_achievable ?? null);
-      } catch {
-        setCounterfactualsData(null);
-        setCounterfactualsBaseline(null);
-        setCounterfactualsBest(null);
+        setCounterfactualsMessage(cfResponse?.message ?? null);
+      } catch (err) {
+        setCounterfactualsError(err.message || 'What-If scenarios could not be computed.');
       }
     } else {
-      setCounterfactualsData(null);
-      setCounterfactualsBaseline(null);
-      setCounterfactualsBest(null);
+      setCounterfactualsData([]);
     }
     setLoading(false);
     setCounterfactualsLoading(false);
@@ -266,6 +267,8 @@ export default function EngineeringMode() {
                     counterfactuals={counterfactualsData}
                     baselineProbability={counterfactualsBaseline}
                     bestAchievable={counterfactualsBest}
+                    error={counterfactualsError}
+                    message={counterfactualsMessage}
                     loading={counterfactualsLoading}
                     prediction={result?.prediction}
                     patientData={lastFormData ?? null}

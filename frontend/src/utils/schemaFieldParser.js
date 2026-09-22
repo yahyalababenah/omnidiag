@@ -116,6 +116,25 @@ function extractDefault(fieldName, schema) {
 }
 
 /**
+ * Pydantic emits an Optional[int] field as
+ *   { anyOf: [{ type: 'integer', minimum, maximum }, { type: 'null' }], title, description, default }
+ * with no top-level `type`. Merge the single non-null branch into the outer
+ * property so the field keeps its real type and range; without this it fell
+ * through to 'string' and got a text validator that rejects every number.
+ */
+function unwrapNullable(prop) {
+  if (!Array.isArray(prop.anyOf)) return prop;
+  const branches = prop.anyOf.filter((b) => b && b.type !== 'null');
+  if (branches.length !== 1) return prop;
+  const { anyOf, ...outer } = prop;
+  return {
+    ...branches[0],
+    ...outer,
+    nullable: branches.length < anyOf.length,
+  };
+}
+
+/**
  * Parse the full JSON Schema into an array of FieldMetadata.
  *
  * @param {object} schema - The JSON Schema object from api.getSchema(disease)
@@ -129,7 +148,8 @@ export function parseSchema(schema) {
 
   const requiredFields = new Set(schema.required || []);
 
-  return Object.entries(schema.properties).map(([name, prop]) => {
+  return Object.entries(schema.properties).map(([name, rawProp]) => {
+    const prop = unwrapNullable(rawProp);
     const fieldType = prop.type || 'string';
     const validation = {
       required: requiredFields.has(name),
@@ -143,6 +163,7 @@ export function parseSchema(schema) {
       name,
       title: deriveTitle(name, prop.description || prop.title),
       type: fieldType,
+      nullable: Boolean(prop.nullable),
       component: resolveComponentType({ ...prop, type: fieldType, name }),
       validation,
       description: prop.description || '',

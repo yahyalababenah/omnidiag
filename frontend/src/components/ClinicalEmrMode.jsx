@@ -74,6 +74,8 @@ export default function ClinicalEmrMode() {
   const [counterfactualsBaseline, setCounterfactualsBaseline] = useState(null);
   const [counterfactualsBest, setCounterfactualsBest] = useState(null);
   const [counterfactualsLoading, setCounterfactualsLoading] = useState(false);
+  const [counterfactualsError, setCounterfactualsError] = useState(null);
+  const [counterfactualsMessage, setCounterfactualsMessage] = useState(null);
   const [patientSelectOpen, setPatientSelectOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
@@ -105,11 +107,20 @@ export default function ClinicalEmrMode() {
     };
   }, [loading]);
 
+  // Every run gets a sequence number; a response is applied only if its run
+  // is still the latest. Without this, a slow response for the previous
+  // disease/patient landed after the current one and overwrote it.
+  const runSeq = useRef(0);
+
   const runDiagnosis = useCallback(async (patient) => {
     if (!selectedDisease || !patient) return;
+    const seq = ++runSeq.current;
+    const isCurrent = () => seq === runSeq.current;
 
     setLoading(true);
     setCounterfactualsLoading(true);
+    setCounterfactualsError(null);
+    setCounterfactualsMessage(null);
     setColdStart(false);
     setError(null);
     setResult(null);
@@ -123,40 +134,42 @@ export default function ClinicalEmrMode() {
         api.predict(selectedDisease, patient.data),
         api.explain(selectedDisease, patient.data),
       ]);
+      if (!isCurrent()) return;
       setResult(pred);
       setShapData(expl);
     } catch (err) {
+      if (!isCurrent()) return;
       setError(err.message || 'Screening failed. Is the backend running?');
     }
 
-    // Counterfactuals: only supported by ensemble diseases (e.g. diabetes).
-    // Skip entirely for single-model diseases (e.g. heart_disease) to avoid a
-    // noisy 501 error in the browser console.
     if (currentDiseaseInfo?.supports_counterfactuals) {
       try {
         const cfResponse = await api.counterfactuals(selectedDisease, patient.data);
-        setCounterfactualsData(cfResponse?.counterfactuals ?? null);
+        if (!isCurrent()) return;
+        setCounterfactualsData(cfResponse?.counterfactuals ?? []);
         setCounterfactualsBaseline(cfResponse?.baseline_probability ?? null);
         setCounterfactualsBest(cfResponse?.best_achievable ?? null);
-      } catch {
-        setCounterfactualsData(null);
-        setCounterfactualsBaseline(null);
-        setCounterfactualsBest(null);
+        setCounterfactualsMessage(cfResponse?.message ?? null);
+      } catch (err) {
+        if (!isCurrent()) return;
+        setCounterfactualsError(err.message || 'What-If scenarios could not be computed.');
       }
     } else {
-      setCounterfactualsData(null);
-      setCounterfactualsBaseline(null);
-      setCounterfactualsBest(null);
+      setCounterfactualsData([]);
     }
     setLoading(false);
     setCounterfactualsLoading(false);
-  }, [selectedDisease]);
+  }, [selectedDisease, currentDiseaseInfo]);
 
-  // Auto-run diagnosis when patient changes
+  // Auto-run diagnosis when patient changes. The patient must belong to the
+  // selected disease: on a disease switch this effect fires once with the new
+  // disease but the previous disease's patient (the reset effect above has
+  // not re-rendered yet), which sent diabetes fields to the heart endpoints.
   useEffect(() => {
-    if (selectedPatient && selectedDisease) {
-      runDiagnosis(selectedPatient);
-    }
+    if (!selectedPatient || !selectedDisease) return;
+    if (!patients.some((p) => p.id === selectedPatient.id)) return;
+    runDiagnosis(selectedPatient);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPatient, selectedDisease, runDiagnosis]);
 
   const selectPatient = (patient) => {
@@ -675,6 +688,8 @@ export default function ClinicalEmrMode() {
                       baselineProbability={counterfactualsBaseline}
                       bestAchievable={counterfactualsBest}
                       loading={counterfactualsLoading}
+                      error={counterfactualsError}
+                      message={counterfactualsMessage}
                       prediction={result?.prediction}
                       patientData={selectedPatient?.data ?? null}
                     />
