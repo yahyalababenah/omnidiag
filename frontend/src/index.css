@@ -129,6 +129,24 @@
   }
 }
 
+/* ── Narrow screens ──────────────────────────────────────────────────────── */
+/*
+ * A single over-wide child used to scroll the entire page sideways on a
+ * phone (15c): the form's action row measured 462px against a 390px
+ * viewport and took the document to 503px. The row itself now wraps; this
+ * is the safety net so the next wide child is clipped to its own scroll
+ * container instead of dragging the whole layout with it.
+ *
+ * Deliberately NOT `overflow-x: hidden` on body: that hides the symptom and
+ * silently clips real content. Elements that legitimately need to scroll
+ * sideways (wide tables, the SHAP chart) already carry `overflow-x-auto`
+ * and keep it.
+ */
+html,
+body {
+  max-width: 100%;
+}
+
 /* ── Print styles (Task 3.2.6) ───────────────────────────────────────────── */
 @media print {
   /* Hide navigation and interactive chrome */

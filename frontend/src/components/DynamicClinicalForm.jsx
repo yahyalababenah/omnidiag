@@ -222,7 +222,10 @@ export default function DynamicClinicalForm({
             {categorizedFields.size} categor{categorizedFields.size !== 1 ? 'ies' : 'y'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* flex-wrap, not a fixed row (15c): these four buttons are 462px
+            wide together and forced the whole document to 503px at a 390px
+            viewport, so every page scrolled sideways on a phone. */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setScalesModalOpen(true)}
