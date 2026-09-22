@@ -412,8 +412,18 @@ async def predict_disease(
     try:
         patient_data = _validate_patient_input(disease, patient)
 
-        # Cache check (skip when linking to a specific patient for accurate audit)
+        # The cache holds the COMPUTATION only, never the recording of it
+        # (X-7). Returning early on a hit used to skip the predictions row,
+        # the Prometheus counter and the review queue entirely, so a second
+        # clinician scoring the same patient left no trace and could not be
+        # queued for review. Everything below the cache block now runs on a
+        # hit exactly as it does on a miss; only the model call is skipped.
         cache_key = predict_cache_key(disease, patient_data)
+        result = None
+        cache_hit = False
+
+        # Cache read is skipped when linking to a specific patient, for
+        # accurate audit.
         if not patient_id:
             cached = await cache_get(cache_key)
             # A payload written by an older release can still be live for up
@@ -430,23 +440,24 @@ async def predict_disease(
                 )
                 cached = None
             if cached is not None:
-                response.headers["Cache-Hit"] = "true"
-                return cached
+                result = cached
+                cache_hit = True
 
-        # Off the event loop: router.predict() is synchronous CPU work
-        # (model inference, feature engineering). Awaiting it inline in an
-        # `async def` endpoint blocks the single event-loop thread, which
-        # freezes EVERY other request for the duration — measured at 18 s on
-        # a 150-row diabetes batch (X-3). run_in_threadpool hands it to the
-        # anyio worker pool; the returned value is byte-identical.
-        result = await run_in_threadpool(router.predict, disease, patient_data)
+        if result is None:
+            # Off the event loop: router.predict() is synchronous CPU work
+            # (model inference, feature engineering). Awaiting it inline in an
+            # `async def` endpoint blocks the single event-loop thread, which
+            # freezes EVERY other request for the duration — measured at 18 s
+            # on a 150-row diabetes batch (X-3). run_in_threadpool hands it to
+            # the anyio worker pool; the returned value is byte-identical.
+            result = await run_in_threadpool(router.predict, disease, patient_data)
+            if not patient_id:
+                await cache_set(cache_key, result, ttl=PREDICT_TTL_SECONDS)
 
-        # Store in cache
-        if not patient_id:
-            await cache_set(cache_key, result, ttl=PREDICT_TTL_SECONDS)
-        response.headers["Cache-Hit"] = "false"
+        response.headers["Cache-Hit"] = "true" if cache_hit else "false"
 
-        # Record Prometheus metrics
+        # Record Prometheus metrics. Counted on cache hits too: the metric
+        # measures predictions served to clinicians, not model invocations.
         try:
             record_prediction(
                 disease=disease,
