@@ -191,6 +191,18 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         log.error("init_db failed: %s", _e, exc_info=True)
     await init_cache()
+
+    # X-5: the live DB is SQLite inside the container and is wiped by every
+    # restart, so the demo patients and their History have to be recreated.
+    # Backgrounded — see backend/demo_seed.py — so the Space answers requests
+    # immediately instead of waiting on 21 model calls.
+    if os.getenv("SEED_DEMO_HISTORY", "true").lower() == "true":
+        try:
+            from backend.demo_seed import seed_demo_history_in_background
+            await seed_demo_history_in_background(router)
+        except Exception as _e:
+            log.warning("Could not schedule demo history seeding: %s", _e)
+
     yield
 
 

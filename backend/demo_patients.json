@@ -1,0 +1,179 @@
+{
+  "heart_disease": [
+    {
+      "id": "P-001",
+      "name": "Ahmed Al-Rashid",
+      "age": 54,
+      "sex": "M",
+      "data": {
+        "Age": 54,
+        "Sex": "M",
+        "ChestPainType": "ATA",
+        "RestingBP": 140,
+        "Cholesterol": 289,
+        "FastingBS": 0,
+        "RestingECG": "Normal",
+        "MaxHR": 122,
+        "ExerciseAngina": "N",
+        "Oldpeak": 0,
+        "ST_Slope": "Flat"
+      }
+    },
+    {
+      "id": "P-002",
+      "name": "Fatima Hassan",
+      "age": 62,
+      "sex": "F",
+      "data": {
+        "Age": 62,
+        "Sex": "F",
+        "ChestPainType": "ASY",
+        "RestingBP": 158,
+        "Cholesterol": 340,
+        "FastingBS": 1,
+        "RestingECG": "LVH",
+        "MaxHR": 98,
+        "ExerciseAngina": "Y",
+        "Oldpeak": 2.3,
+        "ST_Slope": "Down"
+      }
+    },
+    {
+      "id": "P-003",
+      "name": "Khalid Othman",
+      "age": 45,
+      "sex": "M",
+      "data": {
+        "Age": 45,
+        "Sex": "M",
+        "ChestPainType": "NAP",
+        "RestingBP": 120,
+        "Cholesterol": 210,
+        "FastingBS": 0,
+        "RestingECG": "Normal",
+        "MaxHR": 160,
+        "ExerciseAngina": "N",
+        "Oldpeak": 0.5,
+        "ST_Slope": "Up"
+      }
+    }
+  ],
+  "diabetes": [
+    {
+      "id": "D-001",
+      "name": "Noor Sabbagh",
+      "age": 37,
+      "sex": "F",
+      "data": {
+        "HighBP": 0,
+        "HighChol": 0,
+        "CholCheck": 1,
+        "BMI": 24,
+        "Smoker": 0,
+        "Stroke": 0,
+        "HeartDiseaseorAttack": 0,
+        "PhysActivity": 1,
+        "Fruits": 1,
+        "Veggies": 1,
+        "HvyAlcoholConsump": 0,
+        "AnyHealthcare": 1,
+        "NoDocbcCost": 0,
+        "GenHlth": 2,
+        "MentHlth": 0,
+        "PhysHlth": 0,
+        "DiffWalk": 0,
+        "Sex": 0,
+        "Age": 4,
+        "Education": 6,
+        "Income": 7
+      }
+    },
+    {
+      "id": "D-002",
+      "name": "Karim Yaghi",
+      "age": 48,
+      "sex": "M",
+      "data": {
+        "HighBP": 1,
+        "HighChol": 0,
+        "CholCheck": 1,
+        "BMI": 29,
+        "Smoker": 0,
+        "Stroke": 0,
+        "HeartDiseaseorAttack": 0,
+        "PhysActivity": 1,
+        "Fruits": 1,
+        "Veggies": 1,
+        "HvyAlcoholConsump": 0,
+        "AnyHealthcare": 1,
+        "NoDocbcCost": 0,
+        "GenHlth": 3,
+        "MentHlth": 0,
+        "PhysHlth": 2,
+        "DiffWalk": 0,
+        "Sex": 1,
+        "Age": 6,
+        "Education": 5,
+        "Income": 6
+      }
+    },
+    {
+      "id": "D-003",
+      "name": "Samir Abu-Ghazaleh",
+      "age": 62,
+      "sex": "M",
+      "data": {
+        "HighBP": 1,
+        "HighChol": 1,
+        "CholCheck": 1,
+        "BMI": 33,
+        "Smoker": 1,
+        "Stroke": 0,
+        "HeartDiseaseorAttack": 0,
+        "PhysActivity": 0,
+        "Fruits": 0,
+        "Veggies": 0,
+        "HvyAlcoholConsump": 0,
+        "AnyHealthcare": 1,
+        "NoDocbcCost": 0,
+        "GenHlth": 4,
+        "MentHlth": 5,
+        "PhysHlth": 12,
+        "DiffWalk": 1,
+        "Sex": 1,
+        "Age": 9,
+        "Education": 4,
+        "Income": 4
+      }
+    },
+    {
+      "id": "D-004",
+      "name": "Hala Mansour",
+      "age": 47,
+      "sex": "F",
+      "data": {
+        "HighBP": 1,
+        "HighChol": 0,
+        "CholCheck": 1,
+        "BMI": 26,
+        "Smoker": 0,
+        "Stroke": 0,
+        "HeartDiseaseorAttack": 0,
+        "PhysActivity": 1,
+        "Fruits": 1,
+        "Veggies": 1,
+        "HvyAlcoholConsump": 0,
+        "AnyHealthcare": 1,
+        "NoDocbcCost": 0,
+        "GenHlth": 3,
+        "MentHlth": 0,
+        "PhysHlth": 0,
+        "DiffWalk": 0,
+        "Sex": 0,
+        "Age": 6,
+        "Education": 5,
+        "Income": 6
+      }
+    }
+  ]
+}
