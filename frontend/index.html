@@ -2,10 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- 15b: the tab icon was still Vite's logo, and /favicon.ico and
+         /apple-touch-icon.png both 404'd (the SPA host answered with
+         index.html, so iOS "Add to Home Screen" had no icon to use). -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <meta name="theme-color" content="#1d4ed8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OmniDiag — Multi-Disease Diagnostic Platform</title>
-    <meta name="description" content="OmniDiag: AI-powered multi-disease diagnostic platform with SHAP explanations" />
+    <title>OmniDiag — Multi-Disease Clinical Decision Support</title>
+    <meta name="description" content="OmniDiag: multi-disease clinical decision support with SHAP explanations" />
   </head>
   <body>
     <div id="root"></div>

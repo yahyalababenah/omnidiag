@@ -40,6 +40,7 @@ import SchemaFieldFactory from './SchemaFieldFactory';
 import FormSkeleton from './FormSkeleton';
 import { getCategoryIcon } from '../utils/featureCategorizer';
 import VariableScalesModal from './VariableScalesModal';
+import { randomPatient } from '../utils/randomPatient';
 
 // ── Icon resolver for categories ──
 const CATEGORY_ICONS = {
@@ -137,30 +138,15 @@ export default function DynamicClinicalForm({
   const [hasRun, setHasRun] = useState(false);
   const [scalesModalOpen, setScalesModalOpen] = useState(false);
 
-  // ── Randomize all fields with valid data ──
+  // ── Randomize all fields with plausible data ──
+  //
+  // Sampling was uniform across each field's SCHEMA range, which is a
+  // validation bound and not a clinical distribution: RestingBP is allowed
+  // 80-220, so a quarter of randomised patients had a resting BP over 180.
+  // randomPatient() samples inside a plausible band and conforms the result
+  // back to the schema, so the value is both valid and believable.
   const randomizeFields = () => {
-    const randomized = {};
-    fields.forEach((f) => {
-      if (f.component === 'toggle' || f.component === 'segmented') {
-        randomized[f.name] = Math.random() > 0.5 ? 1 : 0;
-      } else if (f.component === 'select' && f.validation.enum?.length) {
-        const opts = f.validation.enum;
-        randomized[f.name] = opts[Math.floor(Math.random() * opts.length)];
-      } else if (f.type === 'number' || f.type === 'integer') {
-        const min = f.validation.minimum ?? 0;
-        const max = f.validation.maximum ?? 100;
-        const step = f.validation.step ?? (f.type === 'number' ? 0.1 : 1);
-        const val = min + Math.random() * (max - min);
-        // Align to step increments, then round to avoid floating jitter
-        const stepped = Math.round(val / step) * step;
-        randomized[f.name] = step < 1
-          ? parseFloat(stepped.toFixed(10))
-          : Math.round(stepped);
-      } else {
-        randomized[f.name] = f.default ?? '';
-      }
-    });
-    form.reset(randomized);
+    form.reset(randomPatient(fields, diseaseName));
   };
 
   // ── Form hook ──
@@ -236,7 +222,10 @@ export default function DynamicClinicalForm({
             {categorizedFields.size} categor{categorizedFields.size !== 1 ? 'ies' : 'y'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* flex-wrap, not a fixed row (15c): these four buttons are 462px
+            wide together and forced the whole document to 503px at a 390px
+            viewport, so every page scrolled sideways on a phone. */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setScalesModalOpen(true)}

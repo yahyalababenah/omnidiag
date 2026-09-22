@@ -12,6 +12,9 @@ Endpoints:
     DELETE /api/v4/patients/{patient_id}           — Soft-delete
     GET    /api/v4/patients/{patient_id}/predictions — Prediction history
     GET    /api/v4/patients/{patient_id}/export    — Full data export bundle
+    POST   /api/v4/patients/{patient_id}/visits    — Record a visit
+    GET    /api/v4/patients/{patient_id}/visits    — Visit history
+    POST   /api/v4/patients/{patient_id}/notes     — Attach a clinician note
 """
 
 import uuid
@@ -358,3 +361,78 @@ async def list_visits(
     q = q.order_by(PatientVisit.visit_date.asc()).limit(limit)
     visits = (await db.execute(q)).scalars().all()
     return {"patient_id": patient_id, "visits": [v.to_dict() for v in visits]}
+
+
+# ── POST /api/v4/patients/{patient_id}/notes ─────────────────────────────────
+
+class ClinicalNoteIn(_BaseModel):
+    """A clinician's free-text note about a screening they just reviewed."""
+
+    disease: Optional[str] = None
+    notes: str
+
+
+@router.post(
+    "/{patient_id}/notes",
+    tags=["Patients"],
+    summary="Attach a clinician's free-text note to this patient's latest screening",
+)
+async def attach_clinical_note(
+    patient_id: str,
+    body: ClinicalNoteIn,
+    _user: User = Depends(require_role(*CLINICAL_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Record what the clinician wrote, against the screening they were looking at.
+
+    The note is stored verbatim on the prediction row and used for nothing
+    else. It is never a model input, never joined into `input_features`, never
+    part of the retraining set, and never sent to DeepSeek — the report
+    endpoint builds its payload from probability, threshold, label and SHAP
+    and has no access to this column. Before this endpoint the only free text
+    a doctor could type in the whole product (the notes parser box) was
+    discarded the moment it was parsed.
+
+    The note attaches to the patient's most recent prediction for the given
+    disease, which is the one on screen when the Save button is pressed.
+    """
+    patient = await _get_active_patient(patient_id, db)
+
+    filters = [Prediction.patient_id == patient.id]
+    if body.disease:
+        filters.append(Prediction.disease == body.disease)
+
+    latest = (
+        await db.execute(
+            select(Prediction)
+            .where(and_(*filters))
+            .order_by(Prediction.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    if latest is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": (
+                    f"No screening on record for patient '{patient_id}'"
+                    + (f" and disease '{body.disease}'" if body.disease else "")
+                    + " — run a screening before saving a note."
+                ),
+                "code": "NO_PREDICTION_TO_ANNOTATE",
+            },
+        )
+
+    latest.notes = body.notes
+    await db.commit()
+    await db.refresh(latest)
+
+    return {
+        "patient_id": patient_id,
+        "prediction_id": latest.id,
+        "disease": latest.disease,
+        "notes": latest.notes,
+        "saved_at": latest.created_at.isoformat() if latest.created_at else None,
+    }

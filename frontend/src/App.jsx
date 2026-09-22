@@ -29,7 +29,7 @@ const CLINICAL_VIEWS = [
   { id: 'engineering', label: 'Engineering Mode',    icon: FlaskConical,   component: EngineeringMode },
   { id: 'clinical',    label: 'Clinical EMR Mode',   icon: Stethoscope,    component: ClinicalEmrMode },
   { id: 'batch',       label: 'Batch Prediction',    icon: Table2,         component: BatchUpload },
-  { id: 'comparison',  label: 'Before/After Compare', icon: ArrowLeftRight, component: ComparisonMode },
+  { id: 'comparison',  label: 'Patient Comparison', icon: ArrowLeftRight, component: ComparisonMode },
 ];
 
 function AppContent() {
@@ -95,7 +95,7 @@ function AppContent() {
           </div>
           <div>
             <h1 className="text-base font-bold text-gray-900 leading-tight">OmniDiag</h1>
-            <p className="text-[10px] text-gray-500 leading-tight">Multi-Disease Diagnostic Platform</p>
+            <p className="text-[10px] text-gray-500 leading-tight">Multi-Disease Clinical Decision Support</p>
           </div>
         </div>
 

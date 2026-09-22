@@ -14,12 +14,23 @@ import traceback
 from dotenv import load_dotenv
 load_dotenv()  # loads .env file into os.environ before anything else reads it
 
-# Configure startup logging to stdout for HF Spaces debugging
+# Configure logging to stdout for HF Spaces.
+#
+# INFO by default, not DEBUG (X-8). At DEBUG the Space emitted 10,106 DEBUG
+# lines out of 10,584 — every SQL statement among them — into a log anyone
+# with Space access can read. Set LOG_LEVEL=DEBUG when actually debugging.
+_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     stream=sys.stdout,
-    level=logging.DEBUG,
+    level=getattr(logging, _LOG_LEVEL, logging.INFO),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+# SQLAlchemy echoes full statements at INFO, which is the bulk of the noise
+# and the part that carries row values. Keep it at WARNING unless the
+# operator has explicitly asked for DEBUG.
+if _LOG_LEVEL != "DEBUG":
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 log = logging.getLogger("omnidiag.startup")
 _explain_log = logging.getLogger("omnidiag.explain")
 _cf_log = logging.getLogger("omnidiag.counterfactuals")
@@ -40,6 +51,7 @@ import io
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -58,7 +70,8 @@ from backend.auth.rbac import require_role, CLINICAL_ROLES
 from backend.auth.dependencies import get_current_active_user, get_optional_user
 from backend.cache import (init_cache, cache_get, cache_set, predict_cache_key,
                            schema_cache_key, counterfactuals_cache_key,
-                           cached_payload_matches_scale)
+                           cached_payload_matches_scale, COUNTERFACTUALS_TTL_SECONDS,
+                           PREDICT_TTL_SECONDS, SCHEMA_TTL_SECONDS)
 from backend.probability_scale import scale_of_disease_config, scale_of_result
 from backend.database import get_db, engine, AsyncSessionLocal, Base
 from backend.db_models.prediction import Prediction
@@ -178,6 +191,18 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         log.error("init_db failed: %s", _e, exc_info=True)
     await init_cache()
+
+    # X-5: the live DB is SQLite inside the container and is wiped by every
+    # restart, so the demo patients and their History have to be recreated.
+    # Backgrounded — see backend/demo_seed.py — so the Space answers requests
+    # immediately instead of waiting on 21 model calls.
+    if os.getenv("SEED_DEMO_HISTORY", "true").lower() == "true":
+        try:
+            from backend.demo_seed import seed_demo_history_in_background
+            await seed_demo_history_in_background(router)
+        except Exception as _e:
+            log.warning("Could not schedule demo history seeding: %s", _e)
+
     yield
 
 
@@ -242,11 +267,19 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 #    💡 When you deploy the frontend to a NEW Vercel URL (e.g. a preview
 #       deployment), add it here or set the CORS_ALLOWED_ORIGINS env var
 #       on Hugging Face Spaces to override the defaults.
+#    Local entries cover both `npm run dev` (5173) and `vite preview` (4173,
+#    the production build served locally — the only way to click-test what
+#    actually ships), under both spellings: a browser treats localhost and
+#    127.0.0.1 as different origins, and only one of each pair was listed.
 _DEFAULT_ORIGINS = (
     "https://omnidiag-delta.vercel.app,"
     "https://omnidiag-qnhrjmoaq-yahia-s-projects05.vercel.app,"
     "http://localhost:5173,"
-    "http://localhost:3000"
+    "http://127.0.0.1:5173,"
+    "http://localhost:4173,"
+    "http://127.0.0.1:4173,"
+    "http://localhost:3000,"
+    "http://127.0.0.1:3000"
 )
 
 _ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
@@ -323,7 +356,8 @@ def list_diseases():
 async def get_disease_schema(disease: str, response: Response):
     """
     Get the JSON Schema for a disease's patient input fields.
-    Cached for 24 h — schema changes only on deployment.
+    Cached for CACHE_TTL_SCHEMA (24 h by default) — schema changes only on
+    deployment.
     """
     key = schema_cache_key(disease)
     cached = await cache_get(key)
@@ -333,7 +367,7 @@ async def get_disease_schema(disease: str, response: Response):
 
     schema = get_schema_for_disease(disease)
     result = schema.model_json_schema()
-    await cache_set(key, result, ttl=86400)
+    await cache_set(key, result, ttl=SCHEMA_TTL_SECONDS)
     response.headers["Cache-Hit"] = "false"
     return result
 
@@ -391,42 +425,61 @@ async def predict_disease(
 
     يتطلب دور: doctor | nurse | super_admin
 
-    النتائج مؤقتة في الكاش لـ 5 دقائق للمدخلات المتكررة.
+    النتائج مؤقتة في الكاش (CACHE_TTL_PREDICT، افتراضياً ساعة) للمدخلات المتكررة.
     يمكن ربط النتيجة بمريض موجود عبر ?patient_id=<uuid>
     """
     _predict_log = logging.getLogger("omnidiag.predict")
     try:
         patient_data = _validate_patient_input(disease, patient)
 
-        # Cache check (skip when linking to a specific patient for accurate audit)
+        # The cache holds the COMPUTATION only, never the recording of it
+        # (X-7). Returning early on a hit used to skip the predictions row,
+        # the Prometheus counter and the review queue entirely, so a second
+        # clinician scoring the same patient left no trace and could not be
+        # queued for review. Everything below the cache block now runs on a
+        # hit exactly as it does on a miss; only the model call is skipped.
         cache_key = predict_cache_key(disease, patient_data)
-        if not patient_id:
-            cached = await cache_get(cache_key)
-            # A payload written by an older release can still be live for up
-            # to the 300 s TTL after a deploy. Serving it would hand back a
-            # raw-scale probability under a corrected-scale contract, so the
-            # scale is checked rather than assumed; a mismatch is a miss.
-            if cached is not None and not cached_payload_matches_scale(
-                cached, router.disease_configs.get(disease)
-            ):
-                log.warning(
-                    "predict: discarding cached payload for disease=%s — "
-                    "probability scale does not match the current contract",
-                    disease,
-                )
-                cached = None
-            if cached is not None:
-                response.headers["Cache-Hit"] = "true"
-                return cached
+        result = None
+        cache_hit = False
 
-        result = router.predict(disease, patient_data)
+        # The cache is consulted whether or not a patient is linked. It used
+        # to be skipped for patient-linked calls "for accurate audit", which
+        # was really a workaround for the X-7 bug above: a cache hit skipped
+        # the record. Now that every served prediction is recorded, a hit is
+        # audited exactly like a miss, so the EMR can link its screenings to
+        # a patient without paying 9-14 s for each one.
+        cached = await cache_get(cache_key)
+        # A payload written by an older release can still be live for up to
+        # the predict TTL after a deploy. Serving it would hand back a
+        # raw-scale probability under a corrected-scale contract, so the
+        # scale is checked rather than assumed; a mismatch is a miss.
+        if cached is not None and not cached_payload_matches_scale(
+            cached, router.disease_configs.get(disease)
+        ):
+            log.warning(
+                "predict: discarding cached payload for disease=%s — "
+                "probability scale does not match the current contract",
+                disease,
+            )
+            cached = None
+        if cached is not None:
+            result = cached
+            cache_hit = True
 
-        # Store in cache
-        if not patient_id:
-            await cache_set(cache_key, result, ttl=300)
-        response.headers["Cache-Hit"] = "false"
+        if result is None:
+            # Off the event loop: router.predict() is synchronous CPU work
+            # (model inference, feature engineering). Awaiting it inline in an
+            # `async def` endpoint blocks the single event-loop thread, which
+            # freezes EVERY other request for the duration — measured at 18 s
+            # on a 150-row diabetes batch (X-3). run_in_threadpool hands it to
+            # the anyio worker pool; the returned value is byte-identical.
+            result = await run_in_threadpool(router.predict, disease, patient_data)
+            await cache_set(cache_key, result, ttl=PREDICT_TTL_SECONDS)
 
-        # Record Prometheus metrics
+        response.headers["Cache-Hit"] = "true" if cache_hit else "false"
+
+        # Record Prometheus metrics. Counted on cache hits too: the metric
+        # measures predictions served to clinicians, not model invocations.
         try:
             record_prediction(
                 disease=disease,
@@ -521,7 +574,7 @@ async def explain_disease(
         patient_data = _validate_patient_input(disease, patient)
 
         _explain_log.debug(f"Explain request for disease={disease}")
-        result = router.explain(disease, patient_data)
+        result = await run_in_threadpool(router.explain, disease, patient_data)  # X-3
         _explain_log.debug("Explain completed successfully")
 
         # Persist prediction + SHAP data only for authenticated users
@@ -578,8 +631,8 @@ async def counterfactuals_disease(
     """
     توليد سيناريوهات "ماذا لو" لتقليل المخاطر. يعمل بدون تسجيل دخول.
 
-    النتائج مؤقتة في الكاش لـ 60 دقيقة — التوليد مكلف (استدلال متكرر)
-    والمخرجات ثابتة لنفس المدخلات.
+    النتائج مؤقتة في الكاش (CACHE_TTL_COUNTERFACTUALS، افتراضياً 12 ساعة) —
+    التوليد مكلف (استدلال متكرر) والمخرجات ثابتة لنفس المدخلات.
     """
     try:
         patient_data = _validate_patient_input(disease, patient)
@@ -591,10 +644,12 @@ async def counterfactuals_disease(
             return cached
 
         _cf_log.debug(f"Counterfactuals request for disease={disease}")
-        result = router.counterfactuals(disease, patient_data)
+        # The heaviest path in the product (9–14 s for diabetes) — the one
+        # that made the whole Space unresponsive before X-3.
+        result = await run_in_threadpool(router.counterfactuals, disease, patient_data)
         _cf_log.debug(f"Counterfactuals completed: status={result.get('status')}")
 
-        await cache_set(cache_key, result, ttl=3600)
+        await cache_set(cache_key, result, ttl=COUNTERFACTUALS_TTL_SECONDS)
         response.headers["Cache-Hit"] = "false"
         return result
     except HTTPException:
@@ -638,6 +693,66 @@ class BatchResponse(BaseModel):
     succeeded: int
     failed: int
     results: List[BatchRowResult]
+
+
+def _run_batch_predictions(
+    disease: str, validated_rows: List[tuple]
+) -> tuple[List[BatchRowResult], int, int]:
+    """
+    Score every validated row. Pure synchronous CPU work — called via
+    run_in_threadpool so it never occupies the event loop (X-3).
+
+    One vectorized model call for every validated row when the model family
+    declares a vectorised predict_batch (heart's — see WEAKNESS_REGISTER.md
+    HM-2; IterativeImputer inside the Pipeline is ~300x slower called once
+    per row than once on the whole batch). Otherwise one predict() call per
+    row (diabetes'), so a failing row only fails itself.
+
+    Returns (results, succeeded, failed).
+    """
+    results: List[BatchRowResult] = []
+    succeeded = 0
+    failed = 0
+
+    loader = router._get_loader(disease)
+    if loader.capabilities.supports_vectorized_batch and validated_rows:
+        try:
+            preds = loader.predict_batch([patient for _, patient in validated_rows])
+            for (i, _), pred in zip(validated_rows, preds):
+                results.append(BatchRowResult(
+                    row=i,
+                    status="ok",
+                    prediction=pred.get("prediction"),
+                    confidence=pred.get("confidence"),
+                    diagnosis=pred.get("diagnosis"),
+                    data_completeness_warning=pred.get("data_completeness_warning"),
+                ))
+                succeeded += 1
+        except Exception as exc:
+            # The vectorized call failed for the whole validated group --
+            # report it per row, same as each row individually raising
+            # would have been reported in the per-row path below.
+            for i, _ in validated_rows:
+                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
+                failed += 1
+    else:
+        for i, validated in validated_rows:
+            try:
+                pred = router.predict(disease, validated)
+                results.append(BatchRowResult(
+                    row=i,
+                    status="ok",
+                    prediction=pred.get("prediction"),
+                    confidence=pred.get("confidence"),
+                    diagnosis=pred.get("diagnosis"),
+                    data_completeness_warning=pred.get("data_completeness_warning"),
+                ))
+                succeeded += 1
+            except Exception as exc:
+                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
+                failed += 1
+
+    return results, succeeded, failed
 
 
 @app.post(
@@ -711,49 +826,15 @@ async def batch_predict(
             results.append(BatchRowResult(row=i, status="error", error=str(exc)))
             failed += 1
 
-    # Prediction: one vectorized model call for every validated row when the
-    # model family declares a vectorised predict_batch (heart's -- see
-    # WEAKNESS_REGISTER.md HM-2; IterativeImputer inside the Pipeline is
-    # ~300x slower called once per row than once on the whole batch).
-    # Otherwise one predict() call per row (diabetes'), so a failing row
-    # only fails itself.
-    loader = router._get_loader(disease)
-    if loader.capabilities.supports_vectorized_batch and validated_rows:
-        try:
-            preds = loader.predict_batch([patient for _, patient in validated_rows])
-            for (i, _), pred in zip(validated_rows, preds):
-                results.append(BatchRowResult(
-                    row=i,
-                    status="ok",
-                    prediction=pred.get("prediction"),
-                    confidence=pred.get("confidence"),
-                    diagnosis=pred.get("diagnosis"),
-                    data_completeness_warning=pred.get("data_completeness_warning"),
-                ))
-                succeeded += 1
-        except Exception as exc:
-            # The vectorized call failed for the whole validated group --
-            # report it per row, same as each row individually raising
-            # would have been reported in the per-row path below.
-            for i, _ in validated_rows:
-                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
-                failed += 1
-    else:
-        for i, validated in validated_rows:
-            try:
-                pred = router.predict(disease, validated)
-                results.append(BatchRowResult(
-                    row=i,
-                    status="ok",
-                    prediction=pred.get("prediction"),
-                    confidence=pred.get("confidence"),
-                    diagnosis=pred.get("diagnosis"),
-                    data_completeness_warning=pred.get("data_completeness_warning"),
-                ))
-                succeeded += 1
-            except Exception as exc:
-                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
-                failed += 1
+    # The whole prediction pass runs in one threadpool hop (X-3). A 500-row
+    # diabetes batch is ~67 s of pure CPU; inline on the event loop it froze
+    # every other visitor's request for that entire time.
+    predicted, ok_count, err_count = await run_in_threadpool(
+        _run_batch_predictions, disease, validated_rows
+    )
+    results.extend(predicted)
+    succeeded += ok_count
+    failed += err_count
 
     results.sort(key=lambda r: r.row)
 
@@ -860,6 +941,7 @@ async def generate_clinical_report(
             body.shap_values,
             body.features,
             risk_bands,
+            decision_threshold,
         )
         return {"disease": body.disease, "report": report_text, "source": "rule_based"}
 
@@ -898,8 +980,13 @@ async def parse_notes(
 ) -> Dict[str, Any]:
     if _parse_clinical_note is None:
         return {"extracted_features": {}, "mapped_features": {}, "field_count": 0, "engine": "none"}
-    from backend.nlp.notes_parser import bert_status
+    from backend.nlp.notes_parser import bert_status, language_support
     bert = bert_status()
+    # Every pattern in the parser is an English regex, so an Arabic note
+    # extracts nothing. Reporting that as "0 fields extracted" told the
+    # clinician their note was empty rather than that the tool cannot read
+    # their language.
+    language = language_support(body.note)
     use_bert = body.use_bert and bert["available"]
     extracted = _parse_clinical_note(body.note, use_bert=use_bert)
     mapped: Dict[str, Any] = {}
@@ -917,4 +1004,8 @@ async def parse_notes(
         # when only the regex rules ran.
         "engine": "regex+bert" if use_bert else "regex",
         "bert": bert,
+        # {script, supported, message}. False for anything containing Arabic,
+        # including a mixed note: a partial read of a clinical note is not a
+        # supported read.
+        "language": language,
     }

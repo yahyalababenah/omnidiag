@@ -9,7 +9,7 @@
  *   3. Persist selection in localStorage for session continuity
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 
 const DiseaseContext = createContext(null);
@@ -29,13 +29,17 @@ export function DiseaseProvider({ children }) {
   const [selectedDisease, setSelectedDisease] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const initialised = useRef(false);
 
   // ── Fetch available diseases on mount ──
+  //
+  // No `initialised` ref guard here on purpose. Pairing one with the
+  // `cancelled` flag deadlocks under StrictMode: the first run sets the ref,
+  // its cleanup sets `cancelled`, and the second run returns early on the
+  // ref — so nothing ever clears `loading` and the app sits on
+  // "Loading diseases…" forever in `npm run dev` (X-4). The `cancelled` flag
+  // alone is the correct guard: the second run is allowed to proceed and is
+  // the one whose state updates land.
   useEffect(() => {
-    if (initialised.current) return;
-    initialised.current = true;
-
     let cancelled = false;
 
     async function init() {
@@ -60,7 +64,7 @@ export function DiseaseProvider({ children }) {
       } catch (err) {
         if (!cancelled) {
           console.error('[DiseaseContext] Failed to load diseases:', err);
-          setError(err.message || 'Failed to connect to the diagnostic engine.');
+          setError(err.message || 'Failed to connect to the screening service.');
         }
       } finally {
         if (!cancelled) setLoading(false);

@@ -1,9 +1,17 @@
 /**
  * ComparisonMode — Feature 3.6
  *
- * Side-by-side comparison of two prediction scenarios (Before/After).
- * Users pick two mock patients (or two sets of parameters) and the component
- * runs both predictions and highlights the differences.
+ * Side-by-side comparison of TWO DIFFERENT PATIENTS. The user picks two demo
+ * patients, the component scores both and highlights where their records
+ * differ.
+ *
+ * It was called "Before / After Compare", which claimed something it has
+ * never done: there is no same-patient before/after anywhere in the product.
+ * Values cannot be edited here, and both columns are separate people, so
+ * "after" invited a judge to read a difference between two patients as the
+ * effect of an intervention on one. Renamed throughout to say what it is.
+ * If a true same-patient comparison is ever built, the old name belongs to
+ * that, not to this.
  *
  * Works with Engineering Mode style (no auth required) so it uses the
  * public /predict endpoint via the existing api utility.
@@ -46,12 +54,14 @@ function DeltaBadge({ before, after }) {
   if (before == null || after == null) return null
   const delta = after - before
   const pct = Math.round(Math.abs(delta) * 100)
-  if (pct === 0) return <span className="text-xs text-gray-400 flex items-center gap-0.5"><Minus className="w-3 h-3" /> No change</span>
-  const improving = delta < 0
+  if (pct === 0) return <span className="text-xs text-gray-400 flex items-center gap-0.5"><Minus className="w-3 h-3" /> Same estimated risk</span>
+  // Two different people: B is higher or lower than A. Not an improvement,
+  // which would imply one patient changed.
+  const lower = delta < 0
   return (
-    <span className={`text-xs font-semibold flex items-center gap-0.5 ${improving ? 'text-green-600' : 'text-red-600'}`}>
-      {improving ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />}
-      {improving ? '↓' : '↑'}{pct}% risk
+    <span className={`text-xs font-semibold flex items-center gap-0.5 ${lower ? 'text-green-600' : 'text-red-600'}`}>
+      {lower ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />}
+      {lower ? '↓' : '↑'}{pct}% vs Patient A
     </span>
   )
 }
@@ -150,14 +160,6 @@ function ResultColumn({ label, result, loading, error, color, colorLight }) {
         </div>
       </div>
 
-      {/* Risk score */}
-      <div className="text-center">
-        <p className="text-xs text-gray-500 uppercase tracking-wide">Risk Score</p>
-        <p className={`text-3xl font-black mt-1 ${colorLight}`}>
-          {Math.round((riskScore(result) ?? 0) * 100)}%
-        </p>
-        <p className="text-[10px] text-gray-400">probability of the positive class</p>
-      </div>
     </div>
   )
 }
@@ -188,8 +190,8 @@ function FeatureDiffTable({ beforePatient, afterPatient, fields }) {
         <thead className="bg-slate-50">
           <tr>
             <th className="text-left px-4 py-2.5 text-gray-500 font-medium uppercase tracking-wide text-[10px]">Feature</th>
-            <th className="text-left px-4 py-2.5 text-blue-600 font-medium uppercase tracking-wide text-[10px]">Before</th>
-            <th className="text-left px-4 py-2.5 text-violet-600 font-medium uppercase tracking-wide text-[10px]">After</th>
+            <th className="text-left px-4 py-2.5 text-blue-600 font-medium uppercase tracking-wide text-[10px]">Patient A</th>
+            <th className="text-left px-4 py-2.5 text-violet-600 font-medium uppercase tracking-wide text-[10px]">Patient B</th>
             <th className="text-left px-4 py-2.5 text-gray-500 font-medium uppercase tracking-wide text-[10px]">Change</th>
           </tr>
         </thead>
@@ -237,8 +239,8 @@ function ComparisonChart({ beforeResult, afterResult, beforeName, afterName, dis
   const data = [
     {
       name: 'Risk Probability',
-      Before: Math.round((beforeResult.confidence ?? 0) * 100),
-      After:  Math.round((afterResult.confidence ?? 0) * 100),
+      patientA: Math.round((beforeResult.confidence ?? 0) * 100),
+      patientB: Math.round((afterResult.confidence ?? 0) * 100),
     },
   ]
 
@@ -268,8 +270,8 @@ function ComparisonChart({ beforeResult, afterResult, beforeName, afterName, dis
                 }}
               />
             )}
-            <Bar name={beforeName} dataKey="Before" fill="#2563eb" radius={[4, 4, 0, 0]} />
-            <Bar name={afterName}  dataKey="After"  fill="#7c3aed" radius={[4, 4, 0, 0]} />
+            <Bar name={beforeName} dataKey="patientA" fill="#2563eb" radius={[4, 4, 0, 0]} />
+            <Bar name={afterName}  dataKey="patientB" fill="#7c3aed" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -329,10 +331,12 @@ export default function ComparisonMode() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <ArrowLeftRight className="w-5 h-5 text-primary-600" /> Before / After Comparison
+            <ArrowLeftRight className="w-5 h-5 text-primary-600" /> Patient Comparison
           </h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Compare two patient profiles side by side to evaluate risk changes
+            Score two patient records side by side and see where they differ.
+            This compares two different patients — it is not a before/after
+            view of one patient's treatment.
           </p>
         </div>
       </div>
@@ -342,14 +346,14 @@ export default function ComparisonMode() {
         <div className="card-body">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
             <PatientPicker
-              label="Before"
+              label="Patient A"
               patients={patients}
               selected={beforePatient}
               onSelect={p => { setBeforePatient(p); setRan(false) }}
               color="text-blue-600"
             />
             <PatientPicker
-              label="After"
+              label="Patient B"
               patients={patients}
               selected={afterPatient}
               onSelect={p => { setAfterPatient(p); setRan(false) }}

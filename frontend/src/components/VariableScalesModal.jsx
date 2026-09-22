@@ -17,6 +17,35 @@ import { X, ChevronDown, Search } from 'lucide-react';
 import { lookupMedicalTerm } from '../utils/medicalDictionary';
 
 /**
+ * Where each module's variables and their coding actually come from.
+ *
+ * The footer used to state "Data source: CDC BRFSS 2015 Health Indicators"
+ * on every page, including the heart module — whose variables come from the
+ * UCI heart-disease cohort and have nothing to do with BRFSS. A judge
+ * reading the scales drawer on the heart page was told the wrong provenance
+ * for every row in front of them.
+ */
+const DISEASE_SCALE_SOURCES = {
+  heart_disease: {
+    source: 'UCI Heart Disease (Cleveland, Hungarian, Long Beach VA, Switzerland — 920 patients)',
+    note: 'Values are direct clinical measurements; Age is in years.',
+  },
+  diabetes: {
+    source: 'CDC BRFSS 2015 Diabetes Health Indicators',
+    note: 'Self-reported survey variables. Age is a BRFSS 5-year band (1 = 18–24 … 13 = 80+), not years; GenHlth is 1 (excellent) to 5 (poor).',
+  },
+};
+
+function scaleSourceFor(diseaseName) {
+  return (
+    DISEASE_SCALE_SOURCES[diseaseName] ?? {
+      source: 'this module’s own schema',
+      note: null,
+    }
+  );
+}
+
+/**
  * Format the validation constraints into a readable scale/range string.
  */
 function formatScale(field) {
@@ -107,6 +136,7 @@ export default function VariableScalesModal({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const scaleSource = scaleSourceFor(diseaseName);
 
   // Expand all categories on open
   useEffect(() => {
@@ -327,8 +357,11 @@ export default function VariableScalesModal({
         {/* ── Footer ── */}
         <div className="shrink-0 px-6 py-3 border-t border-clinical-border bg-gray-50">
           <p className="text-[10px] text-gray-400 text-center">
-            Data source: CDC BRFSS 2015 Health Indicators · Scales reflect validated schema constraints
+            Data source: {scaleSource.source} · Scales reflect validated schema constraints
           </p>
+          {scaleSource.note && (
+            <p className="text-[10px] text-gray-400 text-center mt-0.5">{scaleSource.note}</p>
+          )}
         </div>
       </div>
 

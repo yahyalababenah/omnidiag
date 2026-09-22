@@ -25,7 +25,26 @@ pinned: false
 
 ---
 
-**OmniDiag** is a config-driven, multi-disease clinical decision support system built for healthcare professionals. It serves per-disease XGBoost and stacking ensemble models behind a unified FastAPI surface, with SHAP-based explainability, a DiCE-inspired counterfactual engine, a human-in-the-loop active learning pipeline, DeepSeek LLM clinical report generation, Prometheus/Grafana/Evidently monitoring, MLflow experiment tracking, and Kubernetes deployment with horizontal pod autoscaling.
+**OmniDiag** is a config-driven, multi-disease clinical decision support system built for healthcare professionals. It serves per-disease XGBoost and stacking ensemble models behind a unified FastAPI surface, with SHAP-based explainability, a DiCE-inspired counterfactual engine, a human-in-the-loop active learning pipeline, DeepSeek LLM clinical report generation, Prometheus metrics, and Kubernetes deployment with horizontal pod autoscaling.
+
+> **What is actually running in the deployed Space** (verified 2026-09-23, see
+> [docs/FEATURE_VERIFICATION.md](docs/FEATURE_VERIFICATION.md)):
+>
+> - **Monitoring: Prometheus only.** Evidently drift detection and MLflow
+>   tracking are implemented in this repository but are **not live**. Evidently
+>   is installed in the image yet unusable — the code targets its 0.4 API and
+>   the pin resolves to 0.7, which removed it; the cost of each way out is
+>   costed in [docs/EVIDENTLY_COST.md](docs/EVIDENTLY_COST.md). MLflow creates
+>   an empty database and logs no runs. Do not present either as a working
+>   feature.
+> - **Clinical notes: regex, English only.** The BioBERT path exists in the
+>   code but is never called — the frontend always sends `use_bert: false` and
+>   `transformers` is not part of the deployed dependency set. Arabic is not
+>   supported: `/api/v4/parse-notes` reports `language.supported: false` for
+>   any note containing Arabic and the UI says so explicitly.
+> - **Patient Comparison compares two different patients**, side by side. It
+>   is not a before/after view of one patient under an intervention; no such
+>   view exists.
 
 Coronary Artery Disease (CAD) and Diabetes Mellitus (DM) are currently registered. Adding a disease within a registered model family requires a YAML config, a Pydantic schema, a feature engineer, and model weights — no routing, middleware, auth, or API changes. Adding a new model family requires one backend class implementing the ModelBackend interface, registered once. Tree-based families use TreeExplainer; other families use a slower generic SHAP explainer.
 
@@ -160,7 +179,7 @@ When `DEEPSEEK_API_KEY` is absent or the API call raises any exception, [`_rule_
 
 ### Clinical NLP Notes Parser
 
-[`parse_clinical_note()`](backend/nlp/notes_parser.py:249) implements two-tier extraction from free-text clinical notes. [`_regex_extract()`](backend/nlp/notes_parser.py:97) runs first as the always-available baseline: it applies 20+ regex patterns (matched fresh via `re.search()` per call, not pre-compiled) across categories including age (with short-form aliases like `y/o`), BP systolic/diastolic, cholesterol, glucose, BMI, heart rate, creatinine, hemoglobin, oldpeak, and boolean flags for hypertension, diabetes, stroke, smoking, chest pain, exercise angina, edema, and anemia. If `use_bert=True` and HuggingFace Transformers is installed, `_bert_extract()` runs the `d4data/biomedical-ner-all` NER pipeline (lazy-loaded on first call, CPU inference, confidence threshold 0.7) and merges its output — BERT values win on overlapping keys. [`map_to_disease_schema()`](backend/nlp/notes_parser.py:236) applies disease-specific field name and value transformations: for `heart_disease`, `bp_systolic → RestingBP` (int); for `diabetes`, `cholesterol → HighChol` (binarised at 200 mg/dL). Missing `transformers` degrades silently to regex-only with no user-visible error.
+[`parse_clinical_note()`](backend/nlp/notes_parser.py:249) implements two-tier extraction from free-text clinical notes. [`_regex_extract()`](backend/nlp/notes_parser.py:97) runs first as the always-available baseline: it applies 20+ regex patterns (matched fresh via `re.search()` per call, not pre-compiled) across categories including age (with short-form aliases like `y/o`), BP systolic/diastolic, cholesterol, glucose, BMI, heart rate, creatinine, hemoglobin, oldpeak, and boolean flags for hypertension, diabetes, stroke, smoking, chest pain, exercise angina, edema, and anemia. If `use_bert=True` and HuggingFace Transformers is installed, `_bert_extract()` runs the `d4data/biomedical-ner-all` NER pipeline (lazy-loaded on first call, CPU inference, confidence threshold 0.7) and merges its output — BERT values win on overlapping keys. **This path is never taken in the deployment**: the frontend hard-codes `use_bert: false` and `transformers` is not installed in the Space image, so every extraction is regex. Describing the deployed parser as "BioBERT" is inaccurate. Every pattern is English; `language_support()` classifies the note by script and returns `supported: false` for anything containing Arabic (including mixed notes, where only the English abbreviations are read), which the UI surfaces instead of reporting "0 fields extracted". [`map_to_disease_schema()`](backend/nlp/notes_parser.py:236) applies disease-specific field name and value transformations: for `heart_disease`, `bp_systolic → RestingBP` (int); for `diabetes`, `cholesterol → HighChol` (binarised at 200 mg/dL). Missing `transformers` degrades silently to regex-only with no user-visible error.
 
 ### Explainable Inference Core
 
@@ -202,11 +221,19 @@ Disease-specific now, not uniform: **diabetes** implements a [`BaseFeatureEngine
 
 ### Prometheus + Evidently + Grafana Monitoring
 
+> **Deployment status:** only Prometheus `/metrics` is live. The Evidently and
+> Grafana pieces below describe code in this repository that is not running in
+> the deployed Space — see [docs/EVIDENTLY_COST.md](docs/EVIDENTLY_COST.md).
+
 [`metrics.py`](backend/monitoring/metrics.py:37) registers all Prometheus instruments at module import time using lazy-guarded `try/except` so the app starts even if `prometheus_client` is absent. Eight instruments are exposed at `GET /metrics`: `omnidiag_predictions_total{disease,prediction}` (Counter), `omnidiag_prediction_confidence{disease}` (Histogram, buckets 0.01–1.0 with fine resolution below 0.1 — the old 0.5–1.0 set left 7 of 9 buckets unreachable for prevalence-corrected diabetes probabilities, whose maximum on the test split is 0.653; series recorded before this change are not comparable with those after it), `omnidiag_request_duration_seconds{method,endpoint,status}` (Histogram, buckets 0.01–5.0 s), `omnidiag_active_requests` (Gauge), `omnidiag_drift_share{disease}` (Gauge, updated post-drift-run), `omnidiag_cache_hits_total{disease}`, `omnidiag_cache_misses_total{disease}`, and `omnidiag_batch_rows_total{disease,status}`.
 
 [`DriftMonitor`](backend/monitoring/drift.py:48) wraps Evidently's `Report` with `DatasetDriftMetric` and `DatasetMissingValuesMetric` against a per-disease reference CSV baseline: heart_disease uses `data/heart_disease/processed/final_ready_data.csv`; diabetes uses the raw BRFSS export `data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv` (the paths intentionally differ — see [`_REFERENCE_PATHS`](backend/monitoring/drift.py:175)). A `threading.Lock` prevents concurrent report runs. [`get_monitor(disease)`](backend/monitoring/drift.py:181) returns per-disease singleton instances. After each run, [`record_drift()`](backend/monitoring/metrics.py:101) pushes the `drift_share` value to the Prometheus Gauge so Grafana dashboards reflect it without polling the admin API.
 
 ### MLflow Experiment Tracking
+
+> **Deployment status:** not live. MLflow is installed in the Space image and
+> creates an empty tracking database on first call; `list_recent_runs()`
+> returns an empty list because nothing logs to it there.
 
 [`log_model_info()`](backend/monitoring/mlflow_tracker.py:63) and [`log_drift_metrics()`](backend/monitoring/mlflow_tracker.py:110) in [`mlflow_tracker.py`](backend/monitoring/mlflow_tracker.py) log all runs under the `"OmniDiag"` experiment. [`ensure_experiment()`](backend/monitoring/mlflow_tracker.py:46) is idempotent — it creates the experiment on first call and returns the existing `experiment_id` on subsequent calls. Model runs log `disease` and `model_version` as MLflow **tags**, evaluation metrics as MLflow **metrics** (via `mlflow.log_metrics()` — a separate mechanism from tags), and `.pkl` artifacts from `models/{disease}/`. Drift runs log `drift_share`, `drifted_columns`, `total_columns`, and `sample_size` as metrics with a `run_type=drift` tag. The retraining pipeline calls `_log_to_mlflow()` automatically after each incremental update. [`list_recent_runs(n=20)`](backend/monitoring/mlflow_tracker.py:143) backs the admin dashboard endpoint.
 
@@ -320,7 +347,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   │   └── report_generator.py           # generate_report() — DeepSeek API + rule-based fallback
 │   │
 │   ├── nlp/
-│   │   └── notes_parser.py               # parse_clinical_note() — BioBERT NER + regex fallback
+│   │   └── notes_parser.py               # parse_clinical_note() — regex (English only); BioBERT path unused in deployment
 │   │
 │   ├── federated/                        # Federated learning (🚧 server manifest pending)
 │   │   ├── aggregator.py                 # FedAvg strategy + add_dp_noise() (Gaussian DP)
@@ -614,8 +641,8 @@ Two different prefixes are actually in use — verified live against a running i
 | LLM | [OpenAI SDK → DeepSeek](backend/llm/report_generator.py:100) | Clinical report generation |
 | NLP | [Transformers + regex](backend/nlp/notes_parser.py:249) | Clinical note feature extraction |
 | Metrics | [prometheus-client 0.20+](backend/monitoring/metrics.py) | `/metrics` scrape endpoint |
-| Drift | [Evidently 0.4+](backend/monitoring/drift.py:48) | Dataset drift detection |
-| MLOps | [MLflow 2.10+](backend/monitoring/mlflow_tracker.py:63) | Experiment tracking |
+| Drift | [Evidently 0.4+](backend/monitoring/drift.py:48) | Dataset drift detection — **code only, not live** |
+| MLOps | [MLflow 2.10+](backend/monitoring/mlflow_tracker.py:63) | Experiment tracking — **code only, not live** |
 | Federated | [Flower (flwr 1.0+)](backend/federated/aggregator.py:62) | Cross-hospital FL (🚧) |
 | Validation | [Pydantic v2](backend/schemas.py) | Input/output model validation |
 | Config | [PyYAML 6.0+](configs/config_loader.py) | Disease configuration files |

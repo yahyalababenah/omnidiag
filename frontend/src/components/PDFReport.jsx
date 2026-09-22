@@ -22,7 +22,7 @@ import {
   Image,
   Font,
 } from '@react-pdf/renderer'
-import { normaliseScenario } from '../utils/counterfactuals'
+import { summariseWhatIf, SUBTITLE, SCENARIOS_TITLE } from '../utils/whatIfSummary'
 import { SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening'
 
 // ── Colour palette (matches Tailwind clinical theme) ──────────────────────────
@@ -177,6 +177,10 @@ export default function PDFReport({
   shapText,
   counterfactuals,
   counterfactualsBaseline,
+  counterfactualsBestAchievable = null,
+  counterfactualsMessage = null,
+  counterfactualsError = null,
+  doctorNotes = null,
   patientData = null,
   shapImageUrl,
   doctorName,
@@ -194,33 +198,27 @@ export default function PDFReport({
     : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
   const barColor = isPositive ? C.positive : C.negative
 
-  // Counterfactual field names differ by module: diabetes returns
-  // `new_probability_corrected` / `risk_reduction_relative_pct`, heart returns
-  // `probability`. Reading only `probability` printed "—" on every diabetes
-  // report. The backend's own relative reduction is preferred over recomputing
-  // here, because subtracting two probabilities gives percentage points, which
-  // is a different number from the one this row is labelled with.
-  const cfs = (counterfactuals ?? []).slice(0, 3).map((raw, i) => {
-    // Same normaliser as the What-If card: diabetes `changes` is an object,
-    // and calling .map() on it threw and aborted the whole PDF export.
-    const cf = normaliseScenario(raw, i, patientData)
-    const after =
-      cf.new_probability_corrected ?? cf.new_probability ?? cf.probability ?? null
-    let reduction = null
-    if (typeof cf.risk_reduction_relative_pct === 'number') {
-      reduction = Math.round(cf.risk_reduction_relative_pct)
-    } else if (typeof cf.risk_reduction === 'string' && !Number.isNaN(parseFloat(cf.risk_reduction))) {
-      reduction = Math.round(parseFloat(cf.risk_reduction))
-    } else if (after !== null && typeof counterfactualsBaseline === 'number' && counterfactualsBaseline > 0) {
-      reduction = Math.round(((counterfactualsBaseline - after) / counterfactualsBaseline) * 100)
-    }
-    return {
-      scenarioText: (cf.changes ?? [])
-        .map((c) => `${c.feature}: ${c.original_value} → ${c.counterfactual_value}`)
-        .join('; '),
-      riskReductionPct: reduction,
-    }
+  // Classified by the SAME module the on-screen card uses, so the printed
+  // report cannot say something different from the screen it was exported
+  // from. Before this, PDFReport received no bestAchievable at all and had no
+  // What-If section: a patient the screen told the clinician to refer
+  // produced a report with neither the scenarios nor the referral on it.
+  const whatIf = summariseWhatIf({
+    counterfactuals,
+    prediction: result?.prediction,
+    baselineProbability: counterfactualsBaseline,
+    patientData,
+    bestAchievable: counterfactualsBestAchievable,
+    error: counterfactualsError,
+    message: counterfactualsMessage,
   })
+  const cfs = whatIf.scenarios.slice(0, 3).map((cf) => ({
+    scenarioText: cf.changes
+      .map((c) => `${c.feature}: ${c.original_value} → ${c.counterfactual_value}`)
+      .join('; '),
+    riskReductionPct: cf.reductionPct,
+  }))
+  const pct = (v) => `${(v * 100).toFixed(1)}%`
   const dateStr = reportDate ?? new Date().toLocaleDateString('en-GB')
 
   return (
@@ -254,7 +252,10 @@ export default function PDFReport({
             <LabelValue label="MRN"          value={patient?.mrn} />
           </View>
           <View style={styles.row}>
-            <LabelValue label="Date of Birth" value={patient?.date_of_birth} />
+            <LabelValue
+              label={patient?.date_of_birth ? 'Date of Birth' : 'Age'}
+              value={patient?.date_of_birth ?? (patient?.age != null ? `${patient.age}` : '—')}
+            />
             <LabelValue label="Gender"        value={patient?.gender} />
           </View>
           {patient?.contact_email && (
@@ -305,10 +306,52 @@ export default function PDFReport({
           </View>
         )}
 
-        {/* ── Recommended Interventions ── */}
+        {/* ── What-If ── */}
+        {whatIf.state !== 'unavailable' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {cfs.length > 0 ? SCENARIOS_TITLE : 'What-If Analysis'}
+            </Text>
+            <Text style={styles.summaryText}>{SUBTITLE}</Text>
+
+            {/* The referral recommendation, in the same words as the screen.
+                This is the sentence a printed report must not lose. */}
+            {whatIf.message && (
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryText}>{whatIf.message}</Text>
+                {whatIf.detail && (
+                  <Text style={[styles.summaryText, { marginTop: 3 }]}>{whatIf.detail}</Text>
+                )}
+                {whatIf.best && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={styles.summaryText}>
+                      Best achievable with every modifiable factor improved:
+                    </Text>
+                    {whatIf.best.changes.map((c) => (
+                      <Text key={c.feature} style={styles.summaryText}>
+                        {'  • '}{c.feature}: {String(c.original_value)} → {String(c.counterfactual_value)}
+                      </Text>
+                    ))}
+                    <Text style={[styles.summaryText, { marginTop: 3 }]}>
+                      {typeof counterfactualsBaseline === 'number' &&
+                        `Estimated risk ${pct(counterfactualsBaseline)} → `}
+                      {typeof whatIf.best.after === 'number' && pct(whatIf.best.after)}
+                      {whatIf.best.relativePct !== null &&
+                        ` — relative reduction ${Math.round(whatIf.best.relativePct)}%`}
+                      {whatIf.best.absolutePp !== null &&
+                        ` (${whatIf.best.absolutePp.toFixed(1)} pts absolute)`}
+                      {' '}— still above the threshold.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Modelled scenarios ── */}
         {cfs.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recommended Lifestyle Interventions</Text>
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderCell, { flex: 3 }]}>Scenario</Text>
@@ -322,6 +365,16 @@ export default function PDFReport({
                   </Text>
                 </View>
               ))}
+            </View>
+          </View>
+        )}
+
+        {/* ── Clinician's note ── */}
+        {doctorNotes && String(doctorNotes).trim() && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Clinical Note</Text>
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryText}>{String(doctorNotes).trim()}</Text>
             </View>
           </View>
         )}

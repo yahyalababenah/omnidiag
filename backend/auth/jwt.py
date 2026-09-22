@@ -13,7 +13,22 @@ Token anatomy:
 Environment variables (all optional, sensible dev defaults applied):
     JWT_SECRET_KEY                  — signing secret (MUST be changed in production)
     JWT_ALGORITHM                   — default HS256
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES — default 15
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES — default 1440 (24 h), see below
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS   — default 7
+
+Access token lifetime (X-6)
+---------------------------
+The default is a full day, not the usual 15 minutes, and that is a
+deliberate deployment choice rather than an oversight. This build runs as a
+single-tenant demonstration on a booth laptop and a public Space: a clinician
+signs in once in the morning and uses Admin and Batch through the day. There
+is no refresh loop in the frontend, so a 15-minute access token meant every
+session died mid-demo with "Could not validate credentials" and the only
+recovery was signing in again.
+
+Set JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15 (or lower) for any deployment holding
+real patient data, where a short window plus /auth/refresh is the right
+trade. The refresh token TTL is unchanged at 7 days.
 """
 
 import os
@@ -27,8 +42,9 @@ from starlette.requests import Request
 # ── Configuration ────────────────────────────────────────────────────────────
 SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "dev-secret-do-not-use-in-production")
 ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
-REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+# 1440 minutes = 24 h. See the module docstring for why this is not 15.
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
 _CREDENTIALS_EXCEPTION = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,

@@ -31,6 +31,10 @@ router = APIRouter()
 
 class AnnotateRequest(BaseModel):
     label: int  # 0 or 1 — the expert's ground-truth annotation
+    # The reviewer's reasoning. Stored on the row (it used to be accepted
+    # here and then discarded). It is shown back in the queue and never
+    # reaches a model: retraining reads `label` and the prediction's own
+    # input_features.
     notes: Optional[str] = None
 
 
@@ -89,6 +93,8 @@ async def list_review_queue(
             "id": rq.id,
             "prediction_id": rq.prediction_id,
             "uncertainty_score": rq.uncertainty_score,
+            "notes": rq.notes,
+            "label": rq.label,
             "status": rq.status,
             "created_at": rq.created_at.isoformat() if rq.created_at else None,
             "disease": pred.disease if pred else None,
@@ -130,11 +136,17 @@ async def annotate_review(
         raise HTTPException(status_code=422, detail="label must be 0 or 1")
 
     rq.label = body.label
+    rq.notes = (body.notes or "").strip() or None
     rq.reviewer_id = current_user.id
     rq.reviewed_at = datetime.now(timezone.utc)
     rq.status = "reviewed"
     await db.commit()
-    return {"id": review_id, "status": "reviewed", "label": body.label}
+    return {
+        "id": review_id,
+        "status": "reviewed",
+        "label": body.label,
+        "notes": rq.notes,
+    }
 
 
 @router.post(

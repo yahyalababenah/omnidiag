@@ -22,6 +22,7 @@ import {
 import { pdf } from '@react-pdf/renderer';
 import MedicalTooltip from './MedicalTooltip';
 import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { useDisease } from '../context/DiseaseContext';
 import { useDiseaseSchema } from '../hooks/useDiseaseSchema';
 import { getPatientsForDisease } from '../mockPatients';
@@ -54,6 +55,9 @@ import {
  */
 export default function ClinicalEmrMode() {
   const { selectedDisease, currentDiseaseInfo } = useDisease();
+  // Saving a clinical note needs a signed-in clinician; the rest of this
+  // view works anonymously as before.
+  const { token } = useAuth();
   const titleCase = (str) => str.charAt(0).toUpperCase() + str.slice(1);
   const diseaseLabel = titleCase(currentDiseaseInfo?.display_name || selectedDisease || 'Heart Disease');
 
@@ -80,6 +84,12 @@ export default function ClinicalEmrMode() {
   const [showTimeline, setShowTimeline] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  // The clinician's own free text about this screening (7). Held here, saved
+  // explicitly, and never mixed into patient.data — it is not a feature.
+  const [doctorNotes, setDoctorNotes] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
+  const [notesError, setNotesError] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const coldStartTimer = useRef(null);
   const shapChartRef = useRef(null);
@@ -112,6 +122,27 @@ export default function ClinicalEmrMode() {
   // disease/patient landed after the current one and overwrote it.
   const runSeq = useRef(0);
 
+  // ── Doctor's clinical note (7) ─────────────────────────────────────────────
+  //
+  // Saved explicitly against the screening on screen. It is stored on the
+  // prediction record and shown back in History and the PDF; it is never
+  // merged into patient.data, so it can never become a model feature, and
+  // the report modal builds its own payload so it never reaches DeepSeek.
+  const saveDoctorNotes = useCallback(async () => {
+    const text = doctorNotes.trim();
+    if (!text || !selectedPatient?.id) return;
+    setNotesSaving(true);
+    setNotesError(null);
+    try {
+      await api.saveClinicalNote(selectedPatient.id, selectedDisease, text);
+      setNotesSaved(true);
+    } catch (err) {
+      setNotesError(err.message || 'Could not save the note.');
+    } finally {
+      setNotesSaving(false);
+    }
+  }, [doctorNotes, selectedPatient, selectedDisease]);
+
   const runDiagnosis = useCallback(async (patient) => {
     if (!selectedDisease || !patient) return;
     const seq = ++runSeq.current;
@@ -128,11 +159,19 @@ export default function ClinicalEmrMode() {
     setCounterfactualsData(null);
     setCounterfactualsBaseline(null);
     setCounterfactualsBest(null);
+    // A note belongs to one screening; carrying it across to the next
+    // patient would attach one clinician's words to another's record.
+    setDoctorNotes('');
+    setNotesSaved(false);
+    setNotesError(null);
 
     try {
+      // patient.id is the seeded Patient row's id (backend/demo_seed.py), so
+      // the screening is linked to that patient and appears in History. The
+      // response is unchanged by the query parameter.
       const [pred, expl] = await Promise.all([
-        api.predict(selectedDisease, patient.data),
-        api.explain(selectedDisease, patient.data),
+        api.predict(selectedDisease, patient.data, patient.id),
+        api.explain(selectedDisease, patient.data, patient.id),
       ]);
       if (!isCurrent()) return;
       setResult(pred);
@@ -254,15 +293,25 @@ export default function ClinicalEmrMode() {
         <PDFReport
           patient={{
             full_name: selectedPatient?.name,
-            mrn: selectedPatient?.mrn ?? '—',
-            date_of_birth: selectedPatient?.age ? `Age ${selectedPatient.age}` : '—',
-            gender: selectedPatient?.gender ?? '—',
+            // The demo patients carry `id` as their record number and `sex`,
+            // not `mrn`/`gender`; reading only the latter printed "—" for
+            // both on every exported report.
+            mrn: selectedPatient?.mrn ?? selectedPatient?.id ?? '—',
+            age: selectedPatient?.age ?? null,
+            gender: selectedPatient?.gender ?? selectedPatient?.sex ?? '—',
           }}
           disease={selectedDisease}
           result={result}
           shapText={shapData?.text_explanation}
           counterfactuals={counterfactualsData}
           counterfactualsBaseline={counterfactualsBaseline}
+          // Without these the PDF had no What-If section and, worse, no
+          // referral recommendation for the patients whose screen said
+          // "Referral is recommended".
+          counterfactualsBestAchievable={counterfactualsBest}
+          counterfactualsMessage={counterfactualsMessage}
+          counterfactualsError={counterfactualsError}
+          doctorNotes={doctorNotes}
           patientData={selectedPatient?.data ?? null}
           shapImageUrl={imgUrl}
           reportDate={new Date().toLocaleDateString('en-GB')}
@@ -350,7 +399,12 @@ export default function ClinicalEmrMode() {
               <div className="card-body">
                 {/* Dropdown selector */}
                 <div className="relative">
+                  {/* data-print-keep: the patient's name lives inside this
+                      dropdown trigger, and the print stylesheet hides every
+                      <button>. Without the flag, Print produced a clinical
+                      report with no patient name on it. */}
                   <button
+                    data-print-keep
                     onClick={() => setPatientSelectOpen((prev) => !prev)}
                     className="w-full flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-clinical-border hover:bg-gray-100 transition-colors"
                   >
@@ -417,6 +471,47 @@ export default function ClinicalEmrMode() {
                       <p className="text-sm text-gray-800">{selectedPatient.admittingComplaint}</p>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Doctor's clinical note — free text, stored verbatim */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary-600" />
+                  Clinical Note
+                </h2>
+              </div>
+              <div className="card-body space-y-2">
+                <p className="text-xs text-gray-500">
+                  Your own note on this screening. Stored with the record and shown in
+                  History and the exported PDF. It is not used by the model and is not
+                  sent to the report generator.
+                </p>
+                <textarea
+                  value={doctorNotes}
+                  onChange={(e) => { setDoctorNotes(e.target.value); setNotesSaved(false); }}
+                  rows={3}
+                  placeholder="e.g. Patient reports exertional dyspnoea not captured by the form."
+                  className="w-full text-sm border border-clinical-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                />
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={saveDoctorNotes}
+                    disabled={!token || notesSaving || !doctorNotes.trim()}
+                    className="btn-secondary text-xs flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {notesSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                    {notesSaving ? 'Saving…' : 'Save note'}
+                  </button>
+                  {!token && (
+                    <span className="text-xs text-amber-700">Sign in to save notes to the record.</span>
+                  )}
+                  {notesSaved && !notesError && (
+                    <span className="text-xs text-green-700">Saved to this screening.</span>
+                  )}
+                  {notesError && <span className="text-xs text-red-600">{notesError}</span>}
                 </div>
               </div>
             </div>
@@ -542,7 +637,7 @@ export default function ClinicalEmrMode() {
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                     <Loader2 className="w-8 h-8 animate-spin mb-3" />
                     <p className="text-sm">
-                      {coldStart ? 'Waking up the diagnostic engine...' : 'Running AI risk screening...'}
+                      {coldStart ? 'Waking up the screening service...' : 'Running AI risk screening...'}
                     </p>
                     {coldStart && (
                       <p className="text-xs text-amber-600 mt-2">

@@ -1,0 +1,89 @@
+{
+  "_about": "The 12-note evaluation set for the clinical notes parser. Reconstructed 2026-09-23 from the case descriptions in docs/FEATURE_VERIFICATION.md section 3 -- the original notes.json lived in a session scratchpad that no longer exists. Each note reproduces the documented case (which fields it should yield, and the specific trap it was written to expose); the exact original wording is not recoverable and is not claimed.",
+  "notes": [
+    {
+      "id": "H-EN-1",
+      "language": "en",
+      "disease": "heart_disease",
+      "trap": "typical angina must not be flattened to ASY",
+      "text": "58-year-old male presenting with typical angina on exertion. Resting BP 152/94. Total cholesterol 268 mg/dl. Max heart rate 138 on treadmill. Exercise-induced angina present. ST depression 2.4 mm."
+    },
+    {
+      "id": "H-EN-2",
+      "language": "en",
+      "disease": "heart_disease",
+      "trap": "LDL must not be read as total cholesterol; a resting pulse must not be read as MaxHR",
+      "text": "64-year-old male, atypical angina. BP 138/88. LDL 160 mg/dl, total cholesterol 230 mg/dl. Pulse 88 at rest. Fasting blood sugar above 120."
+    },
+    {
+      "id": "H-EN-3",
+      "language": "en",
+      "disease": "heart_disease",
+      "trap": "'Denies chest pain' must not yield a chest pain type; 'HR 72 at rest' must not become MaxHR",
+      "text": "41-year-old male, non-smoker. Denies chest pain. BP 118/76. Total cholesterol 185 mg/dl. HR 72 at rest."
+    },
+    {
+      "id": "H-AR-1",
+      "language": "ar",
+      "disease": "heart_disease",
+      "trap": "pure Arabic -- must be reported as unsupported, not as an empty note",
+      "text": "مريض ذكر عمره 58 سنة، يشكو من ألم في الصدر عند المجهود. ضغط الدم 150/95. الكوليسترول الكلي 260."
+    },
+    {
+      "id": "H-AR-2",
+      "language": "ar+en",
+      "disease": "heart_disease",
+      "trap": "mixed script -- English abbreviations parse, Arabic does not; must be flagged as partial",
+      "text": "مريض ذكر، BP 150/95، total cholesterol 260 mg/dl، لا يوجد تدخين. FBS > 120."
+    },
+    {
+      "id": "H-AR-3",
+      "language": "ar",
+      "disease": "heart_disease",
+      "trap": "pure Arabic, no Latin digits context -- must be reported as unsupported",
+      "text": "المريضة أنثى، تعاني من ارتفاع ضغط الدم وألم صدري غير نمطي. لا تاريخ عائلي لأمراض القلب."
+    },
+    {
+      "id": "D-EN-1",
+      "language": "en",
+      "disease": "diabetes",
+      "trap": "affirmative history terms should map to 1",
+      "text": "52-year-old female. Known hypertension and high cholesterol. BMI 33.4. Current smoker. Previous myocardial infarction. Rates her general health as fair."
+    },
+    {
+      "id": "D-EN-2",
+      "language": "en",
+      "disease": "diabetes",
+      "trap": "the negation case -- every one of these must be 0, not 1",
+      "text": "47-year-old male, non-smoker. No history of hypertension. Denies stroke, no heart disease. BMI 26.1. Cholesterol checked last year."
+    },
+    {
+      "id": "D-EN-3",
+      "language": "en",
+      "disease": "diabetes",
+      "trap": "BRFSS age bucket must come from the stated age",
+      "text": "42-year-old female with hypertension and hyperlipidaemia. BMI 31.0. History of stroke. Physically active most weeks."
+    },
+    {
+      "id": "D-AR-1",
+      "language": "ar",
+      "disease": "diabetes",
+      "trap": "pure Arabic -- must be reported as unsupported",
+      "text": "مريضة عمرها 52 سنة، لديها ارتفاع في ضغط الدم والكوليسترول. مؤشر كتلة الجسم 33. مدخّنة."
+    },
+    {
+      "id": "D-AR-2",
+      "language": "ar+en",
+      "disease": "diabetes",
+      "trap": "mixed script -- only BMI / BP style tokens parse",
+      "text": "مريض عمره 47 سنة، BMI 26، BP مرتفع، لا يمارس الرياضة. GenHlth fair."
+    },
+    {
+      "id": "D-AR-3",
+      "language": "ar",
+      "disease": "diabetes",
+      "trap": "pure Arabic -- must be reported as unsupported",
+      "text": "المريض يعاني من السمنة وقلة النشاط البدني، ولا يوجد تاريخ للجلطة أو أمراض القلب."
+    }
+  ]
+}

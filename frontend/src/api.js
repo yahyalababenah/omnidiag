@@ -62,7 +62,7 @@ class OmniDiagApi {
     } catch (err) {
       if (err.name === 'AbortError') {
         throw new Error(
-          'The diagnostic engine is waking up — this can take a minute or two on the first scan of the day. Please try again.'
+          'The screening service is waking up — this can take a minute or two on the first scan of the day. Please try again.'
         );
       }
       throw err;
@@ -86,19 +86,45 @@ class OmniDiagApi {
     return this._fetch(`/api/v4/${disease}/schema`);
   }
 
-  /** POST /api/v4/{disease}/predict */
-  predict(disease, patientData) {
-    return this._fetch(`/api/v4/${disease}/predict`, {
+  /**
+   * POST /api/v4/{disease}/predict
+   *
+   * `patientId` links the screening to a patient record, which is what makes
+   * it appear in that patient's History and what a clinical note can later
+   * be attached to. It is a query parameter: the response is identical with
+   * or without it.
+   */
+  predict(disease, patientData, patientId = null) {
+    return this._fetch(`/api/v4/${disease}/predict${this._patientQuery(patientId)}`, {
       method: 'POST',
       body: JSON.stringify(patientData),
     });
   }
 
   /** POST /api/v4/{disease}/explain */
-  explain(disease, patientData) {
-    return this._fetch(`/api/v4/${disease}/explain`, {
+  explain(disease, patientData, patientId = null) {
+    return this._fetch(`/api/v4/${disease}/explain${this._patientQuery(patientId)}`, {
       method: 'POST',
       body: JSON.stringify(patientData),
+    });
+  }
+
+  /** `?patient_id=…`, or '' when no patient is linked. */
+  _patientQuery(patientId) {
+    return patientId ? `?patient_id=${encodeURIComponent(patientId)}` : '';
+  }
+
+  /**
+   * POST /api/v4/patients/{id}/notes — store the clinician's free text
+   * against their latest screening for this disease.
+   *
+   * The note is recorded and shown back; it is never a model input and never
+   * reaches the report LLM.
+   */
+  saveClinicalNote(patientId, disease, notes) {
+    return this._fetch(`/api/v4/patients/${encodeURIComponent(patientId)}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ disease, notes }),
     });
   }
 

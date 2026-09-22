@@ -7,7 +7,7 @@
  * Requires: auth token (AuthContext) + clinical role on backend.
  */
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
 } from 'recharts'
@@ -28,15 +28,41 @@ import { API_BASE } from '../api'
 // even though the Authorization header below is attached correctly.
 const BASE = `${API_BASE}/api/v4`
 
-function downloadCsv(rows, disease, threshold = null) {
+// Diabetes generation is ~0.1 s per row and the whole batch is one request.
+// Above this the judge is watching a spinner rather than the product, so the
+// upload is refused up front with the row count rather than accepted and
+// left to run. Heart is vectorised and stays on the server's 500-row limit.
+const DIABETES_MAX_ROWS = 20
+const SERVER_MAX_ROWS = 500
+
+/** Row cap for a disease, and why, for the message shown to the user. */
+export function rowLimitFor(disease) {
+  return disease === 'diabetes'
+    ? { max: DIABETES_MAX_ROWS, reason: 'diabetes scoring takes about 0.1 s per patient' }
+    : { max: SERVER_MAX_ROWS, reason: 'server limit' }
+}
+
+/** Data rows in a CSV text body, ignoring the header and blank lines. */
+export function countCsvDataRows(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
+  return Math.max(0, lines.length - 1)
+}
+
+function downloadCsv(rows, disease, threshold = null, prevalenceCorrected = false) {
   // The exported file outlives this session and gets opened in Excel with no
   // legend, so the column name has to carry the scale. For diabetes these are
   // prevalence-corrected probabilities compared against a ~6% threshold, not
   // a 50% one; a bare "risk_probability" of 0.07 beside "Positive" reads as
-  // an error.
+  // an error. Heart applies no correction, so naming its column
+  // "..._corrected" claimed something untrue about every heart export.
+  const probabilityHeader = prevalenceCorrected
+    ? 'risk_probability_corrected'
+    : 'risk_probability'
+  // `prediction` (0/1) and `diagnosis` ("Positive"/"Negative") were the same
+  // fact twice. The label is kept, under the screening name the UI uses.
   const headers = [
-    'row', 'status', 'prediction',
-    'risk_probability_corrected', 'decision_threshold', 'diagnosis',
+    'row', 'status', 'screening_result',
+    probabilityHeader, 'decision_threshold',
     'data_completeness_warning', 'error',
   ]
   const lines = [headers.join(',')]
@@ -44,10 +70,9 @@ function downloadCsv(rows, disease, threshold = null) {
     lines.push([
       r.row,
       r.status,
-      r.prediction ?? '',
+      r.diagnosis ?? (r.prediction === 1 ? 'Positive' : r.prediction === 0 ? 'Negative' : ''),
       r.confidence != null ? (r.confidence * 100).toFixed(1) + '%' : '',
       threshold != null ? (threshold * 100).toFixed(2) + '%' : '',
-      r.diagnosis ?? '',
       r.data_completeness_warning ? `"${r.data_completeness_warning.replace(/"/g, '""')}"` : '',
       r.error ? `"${r.error.replace(/"/g, '""')}"` : '',
     ].join(','))
@@ -63,7 +88,7 @@ function downloadCsv(rows, disease, threshold = null) {
 
 // ── Drop zone ─────────────────────────────────────────────────────────────────
 
-function DropZone({ onFile, disabled }) {
+function DropZone({ onFile, disabled, maxRows = SERVER_MAX_ROWS }) {
   const inputRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
 
@@ -89,7 +114,7 @@ function DropZone({ onFile, disabled }) {
       <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
       <p className="text-sm font-medium text-gray-700">Drop a CSV file here, or click to browse</p>
       <p className="text-xs text-gray-400 mt-1">
-        Max 500 rows · UTF-8 encoding · Header row required
+        Max {maxRows} rows · UTF-8 encoding · Header row required
       </p>
       <input
         ref={inputRef}
@@ -139,11 +164,15 @@ function ResultsTable({ results, threshold = null }) {
         <table className="w-full text-xs">
           <thead className="bg-slate-50">
             <tr>
-              {['Row', 'Status', 'Prediction',
+              {/* "Prediction" and "Diagnosis" were the same value twice —
+                  the 0/1 rendered as a badge, and the server's own
+                  "Positive"/"Negative" string. One column, named for what
+                  this product actually produces: a screening result. */}
+              {['Row', 'Status', 'Screening result',
                 threshold != null
                   ? `Risk Probability (threshold ${(threshold * 100).toFixed(1)}%)`
                   : 'Risk Probability',
-                'Diagnosis', 'Data Quality', 'Error'].map(h => (
+                'Data Quality', 'Error'].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-gray-500 font-medium uppercase tracking-wide text-[10px]">{h}</th>
               ))}
             </tr>
@@ -160,14 +189,13 @@ function ResultsTable({ results, threshold = null }) {
                 <td className="px-4 py-2">
                   {r.prediction != null ? (
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${r.prediction === 1 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                      {r.prediction === 1 ? 'Positive' : 'Negative'}
+                      {r.diagnosis ?? (r.prediction === 1 ? 'Positive' : 'Negative')}
                     </span>
                   ) : '—'}
                 </td>
                 <td className="px-4 py-2 text-gray-700">
                   {r.confidence != null ? `${Math.round(r.confidence * 100)}%` : '—'}
                 </td>
-                <td className="px-4 py-2 text-gray-700">{r.diagnosis ?? '—'}</td>
                 <td className="px-4 py-2">
                   {r.data_completeness_warning ? (
                     <span
@@ -186,7 +214,7 @@ function ResultsTable({ results, threshold = null }) {
             ))}
             {visible.length > 200 && (
               <tr>
-                <td colSpan={7} className="px-4 py-3 text-center text-xs text-gray-400">
+                <td colSpan={6} className="px-4 py-3 text-center text-xs text-gray-400">
                   Showing first 200 of {visible.length} rows. Download CSV for full results.
                 </td>
               </tr>
@@ -250,18 +278,49 @@ export default function BatchUpload() {
   const { selectedDisease, availableDiseases } = useDisease()
   // Decision threshold for the selected module, on the same scale as the
   // probabilities the batch endpoint returns.
-  const threshold =
-    availableDiseases?.find(d => d.name === selectedDisease)?.inference_threshold ?? null
+  const diseaseInfo = availableDiseases?.find(d => d.name === selectedDisease)
+  const threshold = diseaseInfo?.inference_threshold ?? null
+  const prevalenceCorrected = diseaseInfo?.prevalence_corrected === true
+  const limit = rowLimitFor(selectedDisease)
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
 
-  const handleFile = useCallback((f) => {
-    setFile(f)
+  // Results belong to the disease they were produced for. Leaving them on
+  // screen after a switch showed heart results under a "Diabetes" heading
+  // and a 10.8% threshold, and Download CSV then wrote heart rows against
+  // the diabetes threshold.
+  useEffect(() => {
+    setFile(null)
     setData(null)
     setError(null)
-  }, [])
+  }, [selectedDisease])
+
+  const handleFile = useCallback(async (f) => {
+    setData(null)
+    setError(null)
+
+    // Count the rows before uploading, so an oversized diabetes batch is
+    // refused in a second instead of running for a minute and timing out.
+    const { max, reason } = rowLimitFor(selectedDisease)
+    try {
+      const rows = countCsvDataRows(await f.text())
+      if (rows > max) {
+        setFile(null)
+        setError(
+          `${f.name} has ${rows} data rows — the limit for ` +
+          `${(selectedDisease || 'this module').replace(/_/g, ' ')} is ${max} ` +
+          `(${reason}). Split the file and run it in parts.`
+        )
+        return
+      }
+    } catch {
+      // Unreadable file: let the server decide rather than blocking upload.
+    }
+
+    setFile(f)
+  }, [selectedDisease])
 
   async function runBatch() {
     if (!file || !selectedDisease) return
@@ -333,7 +392,7 @@ export default function BatchUpload() {
         {data && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => downloadCsv(data.results, selectedDisease, threshold)}
+              onClick={() => downloadCsv(data.results, selectedDisease, threshold, prevalenceCorrected)}
               className="btn-secondary text-sm flex items-center gap-2"
             >
               <Download className="w-4 h-4" /> Download CSV
@@ -362,6 +421,9 @@ export default function BatchUpload() {
               The first row must be a header matching the {diseaseName} schema field names.
               Each subsequent row is one patient. Numeric and categorical values are accepted as-is.
             </p>
+            <p className="text-xs mt-1 text-blue-600">
+              Up to {limit.max} patients per file for this module ({limit.reason}).
+            </p>
           </div>
         </div>
       )}
@@ -369,7 +431,7 @@ export default function BatchUpload() {
       {/* Upload area */}
       {!data && (
         <>
-          <DropZone onFile={handleFile} disabled={loading || !token} />
+          <DropZone onFile={handleFile} disabled={loading || !token} maxRows={limit.max} />
 
           {file && (
             <div className="flex items-center justify-between p-4 bg-slate-50 border border-clinical-border rounded-xl">

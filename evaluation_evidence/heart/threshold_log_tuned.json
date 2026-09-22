@@ -1,0 +1,7366 @@
+{
+  "threshold": 0.3695,
+  "note": "Pooled 5-fold StratifiedKFold(random_state=42) out-of-fold probabilities, shipped hyperparameters (hpo.json:best_params), evaluated at the shipped threshold 0.3695. Same format/derivation method as the archived threshold_log.json, but for the tuned model at the tuned threshold.",
+  "records": [
+    {
+      "index": 0,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.88924,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 1,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.963583,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 2,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.970705,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 3,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.588051,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 4,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.051589,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 5,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.25626,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 6,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.862849,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 7,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.584876,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 8,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.842173,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 9,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.927345,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 10,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.580677,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 11,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.259389,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 12,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.684128,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 13,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.137417,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 14,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.29885,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 15,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.36616,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 16,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.240672,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 17,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.700602,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 18,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.113828,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 19,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.216985,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 20,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.637248,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 21,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.485239,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 22,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.569366,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 23,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.783383,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 24,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.948594,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 25,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.098737,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 26,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.113393,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 27,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.810116,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 28,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.740731,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 29,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.900529,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 30,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.279545,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 31,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.839323,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 32,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.322643,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 33,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.710482,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 34,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.204558,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 35,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.275766,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 36,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.957726,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 37,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.868057,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 38,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.898097,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 39,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.850501,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 40,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.528492,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 41,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.295533,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 42,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.215645,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 43,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.362105,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 44,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.281878,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 45,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.787772,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 46,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.364383,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 47,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.956443,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 48,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.278575,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 49,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.323495,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 50,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.025575,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 51,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.59064,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 52,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.608333,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 53,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.053574,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 54,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.933203,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 55,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.952248,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 56,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.252588,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 57,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.390041,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 58,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.368565,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 59,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.683776,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 60,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.769145,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 61,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.257721,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 62,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.943145,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 63,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.21686,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 64,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.799277,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 65,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.978095,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 66,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.784769,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 67,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.383706,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 68,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.969183,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 69,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.760568,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 70,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.26513,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 71,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.865677,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 72,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.959599,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 73,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.774595,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 74,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.356921,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 75,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.275795,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 76,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.968003,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 77,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.268133,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 78,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.137765,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 79,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.888852,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 80,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.953093,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 81,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.405775,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 82,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.148101,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 83,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.769094,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 84,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.166197,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 85,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.132467,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 86,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.341964,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 87,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.121175,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 88,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.25963,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 89,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.129284,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 90,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.757536,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 91,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.812311,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 92,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.649109,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 93,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.050573,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 94,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.22155,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 95,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.760691,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 96,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.891916,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 97,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.882863,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 98,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.17798,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 99,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.398821,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 100,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.502537,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 101,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.15773,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 102,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.452687,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 103,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.204085,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 104,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.549964,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 105,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.240987,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 106,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.655666,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 107,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.426851,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 108,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.975719,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 109,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.604443,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 110,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.80985,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 111,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.941285,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 112,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.136592,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 113,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.938426,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 114,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.318303,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 115,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.100804,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 116,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.352,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 117,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.302495,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 118,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.95004,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 119,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.965945,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 120,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.866781,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 121,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.861417,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 122,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.674043,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 123,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.971099,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 124,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.611274,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 125,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.068937,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 126,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.969633,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 127,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.95664,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 128,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.073929,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 129,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.376189,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 130,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.354027,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 131,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.231298,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 132,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.050213,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 133,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.671659,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 134,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.061419,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 135,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.149831,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 136,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.972461,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 137,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.720486,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 138,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.906422,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 139,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.876437,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 140,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.338749,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 141,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.568141,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 142,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.10932,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 143,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.763271,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 144,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.615109,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 145,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.227361,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 146,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.951328,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 147,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.152778,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 148,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.133318,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 149,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.115487,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 150,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.343894,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 151,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.366562,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 152,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.27655,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 153,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.893427,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 154,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.968812,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 155,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.920525,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 156,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.828778,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 157,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.628892,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 158,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.802961,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 159,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.53205,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 160,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.127522,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 161,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.718001,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 162,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.158864,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 163,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.606633,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 164,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.330373,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 165,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.706018,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 166,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.185729,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 167,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.222223,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 168,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.72685,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 169,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.036657,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 170,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.933158,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 171,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.826807,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 172,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.776391,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 173,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.556016,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 174,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.882631,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 175,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.955146,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 176,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.769882,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 177,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.941912,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 178,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.286319,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 179,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.286636,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 180,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.601599,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 181,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.859061,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 182,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.238881,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 183,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.940902,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 184,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.310197,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 185,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.063172,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 186,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.26007,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 187,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.710609,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 188,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.13914,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 189,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.720289,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 190,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.153663,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 191,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.965701,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 192,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.881303,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 193,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.872085,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 194,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.249743,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 195,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.891377,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 196,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.661451,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 197,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.447127,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 198,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.107087,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 199,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.566287,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 200,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.401269,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 201,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.745761,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 202,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.262571,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 203,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.213714,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 204,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.460364,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 205,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.812995,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 206,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.977867,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 207,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.891373,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 208,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.187789,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 209,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.8118,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 210,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.042351,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 211,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.672493,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 212,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.324378,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 213,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.711163,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 214,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.510623,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 215,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.467202,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 216,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.025825,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 217,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.58221,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 218,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.766954,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 219,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.616687,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 220,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.147145,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 221,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.121431,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 222,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.034891,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 223,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.964328,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 224,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.742912,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 225,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.033049,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 226,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.51995,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 227,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.207232,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 228,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.798678,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 229,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.740875,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 230,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.096815,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 231,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.931768,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 232,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.372333,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 233,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.378552,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 234,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.089093,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 235,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.97626,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 236,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.969384,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 237,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.716136,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 238,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.061959,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 239,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.131252,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 240,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.140453,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 241,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.04147,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 242,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.286591,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 243,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.839676,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 244,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.239128,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 245,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.875548,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 246,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.607068,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 247,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.914196,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 248,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.489994,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 249,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.29613,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 250,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.890745,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 251,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.915907,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 252,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.942389,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 253,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.098001,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 254,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.645001,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 255,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.04407,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 256,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.233509,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 257,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.251852,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 258,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.470725,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 259,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.337893,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 260,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.145862,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 261,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.140469,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 262,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.23157,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 263,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.107458,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 264,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.970873,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 265,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.920549,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 266,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.823485,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 267,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.764277,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 268,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.19404,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 269,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.083111,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 270,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.906835,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 271,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.89709,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 272,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.946825,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 273,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.586527,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 274,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.372716,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 275,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.418835,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 276,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.214711,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 277,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.074437,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 278,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.28996,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 279,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.318498,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 280,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.96258,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 281,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.169475,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 282,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.802361,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 283,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.076612,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 284,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.597358,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 285,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.935394,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 286,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.959355,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 287,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.317637,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 288,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.117683,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 289,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.181231,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 290,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.478451,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 291,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.114256,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 292,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.938556,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 293,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.96116,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 294,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.633498,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 295,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.037657,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 296,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.892582,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 297,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.753181,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 298,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.402081,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 299,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.955233,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 300,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.896476,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 301,
+      "site": "cleveland",
+      "y_true": 1,
+      "proba": 0.055162,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 302,
+      "site": "cleveland",
+      "y_true": 0,
+      "proba": 0.10979,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 303,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.067426,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 304,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.192502,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 305,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.115628,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 306,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.119807,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 307,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.030766,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 308,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.040781,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 309,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.059101,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 310,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.175859,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 311,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.119541,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 312,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.029558,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 313,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.112446,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 314,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.132638,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 315,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.062381,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 316,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.285662,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 317,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.082493,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 318,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.14333,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 319,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.060165,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 320,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.206247,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 321,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.089237,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 322,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.115332,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 323,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.088506,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 324,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.068144,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 325,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.176225,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 326,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.440211,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 327,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.110774,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 328,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.471342,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 329,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.606754,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 330,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.186615,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 331,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.162841,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 332,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.479044,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 333,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.048864,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 334,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.502239,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 335,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.300688,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 336,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.093744,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 337,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.20021,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 338,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.338787,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 339,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.163882,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 340,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.194108,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 341,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.75215,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 342,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.52775,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 343,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.125345,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 344,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.117517,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 345,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.11098,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 346,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.200382,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 347,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.238565,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 348,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.056162,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 349,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.026317,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 350,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.072887,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 351,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.136427,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 352,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.115182,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 353,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.182128,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 354,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.719584,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 355,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.066322,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 356,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.104718,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 357,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.088223,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 358,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.161777,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 359,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.583701,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 360,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.184366,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 361,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.519598,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 362,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.053692,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 363,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.033164,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 364,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.032657,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 365,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.069627,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 366,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.099093,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 367,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.060883,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 368,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.119232,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 369,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.106908,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 370,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.275311,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 371,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.193049,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 372,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.092898,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 373,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.530189,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 374,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.047908,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 375,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.059771,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 376,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.344214,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 377,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.217818,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 378,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.531698,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 379,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.454118,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 380,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.295263,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 381,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.466968,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 382,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.311266,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 383,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.249063,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 384,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.571423,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 385,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.888913,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 386,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.550131,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 387,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.826352,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 388,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.114115,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 389,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.382779,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 390,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.465075,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 391,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.216971,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 392,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.946019,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 393,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.190073,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 394,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.175868,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 395,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.135867,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 396,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.108422,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 397,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.487525,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 398,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.394928,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 399,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.827965,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 400,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.507598,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 401,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.202745,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 402,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.217857,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 403,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.186401,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 404,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.076494,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 405,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.076494,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 406,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.049206,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 407,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.125635,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 408,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.275523,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 409,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.199094,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 410,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.938905,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 411,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.714006,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 412,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.035938,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 413,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.83147,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 414,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.105857,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 415,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.121889,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 416,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.28434,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 417,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.52829,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 418,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.762903,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 419,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.05795,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 420,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.097898,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 421,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.337792,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 422,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.131469,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 423,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.139216,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 424,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.077945,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 425,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.597551,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 426,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.033982,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 427,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.092181,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 428,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.099257,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 429,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.678326,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 430,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.283999,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 431,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.303126,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 432,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.123472,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 433,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.345237,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 434,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.240185,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 435,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.423831,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 436,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.128654,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 437,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.34433,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 438,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.159036,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 439,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.220688,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 440,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.976926,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 441,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.430617,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 442,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.630272,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 443,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.066154,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 444,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.100388,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 445,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.177789,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 446,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.08901,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 447,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.182749,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 448,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.110867,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 449,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.168106,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 450,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.523689,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 451,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.112229,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 452,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.163083,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 453,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.342108,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 454,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.389646,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 455,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.21173,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 456,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.255975,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 457,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.567803,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 458,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.774404,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 459,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.078709,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 460,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.084066,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 461,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.11835,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 462,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.435328,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 463,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.17081,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 464,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.254295,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 465,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.362611,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 466,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.406065,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 467,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.752284,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 468,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.881329,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 469,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.118025,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 470,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.328522,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 471,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.538743,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 472,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.785817,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 473,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.56504,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 474,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.369128,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 475,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.829181,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 476,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.603288,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 477,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.316204,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 478,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.595435,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 479,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.304685,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 480,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.768217,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 481,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.1442,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 482,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.454159,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 483,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.753451,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 484,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.71271,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 485,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.760546,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 486,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.594853,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 487,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.802597,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 488,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.896307,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 489,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.349184,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 490,
+      "site": "hungarian",
+      "y_true": 0,
+      "proba": 0.466268,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 491,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.880047,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 492,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.732199,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 493,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.053502,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 494,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.177789,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 495,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.491187,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 496,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.89343,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 497,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.495402,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 498,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.574014,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 499,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.957022,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 500,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.865176,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 501,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.548407,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 502,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.831257,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 503,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.941126,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 504,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.674379,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 505,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.60144,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 506,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.936596,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 507,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.597356,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 508,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.86994,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 509,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.831418,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 510,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.917733,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 511,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.940936,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 512,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.094407,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 513,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.202966,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 514,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.440383,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 515,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.377243,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 516,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.67683,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 517,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.829861,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 518,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.917562,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 519,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.402279,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 520,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.865057,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 521,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.957893,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 522,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.714885,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 523,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.262687,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 524,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.908037,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 525,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.912016,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 526,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.685343,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 527,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.95842,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 528,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.693717,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 529,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.912032,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 530,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.664714,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 531,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.62768,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 532,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.242204,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 533,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.803239,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 534,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.762966,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 535,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.489108,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 536,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.965831,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 537,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.969554,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 538,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.952658,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 539,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.959795,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 540,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.939811,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 541,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.447378,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 542,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.947555,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 543,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.892712,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 544,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.676314,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 545,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.955528,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 546,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.943853,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 547,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.89697,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 548,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.90821,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 549,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.93152,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 550,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.924666,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 551,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.981157,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 552,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.752234,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 553,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.940417,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 554,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.834543,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 555,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.857168,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 556,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.832152,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 557,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.945855,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 558,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.503481,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 559,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.141805,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 560,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.719678,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 561,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.900353,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 562,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.81518,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 563,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.462138,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 564,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.90476,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 565,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.896382,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 566,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.94761,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 567,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.978868,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 568,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.405483,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 569,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.943662,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 570,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.793748,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 571,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.447915,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 572,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.759613,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 573,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.968865,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 574,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.129561,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 575,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.937931,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 576,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.957883,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 577,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.82458,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 578,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.803694,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 579,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.930788,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 580,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.969782,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 581,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.956083,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 582,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.971981,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 583,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.932125,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 584,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.568679,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 585,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.796257,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 586,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.944693,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 587,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.837066,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 588,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.871168,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 589,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.943442,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 590,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.968436,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 591,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.939415,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 592,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.978123,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 593,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.419948,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 594,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.977096,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 595,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.584395,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 596,
+      "site": "hungarian",
+      "y_true": 1,
+      "proba": 0.932361,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 597,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.379688,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 598,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.787468,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 599,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.903509,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 600,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.951079,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 601,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.797923,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 602,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.290932,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 603,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.102235,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 604,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.666537,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 605,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.715838,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 606,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.938816,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 607,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.643423,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 608,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.764756,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 609,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.885561,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 610,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.874713,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 611,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.854755,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 612,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.92829,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 613,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.834415,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 614,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.411076,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 615,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.72975,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 616,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.941647,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 617,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.738634,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 618,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.742547,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 619,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.932865,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 620,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.895653,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 621,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.917487,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 622,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.624709,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 623,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.911024,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 624,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.806149,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 625,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.942084,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 626,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.84367,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 627,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.904709,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 628,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.867708,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 629,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.780527,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 630,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.783302,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 631,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.820548,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 632,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.955735,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 633,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.87522,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 634,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.978606,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 635,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.954288,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 636,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.955963,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 637,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.419,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 638,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.528274,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 639,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.430198,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 640,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.85975,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 641,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.89158,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 642,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.921943,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 643,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.938312,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 644,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.958821,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 645,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.703877,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 646,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.983989,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 647,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.888136,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 648,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.459083,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 649,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.876207,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 650,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.862494,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 651,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.852977,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 652,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.697144,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 653,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.714523,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 654,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.730486,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 655,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.934445,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 656,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.906425,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 657,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.702621,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 658,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.970947,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 659,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.971807,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 660,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.630563,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 661,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.962763,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 662,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.959581,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 663,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.955542,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 664,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.983676,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 665,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.691816,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 666,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.883483,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 667,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.953443,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 668,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.958742,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 669,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.82925,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 670,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.952847,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 671,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.844457,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 672,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.960177,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 673,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.939953,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 674,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.83759,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 675,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.916622,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 676,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.962142,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 677,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.938191,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 678,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.951376,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 679,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.860203,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 680,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.85231,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 681,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.975349,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 682,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.948857,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 683,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.930093,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 684,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.822369,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 685,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.978413,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 686,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.950235,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 687,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.959478,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 688,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.914309,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 689,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.378569,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 690,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.929052,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 691,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.702269,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 692,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.887171,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 693,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.985714,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 694,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.974816,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 695,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.968144,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 696,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.927457,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 697,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.92893,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 698,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.968961,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 699,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.953251,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 700,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.95427,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 701,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.840879,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 702,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.745602,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 703,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.974547,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 704,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.942537,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 705,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.95989,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 706,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.915076,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 707,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.949528,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 708,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.825247,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 709,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.968707,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 710,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.623932,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 711,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.863405,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 712,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.932009,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 713,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.805527,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 714,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.89386,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 715,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.941292,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 716,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.962059,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 717,
+      "site": "switzerland",
+      "y_true": 0,
+      "proba": 0.845689,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 718,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.277305,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 719,
+      "site": "switzerland",
+      "y_true": 1,
+      "proba": 0.680218,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 720,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.97431,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 721,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.526422,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 722,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.879588,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 723,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.927391,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 724,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.825952,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 725,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.623885,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 726,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.961753,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 727,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.886508,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 728,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.893024,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 729,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.603321,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 730,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.222687,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 731,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.937494,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 732,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.924034,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 733,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.693258,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 734,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.955909,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 735,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.822696,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 736,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.974173,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 737,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.916293,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 738,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.895258,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 739,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.93725,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 740,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.876052,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 741,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.956078,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 742,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.753025,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 743,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.781228,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 744,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.547616,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 745,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.938137,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 746,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.87789,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 747,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.887451,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 748,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.901818,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 749,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.47634,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 750,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.80491,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 751,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.928281,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 752,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.960287,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 753,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.422169,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 754,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.867835,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 755,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.940238,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 756,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.854376,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 757,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.951518,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 758,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.862175,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 759,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.955567,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 760,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.85268,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 761,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.760322,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 762,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.962242,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 763,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.736715,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 764,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.934899,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 765,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.93717,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 766,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.921915,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 767,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.851534,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 768,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.895189,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 769,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.375588,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 770,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.940313,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 771,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.321034,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 772,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.917721,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 773,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.500747,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 774,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.747217,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 775,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.978897,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 776,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.970848,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 777,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.810258,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 778,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.638303,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 779,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.937942,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 780,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.817961,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 781,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.979246,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 782,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.964993,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 783,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.936957,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 784,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.856013,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 785,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.92848,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 786,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.913759,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 787,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.952602,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 788,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.891444,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 789,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.55751,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 790,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.177134,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 791,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.911069,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 792,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.771373,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 793,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.95527,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 794,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.686936,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 795,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.858186,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 796,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.826928,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 797,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.507829,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 798,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.974754,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 799,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.804403,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 800,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.942053,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 801,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.96534,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 802,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.926115,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 803,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.938626,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 804,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.968692,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 805,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.958449,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 806,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.920958,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 807,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.83973,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 808,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.980038,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 809,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.740959,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 810,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.964377,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 811,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.729807,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 812,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.922635,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 813,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.657941,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 814,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.786718,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 815,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.976767,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 816,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.232578,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 817,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.809848,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 818,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.720879,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 819,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.888043,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 820,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.383388,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 821,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.938276,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 822,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.805854,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 823,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.819602,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 824,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.705076,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 825,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.979283,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 826,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.913177,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 827,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.942624,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 828,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.513995,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 829,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.251779,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 830,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.866054,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 831,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.724133,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 832,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.268545,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 833,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.857069,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 834,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.562118,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 835,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.9137,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 836,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.79716,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 837,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.945267,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 838,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.966837,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 839,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.862378,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 840,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.825902,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 841,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.984979,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 842,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.950533,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 843,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.717812,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 844,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.612806,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 845,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.879957,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 846,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.817621,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 847,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.967393,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 848,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.530895,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 849,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.705636,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 850,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.27089,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 851,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.753438,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 852,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.851459,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 853,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.761695,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 854,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.935152,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 855,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.628864,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 856,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.66451,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 857,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.699094,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 858,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.44811,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 859,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.73385,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 860,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.981521,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 861,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.682937,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 862,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.631075,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 863,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.971497,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 864,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.430374,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 865,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.226497,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 866,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.917396,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 867,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.892474,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 868,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.920329,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 869,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.865525,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 870,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.9169,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 871,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.774597,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 872,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.945846,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 873,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.976478,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 874,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.923987,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 875,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.944318,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 876,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.809912,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 877,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.93744,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 878,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.914755,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 879,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.891935,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 880,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.964324,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 881,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.899967,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 882,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.958844,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 883,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.950601,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 884,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.833661,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 885,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.857876,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 886,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.921094,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 887,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.739756,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 888,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.933392,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 889,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.774562,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 890,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.961922,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 891,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.341427,
+      "threshold": 0.3695,
+      "y_pred": 0
+    },
+    {
+      "index": 892,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.932848,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 893,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.705734,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 894,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.511888,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 895,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.756817,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 896,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.978226,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 897,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.856808,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 898,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.96178,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 899,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.886018,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 900,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.768797,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 901,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.698046,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 902,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.893808,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 903,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.893074,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 904,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.916688,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 905,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.667968,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 906,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.775509,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 907,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.720482,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 908,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.932718,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 909,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.756004,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 910,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.765617,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 911,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.985825,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 912,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.956754,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 913,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.804152,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 914,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.647616,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 915,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.468323,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 916,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.655112,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 917,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.78891,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 918,
+      "site": "long_beach_va",
+      "y_true": 0,
+      "proba": 0.899538,
+      "threshold": 0.3695,
+      "y_pred": 1
+    },
+    {
+      "index": 919,
+      "site": "long_beach_va",
+      "y_true": 1,
+      "proba": 0.74411,
+      "threshold": 0.3695,
+      "y_pred": 1
+    }
+  ]
+}

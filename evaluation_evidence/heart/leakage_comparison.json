@@ -1,0 +1,35 @@
+{
+  "purpose": "Document the leak found in the pre-tuning SVM pipeline and the honest numbers that replaced it. The LEAKED figures are not reproducible from the clean pipeline and are kept only for provenance -- do not cite them as current model performance.",
+  "leaked": {
+    "model": "svm",
+    "roc_auc_full_fit": 0.9570601851851852,
+    "best_cv_roc_auc": 0.9185570987654321,
+    "features": 13,
+    "features_note": "includes ca and thal (invasive, not collected in production)",
+    "leak": "StandardScaler/imputation fit on the full dataset before train/test split, so test-fold statistics leaked into preprocessing; roc_auc_full_fit is scored on data the scaler had already seen",
+    "source": "archive/stale_2026-09/metrics.json, archive/stale_2026-09/metadata.json",
+    "reproducible_from_clean_pipeline": false,
+    "status": "archived 2026-09-17; superseded, not shipped"
+  },
+  "clean": {
+    "model": "xgboost (Pipeline: IterativeImputer+StandardScaler / SimpleImputer+OrdinalEncoder -> XGBClassifier)",
+    "shipped_as": "models/heart_disease/heart_full_tuned.pkl",
+    "threshold": 0.3695,
+    "features": 11,
+    "features_note": "ca and thal excluded (invasive, unavailable in production)",
+    "nested_loso_mean_roc_auc": 0.813,
+    "nested_loso_source": "evaluation_evidence/heart/hpo.json:nested_loso_mean",
+    "nested_loso_note": "hyperparameter search re-run inside each leave-one-site-out fold; the only estimate where the held-out hospital never informed the search",
+    "pooled_cv_roc_auc": 0.8886,
+    "pooled_cv_source": "evaluation_evidence/heart/loso_tuned.json:pooled_cv.roc_auc (reproduced 2026-09-22, matches hpo.json comparison 'Optuna best' pooled_cv)",
+    "pooled_cv_caveat": "sites mixed across folds; optimistic vs LOSO/external",
+    "external_tehran_roc_auc_pct": 76.34,
+    "external_tehran_source": "evaluation_evidence/heart/external_validation_tuned.json",
+    "external_tehran_note": "measured on the 7-feature reduced model (heart_reduced_tuned.pkl); the full 11-feature model cannot be scored on Tehran data because 4 of its features (MaxHR, Oldpeak, ST_Slope, ExerciseAngina) are absent from that cohort",
+    "preprocessing": "fit only on each fold's training split; no test-fold information leaks into imputation or scaling",
+    "status": "shipped, current"
+  },
+  "why_not_directly_comparable": "The leaked figure (0.957) is a single full-dataset fit scored on data its own preprocessing had already seen, using 2 features (ca, thal) the clean pipeline does not have. The clean figures (0.813 nested LOSO, 0.7634 external) are held-out estimates on an 11-feature model with fold-isolated preprocessing. The gap is the leak plus the feature difference, not a single correctable delta -- there is no valid way to re-score the leaked SVM on the clean split to get an apples-to-apples number.",
+  "figure": "evaluation_evidence/heart/figures/leakage_comparison.png",
+  "generated_by": "compiled from cited files, 2026-09-22; chart from scratch/heart_leakage_chart.py"
+}

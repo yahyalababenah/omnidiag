@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="OmniDiag">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <!-- Ring: the "O" of OmniDiag, left open at the right so the trace exits it. -->
+  <path d="M256 92a164 164 0 1 0 150 98"
+        fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" opacity="0.92"/>
+  <!-- ECG trace: the one mark that says what this product is. -->
+  <path d="M130 268h54l30-72 40 148 34-94 26 46h68"
+        fill="none" stroke="#ffffff" stroke-width="30"
+        stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

@@ -21,8 +21,15 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useDisease } from '../context/DiseaseContext'
+import { API_BASE } from '../api'
 
-const BASE = '/api/v4'
+// Absolute, like every other component that hand-rolls a fetch(). The
+// backend and the frontend are not served from the same origin: a bare
+// relative '/api/v4/...' resolved against Vercel, which answered with
+// index.html, and the response surfaced to the clinician as
+// `Unexpected token '<', "<!doctype "... is not valid JSON` — see the same
+// note in BatchUpload.jsx.
+const BASE = `${API_BASE}/api/v4`
 
 async function apiFetch(path, token) {
   const res = await fetch(`${BASE}${path}`, {
@@ -101,6 +108,13 @@ function PredictionCard({ prediction, index }) {
               </p>
               <p className="text-[10px] text-gray-500 flex items-center gap-1">
                 <Clock className="w-3 h-3" /> {dateStr} · {timeStr}
+                {/* A clinician should be able to see that a note exists
+                    without opening every card to look for one. */}
+                {prediction.notes && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 font-medium">
+                    Note
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -135,6 +149,16 @@ function PredictionCard({ prediction, index }) {
                   <p className="text-xs text-gray-400 col-span-full">No feature data recorded</p>
                 )}
               </div>
+
+              {/* The clinician's own note for this screening (7). Stored on
+                  the prediction record; this is one of the two places it has
+                  to surface, the other being the exported PDF. */}
+              {prediction.notes && (
+                <div className="mt-4 border-t border-clinical-border pt-3">
+                  <p className="text-xs font-medium text-gray-700 mb-1">Clinical Note</p>
+                  <p className="text-xs text-gray-800 whitespace-pre-wrap">{prediction.notes}</p>
+                </div>
+              )}
 
               {prediction.shap_chart_data && (
                 <div className="mt-4">

@@ -348,3 +348,68 @@ def parse_clinical_note(note: str, use_bert: bool = True) -> Dict[str, Any]:
         result.update(bert_result)
 
     return result
+
+
+# ── Language support ─────────────────────────────────────────────────────────
+#
+# Every pattern in this module is an English regex. An Arabic note therefore
+# extracts nothing, and the UI used to report that as "0 fields extracted —
+# patient data updated", which reads as "the note contained nothing useful"
+# rather than "this tool cannot read your language". A clinician at a Jordan
+# demo typing an Arabic note deserves to be told which it is.
+#
+# Detection is by script, not by language model: the Arabic block is
+# unambiguous and this only needs to answer "can the English patterns
+# possibly work here".
+
+_ARABIC_BLOCK = re.compile(r"[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
+_LATIN_LETTER = re.compile(r"[A-Za-z]")
+
+SUPPORTED_LANGUAGE = "en"
+
+UNSUPPORTED_LANGUAGE_MESSAGE = (
+    "This parser reads English clinical notes only. Arabic text is not "
+    "supported and no fields were extracted from it — enter the values "
+    "directly, or paste an English note."
+)
+
+MIXED_LANGUAGE_MESSAGE = (
+    "This parser reads English clinical notes only. The Arabic parts of this "
+    "note were not read; only English terms and abbreviations were extracted. "
+    "Check the fields below before applying them."
+)
+
+
+def detect_script(note: str) -> str:
+    """
+    'arabic', 'mixed', or 'latin' — which scripts the note is written in.
+
+    'mixed' matters on its own: an Arabic note sprinkled with English
+    abbreviations (BP, HTN, DM, BMI) yields a handful of fields, which looks
+    like a successful parse while most of the note was silently skipped.
+    """
+    if not note:
+        return "latin"
+    has_arabic = bool(_ARABIC_BLOCK.search(note))
+    has_latin = bool(_LATIN_LETTER.search(note))
+    if has_arabic and has_latin:
+        return "mixed"
+    if has_arabic:
+        return "arabic"
+    return "latin"
+
+
+def language_support(note: str) -> Dict[str, Any]:
+    """
+    Whether this note is in a language the parser can actually read.
+
+    Returns {script, supported, message}. `supported` is False for anything
+    containing Arabic, including mixed notes: a partial read of a clinical
+    note is not a supported read, and saying so is the whole point.
+    """
+    script = detect_script(note)
+    if script == "arabic":
+        return {"script": script, "supported": False, "message": UNSUPPORTED_LANGUAGE_MESSAGE}
+    if script == "mixed":
+        return {"script": script, "supported": False, "message": MIXED_LANGUAGE_MESSAGE}
+    return {"script": script, "supported": True, "message": None}
