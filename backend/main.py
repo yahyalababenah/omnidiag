@@ -40,6 +40,7 @@ import io
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -419,7 +420,13 @@ async def predict_disease(
                 response.headers["Cache-Hit"] = "true"
                 return cached
 
-        result = router.predict(disease, patient_data)
+        # Off the event loop: router.predict() is synchronous CPU work
+        # (model inference, feature engineering). Awaiting it inline in an
+        # `async def` endpoint blocks the single event-loop thread, which
+        # freezes EVERY other request for the duration — measured at 18 s on
+        # a 150-row diabetes batch (X-3). run_in_threadpool hands it to the
+        # anyio worker pool; the returned value is byte-identical.
+        result = await run_in_threadpool(router.predict, disease, patient_data)
 
         # Store in cache
         if not patient_id:
@@ -521,7 +528,7 @@ async def explain_disease(
         patient_data = _validate_patient_input(disease, patient)
 
         _explain_log.debug(f"Explain request for disease={disease}")
-        result = router.explain(disease, patient_data)
+        result = await run_in_threadpool(router.explain, disease, patient_data)  # X-3
         _explain_log.debug("Explain completed successfully")
 
         # Persist prediction + SHAP data only for authenticated users
@@ -591,7 +598,9 @@ async def counterfactuals_disease(
             return cached
 
         _cf_log.debug(f"Counterfactuals request for disease={disease}")
-        result = router.counterfactuals(disease, patient_data)
+        # The heaviest path in the product (9–14 s for diabetes) — the one
+        # that made the whole Space unresponsive before X-3.
+        result = await run_in_threadpool(router.counterfactuals, disease, patient_data)
         _cf_log.debug(f"Counterfactuals completed: status={result.get('status')}")
 
         await cache_set(cache_key, result, ttl=3600)
@@ -638,6 +647,66 @@ class BatchResponse(BaseModel):
     succeeded: int
     failed: int
     results: List[BatchRowResult]
+
+
+def _run_batch_predictions(
+    disease: str, validated_rows: List[tuple]
+) -> tuple[List[BatchRowResult], int, int]:
+    """
+    Score every validated row. Pure synchronous CPU work — called via
+    run_in_threadpool so it never occupies the event loop (X-3).
+
+    One vectorized model call for every validated row when the model family
+    declares a vectorised predict_batch (heart's — see WEAKNESS_REGISTER.md
+    HM-2; IterativeImputer inside the Pipeline is ~300x slower called once
+    per row than once on the whole batch). Otherwise one predict() call per
+    row (diabetes'), so a failing row only fails itself.
+
+    Returns (results, succeeded, failed).
+    """
+    results: List[BatchRowResult] = []
+    succeeded = 0
+    failed = 0
+
+    loader = router._get_loader(disease)
+    if loader.capabilities.supports_vectorized_batch and validated_rows:
+        try:
+            preds = loader.predict_batch([patient for _, patient in validated_rows])
+            for (i, _), pred in zip(validated_rows, preds):
+                results.append(BatchRowResult(
+                    row=i,
+                    status="ok",
+                    prediction=pred.get("prediction"),
+                    confidence=pred.get("confidence"),
+                    diagnosis=pred.get("diagnosis"),
+                    data_completeness_warning=pred.get("data_completeness_warning"),
+                ))
+                succeeded += 1
+        except Exception as exc:
+            # The vectorized call failed for the whole validated group --
+            # report it per row, same as each row individually raising
+            # would have been reported in the per-row path below.
+            for i, _ in validated_rows:
+                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
+                failed += 1
+    else:
+        for i, validated in validated_rows:
+            try:
+                pred = router.predict(disease, validated)
+                results.append(BatchRowResult(
+                    row=i,
+                    status="ok",
+                    prediction=pred.get("prediction"),
+                    confidence=pred.get("confidence"),
+                    diagnosis=pred.get("diagnosis"),
+                    data_completeness_warning=pred.get("data_completeness_warning"),
+                ))
+                succeeded += 1
+            except Exception as exc:
+                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
+                failed += 1
+
+    return results, succeeded, failed
 
 
 @app.post(
@@ -711,49 +780,15 @@ async def batch_predict(
             results.append(BatchRowResult(row=i, status="error", error=str(exc)))
             failed += 1
 
-    # Prediction: one vectorized model call for every validated row when the
-    # model family declares a vectorised predict_batch (heart's -- see
-    # WEAKNESS_REGISTER.md HM-2; IterativeImputer inside the Pipeline is
-    # ~300x slower called once per row than once on the whole batch).
-    # Otherwise one predict() call per row (diabetes'), so a failing row
-    # only fails itself.
-    loader = router._get_loader(disease)
-    if loader.capabilities.supports_vectorized_batch and validated_rows:
-        try:
-            preds = loader.predict_batch([patient for _, patient in validated_rows])
-            for (i, _), pred in zip(validated_rows, preds):
-                results.append(BatchRowResult(
-                    row=i,
-                    status="ok",
-                    prediction=pred.get("prediction"),
-                    confidence=pred.get("confidence"),
-                    diagnosis=pred.get("diagnosis"),
-                    data_completeness_warning=pred.get("data_completeness_warning"),
-                ))
-                succeeded += 1
-        except Exception as exc:
-            # The vectorized call failed for the whole validated group --
-            # report it per row, same as each row individually raising
-            # would have been reported in the per-row path below.
-            for i, _ in validated_rows:
-                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
-                failed += 1
-    else:
-        for i, validated in validated_rows:
-            try:
-                pred = router.predict(disease, validated)
-                results.append(BatchRowResult(
-                    row=i,
-                    status="ok",
-                    prediction=pred.get("prediction"),
-                    confidence=pred.get("confidence"),
-                    diagnosis=pred.get("diagnosis"),
-                    data_completeness_warning=pred.get("data_completeness_warning"),
-                ))
-                succeeded += 1
-            except Exception as exc:
-                results.append(BatchRowResult(row=i, status="error", error=str(exc)))
-                failed += 1
+    # The whole prediction pass runs in one threadpool hop (X-3). A 500-row
+    # diabetes batch is ~67 s of pure CPU; inline on the event loop it froze
+    # every other visitor's request for that entire time.
+    predicted, ok_count, err_count = await run_in_threadpool(
+        _run_batch_predictions, disease, validated_rows
+    )
+    results.extend(predicted)
+    succeeded += ok_count
+    failed += err_count
 
     results.sort(key=lambda r: r.row)
 
