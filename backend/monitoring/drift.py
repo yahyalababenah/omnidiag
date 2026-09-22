@@ -30,8 +30,19 @@ import pandas as pd
 
 log = logging.getLogger("omnidiag.drift")
 
-# Lazy-import evidently so the module loads even if evidently is not installed
+# Lazy-import evidently so the module loads either way.
+#
+# These are the evidently 0.4 imports. requirements.txt asks for
+# `evidently>=0.4.0`, which resolves to 0.7.x, and 0.7 removed both
+# ColumnMapping and evidently.report.Report. So on the Space evidently IS
+# installed and this still raises ImportError.
+#
+# The old message here read "evidently not installed", which sent anyone
+# reading the log looking for a missing dependency that was in fact present.
+# Report the real reason. See docs/EVIDENTLY_COST.md for the options and
+# why neither is worth taking before the demo.
 _evidently_available = False
+_evidently_unavailable_reason: Optional[str] = None
 try:
     from evidently import ColumnMapping
     from evidently.metrics import (
@@ -41,8 +52,28 @@ try:
     )
     from evidently.report import Report
     _evidently_available = True
-except ImportError:
-    log.warning("evidently not installed — drift monitoring unavailable")
+except ImportError as _exc:
+    try:
+        from importlib.metadata import version as _pkg_version
+        _installed = _pkg_version("evidently")
+    except Exception:
+        _installed = None
+    if _installed:
+        _evidently_unavailable_reason = (
+            f"evidently {_installed} is installed but its API is incompatible — "
+            f"backend/monitoring/drift.py targets the 0.4 API ({_exc}). "
+            f"Drift monitoring is unavailable; see docs/EVIDENTLY_COST.md"
+        )
+    else:
+        _evidently_unavailable_reason = (
+            f"evidently is not installed — drift monitoring unavailable ({_exc})"
+        )
+    log.warning(_evidently_unavailable_reason)
+
+
+def drift_unavailable_reason() -> Optional[str]:
+    """Why drift monitoring cannot run, or None when it can."""
+    return None if _evidently_available else _evidently_unavailable_reason
 
 
 class DriftMonitor:

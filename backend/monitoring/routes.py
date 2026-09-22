@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.rbac import require_role, ADMIN_ROLES
 from backend.database import get_db
-from backend.monitoring.drift import get_monitor
+from backend.monitoring.drift import get_monitor, drift_unavailable_reason
 from backend.monitoring.metrics import get_metrics_response
 from backend.monitoring.mlflow_tracker import list_recent_runs, log_model_info
 
@@ -63,7 +63,15 @@ async def drift_status(
         monitor_ready=monitor.is_ready,
         last_run=monitor.last_run.isoformat() if monitor.last_run else None,
         report=monitor.last_report,
-        message="No drift report run yet. POST /admin/drift/{disease}/run to trigger." if monitor.last_report is None else "Drift report available.",
+        # When the monitor cannot run at all, say why rather than implying a
+        # report merely has not been triggered yet. On the Space evidently is
+        # installed but exposes an incompatible API (see docs/EVIDENTLY_COST.md),
+        # and "no report yet" hid that behind a message about a missing run.
+        message=(
+            drift_unavailable_reason()
+            or ("No drift report run yet. POST /admin/drift/{disease}/run to trigger."
+                if monitor.last_report is None else "Drift report available.")
+        ),
     )
 
 
