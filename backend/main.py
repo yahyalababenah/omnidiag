@@ -933,6 +933,7 @@ async def generate_clinical_report(
             body.shap_values,
             body.features,
             risk_bands,
+            decision_threshold,
         )
         return {"disease": body.disease, "report": report_text, "source": "rule_based"}
 

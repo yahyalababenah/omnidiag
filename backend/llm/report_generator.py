@@ -62,6 +62,14 @@ assessment. The report must be:
 Do NOT add disclaimers about seeking medical advice (the audience is medical professionals).
 Do NOT hallucinate lab values or history not provided.
 
+You are given the model's outputs only — a probability, a decision threshold,
+a label, a risk band and the SHAP-ranked feature names with their signed
+contributions. You are NOT given the patient's measured values, their age or
+their sex. Never state, guess or imply a specific measurement, age or
+demographic: write "cholesterol is the largest upward contributor", never
+"cholesterol of 340" and never "this 62-year-old woman". Refer to a factor by
+the exact name given in the glossary.
+
 This is a SCREENING estimate, not a diagnosis. Hard rules:
 - Never state or imply that the patient has, or is diagnosed with, any disease.
   Do not write "diagnosis", "diagnosed", "confirms", "consistent with <disease>",
@@ -69,7 +77,14 @@ This is a SCREENING estimate, not a diagnosis. Hard rules:
   Describe only the estimated risk, the decision threshold and the risk drivers.
 - Never name a medication, drug class or dose, and never recommend starting,
   stopping or changing any drug therapy. Recommended actions are limited to
-  confirmatory testing, referral, follow-up timing and lifestyle counselling."""
+  confirmatory testing, referral, follow-up timing and lifestyle counselling.
+- Never name a laboratory analyte that is not in the glossary you are given.
+  In particular do not write LDL, HDL, triglycerides or HbA1c: this platform
+  measures serum TOTAL cholesterol and a fasting-blood-sugar flag, and naming
+  a fraction it does not measure is a factual error about the patient.
+- The word "diagnosis" and its forms are banned outright, including in
+  headings and in phrases like "the diagnosis of X is not established". Write
+  "screening estimate" or "risk assessment" instead."""
 
 # Output check. A report that breaks either rule above is replaced by the
 # deterministic report — the prompt asks, this enforces.
@@ -86,6 +101,12 @@ _FORBIDDEN_PATTERNS = [
     (r"\bindicat\w*\s+(?:inducible\s+|myocardial\s+)?ischemi\w*", "diagnosis wording"),
     # medication / dose advice
     (r"\b\d+(?:\.\d+)?\s*(?:mg|mcg|µg|g|units?|iu)\b(?!\s*/\s*dl)", "dose"),
+    # hallucinated lab analytes: the platform measures serum TOTAL
+    # cholesterol and a fasting-blood-sugar flag. Reports were describing
+    # that as "LDL burden" — a different lipid fraction, never measured here.
+    # Naming the wrong analyte is a factual error about the patient.
+    (r"\b(?:LDL|HDL|triglycerides?|HbA1c|A1c|haemoglobin\s+a1c|hemoglobin\s+a1c)\b",
+     "names a lab value this platform does not measure"),
     (r"\b(?:statins?|atorvastatin|rosuvastatin|simvastatin|metformin|insulin|aspirin|"
      r"clopidogrel|antiplatelet\w*|anticoagula\w*|beta[\s-]?blockers?|ace[\s-]?inhibitors?|"
      r"arbs?|angiotensin|diuretics?|nitrates?|nitroglycerin|glp-?1|sglt-?2|sulfonylureas?|"
@@ -115,11 +136,18 @@ Note: this probability is stated on the deployment population's prevalence, so
 it is NOT comparable to a 50% cut-off. Judge it against the decision threshold
 and the risk band above, never against 50%.
 
+The label and the band answer different questions and do not contradict each
+other: the LABEL says which side of the decision threshold this patient falls
+(whether to act at all), the BAND says how urgently among those flagged. A
+Positive patient in the MODERATE band is above the threshold and warrants
+follow-up; do not describe such a patient as low risk, and do not describe a
+Negative patient as flagged.
+
 Top Risk Factors (SHAP-ranked):
 {shap_summary}
 
-Patient Features:
-{features_summary}
+What each factor is:
+{glossary_summary}
 
 Structure the report as:
 1. Clinical Summary (2-3 sentences)
@@ -138,9 +166,100 @@ def _format_shap(shap_values: List[Dict[str, Any]], top_n: int = 5) -> str:
     return "\n".join(lines) or "  - No SHAP data available"
 
 
-def _format_features(features: Dict[str, Any]) -> str:
-    lines = [f"  {k}: {v}" for k, v in features.items()]
-    return "\n".join(lines[:20])  # cap to avoid prompt bloat
+# What each model input actually measures, in the words a clinician would
+# use. Sent instead of the patient's values so the narrative can name a
+# factor precisely without being told the number.
+#
+# `Cholesterol` is the entry that mattered: it is SERUM TOTAL cholesterol in
+# the UCI heart data, and reports were describing it as "LDL burden" — a
+# different lipid fraction, and one this platform never measures. Naming the
+# wrong analyte in a clinical report is a factual error about the patient,
+# not a wording preference.
+_FEATURE_GLOSSARY: Dict[str, str] = {
+    # heart_disease
+    "Age": "age in years",
+    "Sex": "recorded sex",
+    "ChestPainType": "chest pain character (TA typical angina / ATA atypical / NAP non-anginal / ASY asymptomatic)",
+    "RestingBP": "resting systolic blood pressure (mm Hg)",
+    "Cholesterol": "serum TOTAL cholesterol (mg/dL) — not LDL, not HDL, and no fractions are measured",
+    "FastingBS": "fasting blood sugar above 120 mg/dL (yes/no flag, not a glucose value)",
+    "RestingECG": "resting electrocardiogram category",
+    "MaxHR": "maximum heart rate achieved during exercise testing",
+    "ExerciseAngina": "exercise-induced angina (yes/no)",
+    "Oldpeak": "ST depression induced by exercise relative to rest",
+    "ST_Slope": "slope of the peak exercise ST segment",
+    # diabetes (BRFSS self-report)
+    "HighBP": "self-reported history of high blood pressure (yes/no)",
+    "HighChol": "self-reported history of high cholesterol (yes/no)",
+    "CholCheck": "cholesterol checked in the last 5 years (yes/no)",
+    "BMI": "body mass index",
+    "Smoker": "smoked at least 100 cigarettes in their lifetime (yes/no)",
+    "Stroke": "self-reported history of stroke (yes/no)",
+    "HeartDiseaseorAttack": "self-reported coronary heart disease or myocardial infarction (yes/no)",
+    "PhysActivity": "any physical activity in the past 30 days (yes/no)",
+    "Fruits": "eats fruit at least once a day (yes/no)",
+    "Veggies": "eats vegetables at least once a day (yes/no)",
+    "HvyAlcoholConsump": "heavy alcohol consumption (yes/no)",
+    "AnyHealthcare": "has any health coverage (yes/no)",
+    "NoDocbcCost": "could not see a doctor because of cost in the past year (yes/no)",
+    "GenHlth": "self-rated general health, 1 (excellent) to 5 (poor)",
+    "MentHlth": "days of poor mental health in the past 30",
+    "PhysHlth": "days of poor physical health in the past 30",
+    "DiffWalk": "serious difficulty walking or climbing stairs (yes/no)",
+    "Education": "education level band",
+    "Income": "income band",
+}
+
+
+def _format_glossary(shap_values: List[Dict[str, Any]], top_n: int = 5) -> str:
+    """
+    Describe the factors the report will discuss — names only, no values.
+
+    Only the features that actually appear in the SHAP list are described, so
+    the prompt stays short and the model is never handed a factor it was not
+    asked to write about.
+    """
+    ranked = sorted(shap_values, key=lambda x: abs(x.get("shap_value", 0)), reverse=True)[:top_n]
+    lines = []
+    for item in ranked:
+        name = item.get("feature", "")
+        meaning = _FEATURE_GLOSSARY.get(name)
+        if meaning:
+            lines.append(f"  - {name}: {meaning}")
+        else:
+            # An engineered or unknown feature: say so rather than let the
+            # model invent a clinical meaning for it.
+            lines.append(f"  - {name}: a model-internal feature; describe it by name only")
+    return "\n".join(lines) or "  - No factors available"
+
+
+def band_for_report(
+    probability_corrected: float,
+    risk_bands: Mapping[str, float],
+    decision_threshold: Optional[float] = None,
+) -> str:
+    """
+    Display band, floored so it cannot contradict the screening decision.
+
+    classify_band() alone produced "Positive" beside "LOW" — D-004 sits at
+    14.4% with a 10.8% decision threshold and a 17.2% moderate cut-point, so
+    the patient was flagged for follow-up and simultaneously told "routine
+    follow-up, rescreen in 12 months". The two numbers answer different
+    questions (which side of the threshold vs how urgent among the flagged),
+    but LOW is not an available answer to the second question for a patient
+    who is above the threshold: being flagged IS the floor.
+
+    A patient at or above the decision threshold is therefore never LOW. The
+    bands are otherwise untouched, and a Negative patient is unaffected.
+    """
+    band = classify_band(probability_corrected, risk_bands)
+    if (
+        decision_threshold is not None
+        and probability_corrected >= decision_threshold
+        and band == "LOW"
+    ):
+        return "MODERATE"
+    return band
 
 
 def _rule_based_report(
@@ -150,6 +269,7 @@ def _rule_based_report(
     shap_values: Optional[List[Dict[str, Any]]] = None,
     features: Optional[Dict[str, Any]] = None,
     risk_bands: Optional[Mapping[str, float]] = None,
+    decision_threshold: Optional[float] = None,
 ) -> str:
     shap_values = shap_values or []
     features = features or {}
@@ -160,7 +280,9 @@ def _rule_based_report(
         "MODERATE": "- Schedule follow-up within 4 weeks\n- Lifestyle modification counselling\n- Monitor key biomarkers",
         "LOW": "- Routine follow-up\n- Reinforce preventive measures\n- Rescreen in 12 months",
     }
-    band = classify_band(probability_corrected, risk_bands or DEFAULT_RISK_BANDS)
+    band = band_for_report(
+        probability_corrected, risk_bands or DEFAULT_RISK_BANDS, decision_threshold
+    )
     report = (
         f"**Clinical Summary**\n"
         f"Patient assessed for {disease_display} risk. "
@@ -200,6 +322,16 @@ async def generate_report(
     can never disagree with one another. A caller-supplied band that differs
     is logged and discarded.
 
+    `features` is accepted and DELIBERATELY NOT SENT to the LLM. The clients
+    still post it and the parameter is kept so they keep working, but the
+    prompt now carries only the model's outputs — probability, threshold,
+    label, band, and the SHAP-ranked feature NAMES with a glossary of what
+    each one measures. Previously the first 20 raw patient values went to a
+    third-party API on every report, which is how the narrative came to
+    contain "62-year-old female" and "cholesterol 340". Those are health data
+    about an individual; nothing in the report requires them, because SHAP
+    already says which factors drove the estimate and in which direction.
+
     Returns a dict with keys:
         - report:        The generated markdown report text
         - source:        'llm' | 'rule_based'
@@ -214,7 +346,7 @@ async def generate_report(
     shap_values = shap_values or []
     features = features or {}
     bands = risk_bands or DEFAULT_RISK_BANDS
-    band = classify_band(probability_corrected, bands)
+    band = band_for_report(probability_corrected, bands, decision_threshold)
     if confidence_band and confidence_band != band:
         log.info(
             "Discarding caller-supplied confidence_band=%r; %.4f against bands %r is %r",
@@ -232,7 +364,8 @@ async def generate_report(
         log.warning("DEEPSEEK_API_KEY not set — falling back to rule-based report")
         return {
             "report": _rule_based_report(
-                disease_display, probability_corrected, label, shap_values, features, bands
+                disease_display, probability_corrected, label, shap_values,
+                features, bands, decision_threshold,
             ),
             "source": "rule_based",
             "risk_band": band,
@@ -254,7 +387,7 @@ async def generate_report(
             label=label,
             confidence_band=band,
             shap_summary=_format_shap(shap_values),
-            features_summary=_format_features(features),
+            glossary_summary=_format_glossary(shap_values),
         )
 
         log.info(f"Calling DeepSeek API (model={model}) for {disease_display} report...")
@@ -278,7 +411,8 @@ async def generate_report(
             log.warning("LLM report rejected (%s) — using rule-based report", "; ".join(violations))
             return {
                 "report": _rule_based_report(
-                    disease_display, probability_corrected, label, shap_values, features, bands
+                    disease_display, probability_corrected, label, shap_values,
+                    features, bands, decision_threshold,
                 ),
                 "source": "rule_based",
                 "risk_band": band,
@@ -297,7 +431,8 @@ async def generate_report(
         log.error(f"DeepSeek API call failed: {exc!r}")
         return {
             "report": _rule_based_report(
-                disease_display, probability_corrected, label, shap_values, features, bands
+                disease_display, probability_corrected, label, shap_values,
+                features, bands, decision_threshold,
             ),
             "source": "rule_based",
             "risk_band": band,
