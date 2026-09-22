@@ -21,8 +21,15 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useDisease } from '../context/DiseaseContext'
+import { API_BASE } from '../api'
 
-const BASE = '/api/v4'
+// Absolute, like every other component that hand-rolls a fetch(). The
+// backend and the frontend are not served from the same origin: a bare
+// relative '/api/v4/...' resolved against Vercel, which answered with
+// index.html, and the response surfaced to the clinician as
+// `Unexpected token '<', "<!doctype "... is not valid JSON` — see the same
+// note in BatchUpload.jsx.
+const BASE = `${API_BASE}/api/v4`
 
 async function apiFetch(path, token) {
   const res = await fetch(`${BASE}${path}`, {
