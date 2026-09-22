@@ -108,6 +108,13 @@ function PredictionCard({ prediction, index }) {
               </p>
               <p className="text-[10px] text-gray-500 flex items-center gap-1">
                 <Clock className="w-3 h-3" /> {dateStr} · {timeStr}
+                {/* A clinician should be able to see that a note exists
+                    without opening every card to look for one. */}
+                {prediction.notes && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 font-medium">
+                    Note
+                  </span>
+                )}
               </p>
             </div>
           </div>

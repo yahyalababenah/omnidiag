@@ -267,11 +267,19 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 #    💡 When you deploy the frontend to a NEW Vercel URL (e.g. a preview
 #       deployment), add it here or set the CORS_ALLOWED_ORIGINS env var
 #       on Hugging Face Spaces to override the defaults.
+#    Local entries cover both `npm run dev` (5173) and `vite preview` (4173,
+#    the production build served locally — the only way to click-test what
+#    actually ships), under both spellings: a browser treats localhost and
+#    127.0.0.1 as different origins, and only one of each pair was listed.
 _DEFAULT_ORIGINS = (
     "https://omnidiag-delta.vercel.app,"
     "https://omnidiag-qnhrjmoaq-yahia-s-projects05.vercel.app,"
     "http://localhost:5173,"
-    "http://localhost:3000"
+    "http://127.0.0.1:5173,"
+    "http://localhost:4173,"
+    "http://127.0.0.1:4173,"
+    "http://localhost:3000,"
+    "http://127.0.0.1:3000"
 )
 
 _ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")

@@ -51,10 +51,16 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 
+from backend.active_learning.sampler import (
+    DEFAULT_DECISION_THRESHOLD,
+    prediction_entropy,
+    should_queue_for_review,
+)
 from backend.database import AsyncSessionLocal
 from backend.db_models.patient import Patient
 from backend.db_models.patient_visit import PatientVisit
 from backend.db_models.prediction import Prediction
+from backend.db_models.review_queue import ReviewQueue
 from backend.probability_scale import scale_of_result
 
 log = logging.getLogger("omnidiag.demo_seed")
@@ -147,6 +153,7 @@ async def seed_demo_history(router, *, force: bool = False) -> int:
             return 0
 
         written = 0
+        queued = 0
         now = datetime.now(timezone.utc)
 
         for disease, patients in demo.items():
@@ -183,17 +190,45 @@ async def seed_demo_history(router, *, force: bool = False) -> int:
                         )
                         continue
 
-                    db.add(Prediction(
+                    confidence = float(result.get("confidence", 0.0))
+                    record = Prediction(
                         id=str(uuid.uuid4()),
                         patient_id=patient.id,
                         disease=disease,
                         input_features=features,
                         prediction=int(result.get("prediction", 0)),
-                        confidence=float(result.get("confidence", 0.0)),
+                        confidence=confidence,
                         probability_scale=scale_of_result(result).value,
                         diagnosis=result.get("diagnosis"),
                         created_at=visit_date,
-                    ))
+                    )
+                    db.add(record)
+                    await db.flush()
+
+                    # Queue the CURRENT screening for review when it is
+                    # genuinely uncertain, by the same rule /predict applies
+                    # to a live one. Without this the Admin annotation queue
+                    # is empty after every restart and there is nothing to
+                    # demonstrate the human-in-the-loop step with — the
+                    # feature exists but cannot be shown. Only today's visit
+                    # is considered; backdated ones are history, not work.
+                    decision_threshold = float(
+                        result.get("inference_threshold", DEFAULT_DECISION_THRESHOLD)
+                    )
+                    if steps_back == 0 and should_queue_for_review(
+                        confidence, decision_threshold=decision_threshold
+                    ):
+                        db.add(ReviewQueue(
+                            id=str(uuid.uuid4()),
+                            prediction_id=record.id,
+                            uncertainty_score=prediction_entropy(
+                                confidence, decision_threshold=decision_threshold
+                            ),
+                            uncertainty_scale=scale_of_result(result).value,
+                            decision_threshold=decision_threshold,
+                            created_at=visit_date,
+                        ))
+                        queued += 1
                     db.add(PatientVisit(
                         id=str(uuid.uuid4()),
                         patient_id=patient.id,
@@ -213,8 +248,11 @@ async def seed_demo_history(router, *, force: bool = False) -> int:
                     written += 1
 
         await db.commit()
-        log.info("Demo history seeded — %d prediction rows across %d patients",
-                 written, sum(len(p) for p in demo.values()))
+        log.info(
+            "Demo history seeded — %d prediction rows across %d patients, "
+            "%d queued for review",
+            written, sum(len(p) for p in demo.values()), queued,
+        )
         return written
 
 

@@ -150,23 +150,31 @@ export default function DiseaseSelector() {
                     isActive ? 'bg-primary-500' : 'bg-gray-300'
                   }`}
                 />
+                {/* Read the flattened fields, not `d.info`.
+                    DiseaseContext maps the API's { name, info: {...} } into
+                    { name, ...info } before it reaches here, so `d.info` is
+                    always undefined and every option fell back to the raw
+                    key: the dropdown listed "diabetes / No description / v—"
+                    while the trigger right above it correctly read "Diabetes
+                    Risk Assessment v1.1.0". `d.info?.` is kept as a fallback
+                    in case an unflattened shape is ever passed in. */}
                 <div className="min-w-0">
                   <p
                     className={`text-sm font-medium truncate ${
                       isActive ? 'text-primary-700' : 'text-gray-800'
                     }`}
                   >
-                    {d.info?.display_name || d.name}
+                    {d.display_name || d.info?.display_name || d.name}
                   </p>
                   <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">
-                    {d.info?.description || 'No description'}
+                    {d.description || d.info?.description || 'No description'}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] text-gray-400 font-mono">
-                      v{d.info?.version || '—'}
+                      v{d.version || d.info?.version || '—'}
                     </span>
                     <span className="text-[10px] text-gray-400">
-                      {d.info?.model_type || '—'}
+                      {d.model_type || d.info?.model_type || '—'}
                     </span>
                   </div>
                 </div>
