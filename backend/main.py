@@ -14,12 +14,23 @@ import traceback
 from dotenv import load_dotenv
 load_dotenv()  # loads .env file into os.environ before anything else reads it
 
-# Configure startup logging to stdout for HF Spaces debugging
+# Configure logging to stdout for HF Spaces.
+#
+# INFO by default, not DEBUG (X-8). At DEBUG the Space emitted 10,106 DEBUG
+# lines out of 10,584 — every SQL statement among them — into a log anyone
+# with Space access can read. Set LOG_LEVEL=DEBUG when actually debugging.
+_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     stream=sys.stdout,
-    level=logging.DEBUG,
+    level=getattr(logging, _LOG_LEVEL, logging.INFO),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+# SQLAlchemy echoes full statements at INFO, which is the bulk of the noise
+# and the part that carries row values. Keep it at WARNING unless the
+# operator has explicitly asked for DEBUG.
+if _LOG_LEVEL != "DEBUG":
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 log = logging.getLogger("omnidiag.startup")
 _explain_log = logging.getLogger("omnidiag.explain")
 _cf_log = logging.getLogger("omnidiag.counterfactuals")
@@ -59,7 +70,8 @@ from backend.auth.rbac import require_role, CLINICAL_ROLES
 from backend.auth.dependencies import get_current_active_user, get_optional_user
 from backend.cache import (init_cache, cache_get, cache_set, predict_cache_key,
                            schema_cache_key, counterfactuals_cache_key,
-                           cached_payload_matches_scale)
+                           cached_payload_matches_scale, COUNTERFACTUALS_TTL_SECONDS,
+                           PREDICT_TTL_SECONDS, SCHEMA_TTL_SECONDS)
 from backend.probability_scale import scale_of_disease_config, scale_of_result
 from backend.database import get_db, engine, AsyncSessionLocal, Base
 from backend.db_models.prediction import Prediction
@@ -324,7 +336,8 @@ def list_diseases():
 async def get_disease_schema(disease: str, response: Response):
     """
     Get the JSON Schema for a disease's patient input fields.
-    Cached for 24 h — schema changes only on deployment.
+    Cached for CACHE_TTL_SCHEMA (24 h by default) — schema changes only on
+    deployment.
     """
     key = schema_cache_key(disease)
     cached = await cache_get(key)
@@ -334,7 +347,7 @@ async def get_disease_schema(disease: str, response: Response):
 
     schema = get_schema_for_disease(disease)
     result = schema.model_json_schema()
-    await cache_set(key, result, ttl=86400)
+    await cache_set(key, result, ttl=SCHEMA_TTL_SECONDS)
     response.headers["Cache-Hit"] = "false"
     return result
 
@@ -392,7 +405,7 @@ async def predict_disease(
 
     يتطلب دور: doctor | nurse | super_admin
 
-    النتائج مؤقتة في الكاش لـ 5 دقائق للمدخلات المتكررة.
+    النتائج مؤقتة في الكاش (CACHE_TTL_PREDICT، افتراضياً ساعة) للمدخلات المتكررة.
     يمكن ربط النتيجة بمريض موجود عبر ?patient_id=<uuid>
     """
     _predict_log = logging.getLogger("omnidiag.predict")
@@ -404,7 +417,7 @@ async def predict_disease(
         if not patient_id:
             cached = await cache_get(cache_key)
             # A payload written by an older release can still be live for up
-            # to the 300 s TTL after a deploy. Serving it would hand back a
+            # to the predict TTL after a deploy. Serving it would hand back a
             # raw-scale probability under a corrected-scale contract, so the
             # scale is checked rather than assumed; a mismatch is a miss.
             if cached is not None and not cached_payload_matches_scale(
@@ -430,7 +443,7 @@ async def predict_disease(
 
         # Store in cache
         if not patient_id:
-            await cache_set(cache_key, result, ttl=300)
+            await cache_set(cache_key, result, ttl=PREDICT_TTL_SECONDS)
         response.headers["Cache-Hit"] = "false"
 
         # Record Prometheus metrics
@@ -585,8 +598,8 @@ async def counterfactuals_disease(
     """
     توليد سيناريوهات "ماذا لو" لتقليل المخاطر. يعمل بدون تسجيل دخول.
 
-    النتائج مؤقتة في الكاش لـ 60 دقيقة — التوليد مكلف (استدلال متكرر)
-    والمخرجات ثابتة لنفس المدخلات.
+    النتائج مؤقتة في الكاش (CACHE_TTL_COUNTERFACTUALS، افتراضياً 12 ساعة) —
+    التوليد مكلف (استدلال متكرر) والمخرجات ثابتة لنفس المدخلات.
     """
     try:
         patient_data = _validate_patient_input(disease, patient)
@@ -603,7 +616,7 @@ async def counterfactuals_disease(
         result = await run_in_threadpool(router.counterfactuals, disease, patient_data)
         _cf_log.debug(f"Counterfactuals completed: status={result.get('status')}")
 
-        await cache_set(cache_key, result, ttl=3600)
+        await cache_set(cache_key, result, ttl=COUNTERFACTUALS_TTL_SECONDS)
         response.headers["Cache-Hit"] = "false"
         return result
     except HTTPException:

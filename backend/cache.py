@@ -18,9 +18,10 @@ Usage in main.py:
         result = compute()
         await cache_set(key, result, ttl=300)
 
-TTLs:
-    Schema responses  → 86400 s  (24 h) — changes only on deployment
-    Predict responses →   300 s  ( 5 m) — short enough to stay fresh
+TTLs (all overridable from the environment — see the constants below):
+    Schema responses         → 86400 s (24 h) — changes only on deployment
+    Predict responses        →  3600 s ( 1 h)
+    Counterfactual responses → 43200 s (12 h) — generation costs 9-14 s
 
 Probability scale and the cache
 -------------------------------
@@ -53,6 +54,37 @@ _PREFIX = "omnidiag"
 # new threshold basis, a renamed probability field. v2 = prevalence-corrected
 # probabilities (backend/prevalence_correction.py).
 PROBABILITY_SCALE_CONTRACT = "v2"
+
+
+def _ttl_from_env(var: str, default: int) -> int:
+    """
+    Read a TTL in seconds from the environment, falling back to *default*.
+
+    A malformed or negative value falls back rather than raising: a typo in a
+    Space secret must not stop the API from starting, and losing caching is a
+    slowdown, not a wrong answer.
+    """
+    raw = os.getenv(var, "")
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        log.warning("Cache: %s=%r is not an integer — using default %ds", var, raw, default)
+        return default
+    if value < 0:
+        log.warning("Cache: %s=%d is negative — using default %ds", var, value, default)
+        return default
+    return value
+
+
+# A cached counterfactual is deterministic for a given input, and generating
+# one costs 9-14 s for diabetes. A 1 h TTL meant a demo that started before
+# lunch was cold again after it; 12 h covers a full judging day from a single
+# warm-up run (scripts/warmup_demo_cache.py).
+COUNTERFACTUALS_TTL_SECONDS = _ttl_from_env("CACHE_TTL_COUNTERFACTUALS", 43_200)
+PREDICT_TTL_SECONDS = _ttl_from_env("CACHE_TTL_PREDICT", 3_600)
+SCHEMA_TTL_SECONDS = _ttl_from_env("CACHE_TTL_SCHEMA", 86_400)
 
 
 async def init_cache() -> None:
