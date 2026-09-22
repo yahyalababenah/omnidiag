@@ -236,6 +236,30 @@ def diabetes_loader(real_router):
     return real_router._get_loader("diabetes")
 
 
+def _flush_cache_sync():
+    """
+    Drop every cached /predict payload.
+
+    Necessary because live_app swaps the router on the SHARED app object
+    while the prediction cache stays the same. A cache key is (disease,
+    patient data) and says nothing about which router produced the payload,
+    so a response the MOCK router cached in another test module is a valid
+    hit for the real router here — and vice versa. That surfaced as
+    test_heart_response_has_no_correction_fields failing only in a full-suite
+    run: it received the mock's {prediction, confidence, diagnosis} instead
+    of the real response, which also carries inference_threshold.
+
+    Flushed on both entry and exit so neither direction leaks.
+    """
+    try:
+        from fastapi_cache import FastAPICache
+        backend = FastAPICache.get_backend()
+        if hasattr(backend, "_store"):
+            backend._store.clear()
+    except Exception:
+        pass
+
+
 @pytest.fixture(scope="module")
 def live_app(app, real_router):
     """The shared app, with the real router swapped in and the limiter off."""
@@ -246,7 +270,9 @@ def live_app(app, real_router):
     previous_enabled = limiter.enabled
     main_module.router = real_router
     limiter.enabled = False
+    _flush_cache_sync()
     yield main_module.app
+    _flush_cache_sync()
     main_module.router = previous_router
     limiter.enabled = previous_enabled
 
