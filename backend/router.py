@@ -119,6 +119,13 @@ class OmniDiagRouter:
             # configures none — heart takes sklearn's argmax — and the UI
             # falls back to its own documented constant in that case.
             "inference_threshold": model_cfg.get("inference_threshold"),
+            # Whether this module's probabilities are prevalence-corrected.
+            # The UI needs it to label a column or an export honestly: a
+            # batch CSV headed `risk_probability_corrected` is a false claim
+            # for heart, which has no correction to apply. True only when the
+            # config declares both priors — the same test
+            # backend/cache.cached_payload_matches_scale() uses.
+            "prevalence_corrected": {"prevalence_train", "prevalence_deploy"} <= set(model_cfg),
             "supports_counterfactuals": self._supports_counterfactuals(disease),
         }
     
