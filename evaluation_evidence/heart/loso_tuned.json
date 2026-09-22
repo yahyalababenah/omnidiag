@@ -1,0 +1,80 @@
+{
+  "generated_by": "scratchpad/regen_heart_evidence.py, 2026-09-22",
+  "model": "models/heart_disease/heart_full_tuned.pkl (shipped)",
+  "threshold": 0.3695,
+  "threshold_source": "heart_full_tuned.pkl['threshold'] / hpo_threshold_summary.json shipped",
+  "hyperparameters_source": "evaluation_evidence/heart/hpo.json:best_params (verified == heart_full_tuned.pkl['params'])",
+  "data_source": "data/heart_disease/processed/uci_heart_by_site.csv (920 rows, 4 UCI sites)",
+  "pooled_cv": {
+    "cv": "StratifiedKFold(5, shuffle=True, random_state=42)",
+    "tn": 250,
+    "fp": 161,
+    "fn": 26,
+    "tp": 483,
+    "sensitivity": 94.89,
+    "specificity": 60.83,
+    "accuracy": 79.67,
+    "roc_auc": 0.8886,
+    "n": 920
+  },
+  "leave_one_site_out": {
+    "cleveland": {
+      "tn": 80,
+      "fp": 84,
+      "fn": 9,
+      "tp": 130,
+      "sensitivity": 93.53,
+      "specificity": 48.78,
+      "accuracy": 69.31,
+      "roc_auc": 0.864,
+      "n": 303,
+      "prevalence": 45.9,
+      "controls": 164,
+      "cases": 139
+    },
+    "hungarian": {
+      "tn": 94,
+      "fp": 94,
+      "fn": 5,
+      "tp": 101,
+      "sensitivity": 95.28,
+      "specificity": 50.0,
+      "accuracy": 66.33,
+      "roc_auc": 0.8751,
+      "n": 294,
+      "prevalence": 36.1,
+      "controls": 188,
+      "cases": 106
+    },
+    "long_beach_va": {
+      "tn": 9,
+      "fp": 42,
+      "fn": 6,
+      "tp": 143,
+      "sensitivity": 95.97,
+      "specificity": 17.65,
+      "accuracy": 76.0,
+      "roc_auc": 0.7515,
+      "n": 200,
+      "prevalence": 74.5,
+      "controls": 51,
+      "cases": 149
+    },
+    "switzerland": {
+      "tn": 4,
+      "fp": 4,
+      "fn": 7,
+      "tp": 108,
+      "sensitivity": 93.91,
+      "specificity": 50.0,
+      "accuracy": 91.06,
+      "roc_auc": 0.763,
+      "n": 123,
+      "prevalence": 93.5,
+      "controls": 8,
+      "cases": 115
+    }
+  },
+  "loso_roc_auc_mean_non_nested": 0.8134,
+  "nested_loso_roc_auc_mean_reference": "0.813 (evaluation_evidence/heart/hpo.json:nested_loso_mean; hyperparameter search re-run inside each fold -- this script's LOSO instead reuses the shipped/fixed hyperparameters, which is what actually happens in production per held-out site)"
+}

@@ -1,0 +1,65 @@
+{
+  "generated_by": "scratchpad/regen_heart_evidence.py, 2026-09-22 (see loso_tuned.json for full detail)",
+  "model": "models/heart_disease/heart_full_tuned.pkl",
+  "threshold": 0.3695,
+  "training_data": {
+    "source": "UCI Heart Disease, 4 original site files",
+    "n": 920,
+    "sites": {
+      "cleveland": 303,
+      "hungarian": 294,
+      "long_beach_va": 200,
+      "switzerland": 123
+    },
+    "note": "ca and thal excluded: invasive, absent from production"
+  },
+  "external_data": {
+    "source": "Z-Alizadeh Sani (Tehran)",
+    "n": 303,
+    "used_for": "validation only, never training",
+    "result_file": "evaluation_evidence/heart/external_validation_tuned.json"
+  },
+  "headline": {
+    "internal_pooled_cv_roc_auc": 0.8886,
+    "internal_pooled_cv_at_threshold": {
+      "tn": 250,
+      "fp": 161,
+      "fn": 26,
+      "tp": 483,
+      "sensitivity": 94.89,
+      "specificity": 60.83,
+      "accuracy": 79.67,
+      "roc_auc": 0.8886,
+      "n": 920
+    },
+    "nested_loso_mean_roc_auc": 0.813,
+    "nested_loso_source": "evaluation_evidence/heart/hpo.json:nested_loso_mean",
+    "non_nested_loso_mean_roc_auc_at_fixed_hparams": 0.8134,
+    "external_tehran_roc_auc": 76.34,
+    "external_tehran_source": "evaluation_evidence/heart/external_validation_tuned.json",
+    "external_tehran_note": "measured on the 7-feature reduced model; full 11-feature model cannot be evaluated on Tehran data (4 features unavailable)"
+  },
+  "operating_point": {
+    "threshold": 0.3695,
+    "selected_on": "out-of-fold predictions of training data",
+    "cost_function": "2.0*FN + 1.0*FP",
+    "pooled_cv": {
+      "tn": 250,
+      "fp": 161,
+      "fn": 26,
+      "tp": 483,
+      "sensitivity": 94.89,
+      "specificity": 60.83,
+      "accuracy": 79.67,
+      "roc_auc": 0.8886,
+      "n": 920
+    }
+  },
+  "evidence_files": [
+    "evaluation_evidence/heart/hpo.json",
+    "evaluation_evidence/heart/loso_tuned.json",
+    "evaluation_evidence/heart/threshold_log_tuned.json",
+    "evaluation_evidence/heart/external_validation_tuned.json",
+    "evaluation_evidence/heart/leakage_comparison.json"
+  ]
+}
