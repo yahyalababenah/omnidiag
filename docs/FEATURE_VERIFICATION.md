@@ -220,6 +220,26 @@ backend/.venv/bin/python scripts/warmup_demo_cache.py
 | Batch سكري 500 صف | السقف صار 20 للسكري؛ القلب مُتجَّه ولم يُختبر عند 500 هذه الجولة |
 | C-1 | خارج النطاق بطلب صريح |
 
-## G. حالة النشر
+## G. حالة النشر — **اقرأ هذا قبل العرض**
 
-**لم يُنشر بعد.** كل ما سبق تحقّق على البناء الإنتاجي محلياً. خطوات النشر وrollback في تقرير الجلسة.
+| المكوّن | الحالة | الدليل |
+|---|---|---|
+| **الخلفية (HF Space)** | ✅ **منشورة ومُتحقَّق منها** | snapshot `3610ba0` (من `d8ce1bf`). `verify_live.py`: 7 مرضى × 3 endpoints = **IDENTICAL** بسماحية 1e-6، بما فيها D-003 عند 63.74%. History تعمل لكل المرضى (3 نقاط لكلٍّ، مطابقة للمحلي). الطابور فيه 3 حالات. `expires_in = 86400 s` (24 ساعة). الكاش مُسخَّن 21/21 |
+| **الواجهة (Vercel)** | ❌ **لم تُنشر** | الحزمة الحيّة ما زالت `index-Ca31dcIj.js` (22 سبتمبر) والعنوان ما زال «Multi-Disease Diagnostic Platform». `/favicon.ico` و`/apple-touch-icon.png` يعيدان `text/html` |
+
+**الدفع إلى `origin/deploy/v2-platform` لم يُطلق بناءً على Vercel** خلال 15 دقيقة من المراقبة. لا يوجد Vercel CLI ولا رمز وصول على هذا الجهاز، فالنشر يحتاج تدخّلاً يدوياً.
+
+**نتيجة Playwright على LIVE: 9 نجاح / 21 فشل.** كل فشل بند واجهة، وسببها جميعاً واحد: الحزمة القديمة. البنود التي نجحت هي المدفوعة بالخلفية. **هذه ليست 21 مشكلة، بل مشكلة واحدة.**
+
+**ما يجب فعله قبل التحكيم:**
+
+1. انشر الواجهة من `deploy/v2-platform` (لوحة Vercel → Redeploy، أو `vercel --prod` من `frontend/`).
+2. تأكّد أن الحزمة تغيّرت: `curl -s https://omnidiag-delta.vercel.app/ | grep -o 'index-[^"]*\.js'` — يجب ألّا تكون `index-Ca31dcIj.js`.
+3. أعد تشغيل `scratch/ui_verify.py https://omnidiag-delta.vercel.app https://yahyoha-omnidiag.hf.space` — المتوقع 57/57.
+4. شغّل `scripts/warmup_demo_cache.py` بعد أي إعادة تشغيل للـ Space.
+
+**الرجوع (rollback) للخلفية:**
+
+```bash
+git push hf 2074dec5e8f0475cb59f1e39915cd2a5c28f5d37:main --force
+```
