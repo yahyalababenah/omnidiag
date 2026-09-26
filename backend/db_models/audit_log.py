@@ -14,11 +14,18 @@ Design decisions:
     - created_at is indexed for efficient time-range queries.
     - user_id is nullable to allow logging requests from unauthenticated
       users (e.g., failed login attempts).
+    - details is nullable JSON for whatever a handler needs on the record
+      beyond the request line. It exists because some requests are not
+      auditable from the path alone: a heart batch upload is read under a
+      declared chest-pain coding (Gate 8.2), and a batch whose coding was
+      never recorded cannot be rechecked afterwards. Passing that through the
+      URL instead would have polluted the `endpoint` grouping the dashboards
+      key on. Existing rows keep NULL.
 """
 
 import uuid as _uuid
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -40,6 +47,7 @@ class AuditLog(Base):
     status_code = Column(Integer, nullable=True)
     ip_address = Column(String(45), nullable=True)  # IPv6 max length
     duration_ms = Column(Float, nullable=True)
+    details = Column(JSON, nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -693,6 +693,10 @@ class BatchResponse(BaseModel):
     succeeded: int
     failed: int
     results: List[BatchRowResult]
+    #: Which chest-pain coding the rows were read under (heart only; None for a
+    #: disease that declares no coding). Returned because a batch result whose
+    #: coding is not stated cannot be checked afterwards -- see Gate 8.2.
+    chest_pain_coding: Optional[str] = None
 
 
 def _run_batch_predictions(
@@ -755,6 +759,74 @@ def _run_batch_predictions(
     return results, succeeded, failed
 
 
+def _resolve_chest_pain_coding(disease: str, requested: Optional[str]) -> Optional[str]:
+    """
+    Which chest-pain coding this batch is read under, from the disease config.
+
+    A disease that declares no coding (diabetes) gets None and is untouched --
+    this is read from the config, never branched on the disease name.
+    """
+    model_config = (router.disease_configs.get(disease) or {}).get("model", {}) or {}
+    default = model_config.get("chest_pain_coding_default")
+    if default is None:
+        if requested is not None:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": f"{disease} has no chest-pain coding to declare",
+                        "code": "CODING_NOT_APPLICABLE"},
+            )
+        return None
+
+    coding = requested or default
+    allowed = model_config.get("chest_pain_coding_allowed", [default])
+    if coding not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": f"chest_pain_coding must be one of {sorted(allowed)}",
+                    "code": "INVALID_CHEST_PAIN_CODING"},
+        )
+    return coding
+
+
+def _reject_raw_research_export(disease: str, header: List[str], coding: Optional[str]) -> None:
+    """
+    Refuse a CSV that is plainly a raw UCI research export (Gate 8.2, layer 1).
+
+    Those files code ChestPainType by anginal-feature COUNT, the inverse of the
+    clinical meaning this API takes (HF-1). Read under the default coding, 609
+    of the 920 rows change decision and 130 diseased patients lose their
+    referral -- measured, not estimated.
+
+    The marker columns come from the config and exist in no API schema, so a
+    clinician's export cannot carry them. Refusing beats translating silently:
+    a silent translation guesses what the uploader meant.
+
+    This catches the file as distributed. It cannot catch one whose marker
+    columns were removed -- that limit is declared in the config and in the
+    gate report, and layer 2 (the explicit coding) is what covers it.
+    """
+    model_config = (router.disease_configs.get(disease) or {}).get("model", {}) or {}
+    markers = model_config.get("uci_raw_marker_columns") or []
+    found = sorted(set(header) & set(markers))
+    if not found or coding == "uci_raw":
+        return
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "error": (
+                f"This CSV carries the raw research columns {found}, so it looks like the "
+                f"raw UCI export. That file codes ChestPainType by anginal-feature count, "
+                f"which is the inverse of what this API means by TA/ATA/NAP/ASY -- reading "
+                f"it as clinical input would silently invert every patient's chest pain. "
+                f"Either upload a file with the clinical codes and without those columns, "
+                f"or pass chest_pain_coding=uci_raw to have the codes converted explicitly."
+            ),
+            "code": "RAW_UCI_EXPORT_REJECTED",
+            "marker_columns_found": found,
+        },
+    )
+
+
 @app.post(
     "/api/v4/{disease}/batch",
     response_model=BatchResponse,
@@ -772,6 +844,14 @@ async def batch_predict(
     request: Request,
     disease: str,
     file: UploadFile = File(..., description="CSV file with header row matching the disease schema"),
+    chest_pain_coding: Optional[str] = Query(
+        None,
+        description=(
+            "Heart only. Which coding the ChestPainType column uses: 'clinical' (the "
+            "default, and what the UI sends: TA = typical angina) or 'uci_raw' (the raw "
+            "UCI file's inverted coding, converted explicitly). See Gate 8.2."
+        ),
+    ),
     _user: User = Depends(require_role(*CLINICAL_ROLES)),
 ) -> BatchResponse:
     if not file.filename or not file.filename.lower().endswith(".csv"):
@@ -783,8 +863,15 @@ async def batch_predict(
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail={"error": "CSV must be UTF-8 encoded", "code": "ENCODING_ERROR"})
 
+    coding = _resolve_chest_pain_coding(disease, chest_pain_coding)
+
     reader = csv.DictReader(io.StringIO(text))
     rows: List[Dict[str, Any]] = list(reader)
+    _reject_raw_research_export(disease, list(reader.fieldnames or []), coding)
+
+    # The coding is auditable: a batch whose coding was not recorded cannot be
+    # rechecked later. AuditMiddleware reads this after the handler returns.
+    request.state.audit_details = {"chest_pain_coding": coding, "rows": len(rows)}
 
     if len(rows) == 0:
         raise HTTPException(status_code=400, detail={"error": "CSV is empty or has no data rows", "code": "EMPTY_CSV"})
@@ -797,6 +884,14 @@ async def batch_predict(
 
     # Validation is always per-row: a malformed row must never affect any
     # other row's result, whichever prediction path runs below.
+    # A declared raw-coded upload is rewritten into the clinical codes that mean
+    # the same thing, using a map DERIVED from the model's two maps. From here
+    # the rows are ordinary API input, so encode_for_inference() stays the only
+    # thing that ever scores -- there is no second path to keep in step.
+    if coding == "uci_raw":
+        from backend.heart_glm.stack import translate_raw_codes
+        rows = translate_raw_codes(rows)
+
     validated_rows: List[tuple] = []  # (original CSV row number, validated patient dict)
     for i, raw_row in enumerate(rows, start=1):
         # Convert numeric strings to appropriate types
@@ -850,6 +945,7 @@ async def batch_predict(
         succeeded=succeeded,
         failed=failed,
         results=results,
+        chest_pain_coding=coding,
     )
 
 

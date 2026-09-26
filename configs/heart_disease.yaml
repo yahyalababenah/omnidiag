@@ -115,6 +115,25 @@ model:
     - "Cholesterol"
     - "FastingBS"
 
+  # ── Chest-pain coding on the batch upload path (Gate 8.2) ────────────────
+  # The raw UCI file codes ChestPainType by anginal-feature COUNT, which is the
+  # inverse of the clinical meaning the API takes (HF-1). Uploading that file
+  # as-is flips 609 of its 920 decisions and drops 130 diseased patients out of
+  # referral (measured; results/p8_2_guard_size.json). Two declared guards:
+  #
+  #   1. A CSV carrying any of these columns is a raw research export, not a
+  #      clinician's upload, and is refused with an explanation. They exist in
+  #      the UCI file and in no API schema.
+  uci_raw_marker_columns: ["site", "HeartDisease", "num"]
+  #   2. Whoever uploads states the coding. The default is the clinical meaning,
+  #      which is what the UI already sends, so no existing behaviour changes.
+  chest_pain_coding_default: "clinical"
+  chest_pain_coding_allowed: ["clinical", "uci_raw"]
+  #
+  # Declared limit: a UCI file stripped of the marker columns and uploaded under
+  # the default coding CANNOT be detected. Neither guard catches that; only the
+  # uploader declaring the coding does.
+
 # ---------------------------------------------------------------------------
 # Training / validation — what was actually run
 # ---------------------------------------------------------------------------

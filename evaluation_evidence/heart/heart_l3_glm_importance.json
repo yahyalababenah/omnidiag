@@ -1,0 +1,28 @@
+{
+ "model": "heart_l3_glm_stack (Spline-GLM + Venn-Abers + Mondrian conformal)",
+ "generated_by": "scripts/regen_heart_importance.py",
+ "training_csv_sha256": "6a22655183f30e85b04258104d4adb81f4d34af0933a9c9b94b3a14d59402c5b",
+ "n_rows": 920,
+ "scale": "mean_abs_shap_log_odds_raw_score",
+ "scale_limit": "Ranks features by their effect on the model's RAW log-odds score. This is NOT an attribution of the IVAP-calibrated probability shown to a clinician: IVAP is monotone but not linear, so no additive attribution of that probability exists. Same limit as /explain's shap_scale.",
+ "exact": true,
+ "supersedes": "evaluation_evidence/heart/shap_importance.json, which describes a model that was never deployed (F0-1) and lists four features this model does not read.",
+ "importance": {
+  "cp_anginal": 0.930621,
+  "Sex_m": 0.345946,
+  "Age": 0.267017,
+  "RestingBP": 0.065145,
+  "RestingECG": 0.065089,
+  "FastingBS_cat": 0.061472,
+  "Cholesterol": 0.059227
+ },
+ "rank": [
+  "cp_anginal",
+  "Sex_m",
+  "Age",
+  "RestingBP",
+  "RestingECG",
+  "FastingBS_cat",
+  "Cholesterol"
+ ]
+}

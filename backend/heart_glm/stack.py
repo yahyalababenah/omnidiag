@@ -89,6 +89,18 @@ CP_MAP_CLINICAL: Dict[str, float] = {"TA": 3.0, "ATA": 2.0, "NAP": 1.0, "ASY": 0
 #: Raw UCI code -> number of anginal features (the inverted coding). TRAINING ONLY.
 CP_MAP_UCI_RAW: Dict[str, float] = {"ASY": 3.0, "NAP": 2.0, "ATA": 1.0, "TA": 0.0}
 
+#: Raw UCI code -> the CLINICAL code that means the same thing. DERIVED from the
+#: two maps above by matching anginal-feature count, never written out by hand:
+#: a hand-written third map is a third place for HF-1 to come back. Used only to
+#: translate a declared raw-coded batch upload into ordinary API input, so that
+#: encode_for_inference() stays the one and only path that scores anything.
+CP_RAW_TO_CLINICAL: Dict[str, str] = {
+    raw_code: clinical_code
+    for raw_code, count in CP_MAP_UCI_RAW.items()
+    for clinical_code, clinical_count in CP_MAP_CLINICAL.items()
+    if clinical_count == count
+}
+
 #: Human-readable label per anginal-feature count, for explanations.
 CP_LABEL: Dict[float, str] = {
     3.0: "typical angina", 2.0: "atypical angina",
@@ -149,6 +161,29 @@ def encode_for_inference(records: Sequence[Mapping[str, Any]] | pd.DataFrame) ->
             f"(clinical meaning: TA = typical angina)"
         )
     return _encode(frame, cp)
+
+
+def translate_raw_codes(records: Sequence[Mapping[str, Any]]) -> list[dict]:
+    """
+    Rewrite ChestPainType from the raw UCI coding into the clinical coding.
+
+    For a batch upload that DECLARES it carries raw UCI codes (Gate 8.2). The
+    rows then mean what the API means by them, so validation and
+    encode_for_inference() handle them like any other upload -- there is no
+    second scoring path to keep in step with the first.
+
+    Rows with no ChestPainType, or an unrecognised one, are passed through
+    untouched: per-row validation is what reports them, one row at a time, and
+    a translation step must not turn one bad cell into a failed batch.
+    """
+    out = []
+    for record in records:
+        row = dict(record)
+        code = row.get("ChestPainType")
+        if isinstance(code, str) and code in CP_RAW_TO_CLINICAL:
+            row["ChestPainType"] = CP_RAW_TO_CLINICAL[code]
+        out.append(row)
+    return out
 
 
 # ── Model ────────────────────────────────────────────────────────────────────

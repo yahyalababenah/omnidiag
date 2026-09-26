@@ -18,6 +18,7 @@ and the mock restored cleanly). No network, no external data.
 """
 
 import os
+import sys
 
 import numpy as np
 import pytest
@@ -608,3 +609,221 @@ class TestDiabetesEdgeInputs:
         cfg = {"model": {k: v for k, v in _DIABETES_MODEL_CFG.items() if k != "prevalence_deploy"}}
         with pytest.raises(KeyError, match="prevalence_deploy"):
             EnsembleModelLoader(cfg)
+
+
+class TestBatchChestPainCodingGuard:
+    """
+    Gate 8.2 — the two guards on the batch upload path.
+
+    The raw UCI file codes ChestPainType by anginal-feature COUNT, the inverse
+    of the clinical meaning this API takes (HF-1). Uploaded as-is and read as
+    clinical input, 609 of its 920 rows change decision and 130 diseased
+    patients lose their referral (measured, results/p8_2_guard_size.json). One
+    guard refuses the file as distributed; the other lets a caller declare the
+    coding and converts explicitly.
+    """
+
+    HEART_HEADER = ",".join(HEART_CASES["clinical_atypical_angina_up_slope"].keys())
+
+    def _rows(self, *patients):
+        body = [self.HEART_HEADER]
+        body += [",".join(str(v) for v in p.values()) for p in patients]
+        return "\n".join(body).encode("utf-8")
+
+    async def _post(self, live_client, doctor_token, csv_bytes, **params):
+        return await live_client.post(
+            "/api/v4/heart_disease/batch",
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+            params=params,
+        )
+
+    # ── Layer 1: the raw research export is refused ──────────────────────────
+
+    @pytest.mark.parametrize("marker", ["site", "HeartDisease", "num"])
+    async def test_csv_with_a_raw_uci_marker_column_is_refused(self, live_client, doctor_token, marker):
+        """
+        A column that exists in the UCI export and in no API schema means this
+        is a research file, not a clinician's upload. Refused with the reason
+        and the fix, not a bare 400.
+        """
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        csv_bytes = "\n".join([
+            self.HEART_HEADER + f",{marker}",
+            ",".join(str(v) for v in patient.values()) + ",cleveland",
+        ]).encode("utf-8")
+
+        resp = await self._post(live_client, doctor_token, csv_bytes)
+        assert resp.status_code == 422, resp.text
+        # The app flattens a dict detail into its standard error envelope.
+        body = resp.json()
+        assert body["code"] == "RAW_UCI_EXPORT_REJECTED"
+        assert body["marker_columns_found"] == [marker]
+        # The message must name the fix, or the user has no way forward.
+        assert "chest_pain_coding=uci_raw" in body["error"]
+
+    async def test_an_ordinary_clinical_upload_is_untouched(self, live_client, doctor_token):
+        """The guard must not fire on the file a clinician actually uploads."""
+        patient = dict(HEART_CASES["clinical_no_anginal_features_flat"])
+        resp = await self._post(live_client, doctor_token, self._rows(patient))
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["succeeded"] == 1, data
+        assert data["chest_pain_coding"] == "clinical"
+        # Unchanged against the golden value: the default path did not move.
+        golden = HEART_GOLDEN["clinical_no_anginal_features_flat"]
+        assert data["results"][0]["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
+
+    async def test_marker_column_is_allowed_once_the_coding_is_declared(self, live_client, doctor_token):
+        """
+        Declaring uci_raw is the documented way to upload the research file, so
+        the marker column stops being a reason to refuse. It is not a model
+        input either way.
+        """
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        csv_bytes = "\n".join([
+            self.HEART_HEADER + ",site",
+            ",".join(str(v) for v in patient.values()) + ",cleveland",
+        ]).encode("utf-8")
+
+        resp = await self._post(live_client, doctor_token, csv_bytes, chest_pain_coding="uci_raw")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["chest_pain_coding"] == "uci_raw"
+
+    # ── Layer 2: the declared coding actually converts ───────────────────────
+
+    async def test_declared_raw_coding_scores_as_the_clinical_opposite(self, live_client, doctor_token):
+        """
+        The point of the whole gate. A row whose ChestPainType is the raw code
+        'TA' means NO anginal features; read as clinical input it would mean
+        typical angina. Declaring uci_raw must produce the same answer as
+        uploading 'ASY' -- the clinical code for the same thing -- and a
+        different one from uploading 'TA' as clinical.
+        """
+        raw = dict(HEART_CASES["clinical_atypical_angina_up_slope"], ChestPainType="TA")
+        equivalent = dict(raw, ChestPainType="ASY")   # CP_RAW_TO_CLINICAL["TA"]
+
+        as_raw = await self._post(live_client, doctor_token, self._rows(raw), chest_pain_coding="uci_raw")
+        as_clinical_equivalent = await self._post(live_client, doctor_token, self._rows(equivalent))
+        as_clinical_literal = await self._post(live_client, doctor_token, self._rows(raw))
+        for resp in (as_raw, as_clinical_equivalent, as_clinical_literal):
+            assert resp.status_code == 200, resp.text
+
+        raw_conf = as_raw.json()["results"][0]["confidence"]
+        equivalent_conf = as_clinical_equivalent.json()["results"][0]["confidence"]
+        literal_conf = as_clinical_literal.json()["results"][0]["confidence"]
+
+        assert raw_conf == pytest.approx(equivalent_conf, abs=1e-9)
+        # And the inversion this gate is about is real, not cosmetic.
+        assert abs(raw_conf - literal_conf) > 0.05, (raw_conf, literal_conf)
+
+    async def test_unknown_coding_is_refused(self, live_client, doctor_token):
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        resp = await self._post(
+            live_client, doctor_token, self._rows(patient), chest_pain_coding="whatever"
+        )
+        assert resp.status_code == 400, resp.text
+        assert resp.json()["code"] == "INVALID_CHEST_PAIN_CODING"
+
+    async def test_diabetes_declares_no_coding_and_is_unaffected(self, live_client, doctor_token):
+        """
+        Both guards read the disease's own config, never the disease name. A
+        disease that declares no coding has none to pass, and its batch path is
+        unchanged.
+        """
+        resp = await live_client.post(
+            "/api/v4/diabetes/batch",
+            files={"file": ("d.csv", b"BMI\n25.0\n", "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+            params={"chest_pain_coding": "uci_raw"},
+        )
+        assert resp.status_code == 400, resp.text
+        assert resp.json()["code"] == "CODING_NOT_APPLICABLE"
+
+    async def test_the_coding_reaches_the_audit_row(self, live_client, doctor_token, db_session):
+        """
+        Gate 8.2: the coding is recorded, not just returned. A batch result can
+        be re-read later; the coding it was scored under cannot, unless it was
+        written down. Asserted end to end through AuditMiddleware rather than by
+        setting the column directly, because what could break is the handoff.
+        """
+        from sqlalchemy import select
+
+        from backend.db_models.audit_log import AuditLog
+
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        resp = await self._post(
+            live_client, doctor_token, self._rows(patient), chest_pain_coding="uci_raw"
+        )
+        assert resp.status_code == 200, resp.text
+
+        rows = (await db_session.execute(
+            select(AuditLog).where(AuditLog.endpoint == "/api/v4/heart_disease/batch")
+        )).scalars().all()
+        assert rows, "the batch upload wrote no audit row at all"
+        assert any((r.details or {}).get("chest_pain_coding") == "uci_raw" for r in rows), \
+            [r.details for r in rows]
+
+    # ── The translation map is derived, not hand-written ─────────────────────
+
+    def test_raw_to_clinical_map_is_derived_from_the_two_maps(self):
+        """
+        A hand-written third map would be a third place for HF-1 to come back.
+        This asserts the map is exactly the count-preserving one and that it is
+        its own inverse.
+        """
+        from backend.heart_glm import stack
+
+        for raw_code, clinical_code in stack.CP_RAW_TO_CLINICAL.items():
+            assert stack.CP_MAP_UCI_RAW[raw_code] == stack.CP_MAP_CLINICAL[clinical_code]
+            assert stack.CP_RAW_TO_CLINICAL[clinical_code] == raw_code
+        assert set(stack.CP_RAW_TO_CLINICAL) == set(stack.CP_MAP_UCI_RAW)
+        # No code maps to itself: the two codings disagree on all four values.
+        assert not any(k == v for k, v in stack.CP_RAW_TO_CLINICAL.items())
+
+    def test_translation_passes_through_rows_it_cannot_map(self):
+        """
+        A bad cell must stay a one-row validation error, not break the batch.
+        """
+        from backend.heart_glm import stack
+
+        out = stack.translate_raw_codes([{"ChestPainType": "TA"}, {"ChestPainType": None}, {}])
+        assert out == [{"ChestPainType": "ASY"}, {"ChestPainType": None}, {}]
+
+
+class TestHeartImportanceFile:
+    """
+    Gate 8.2 — the importance file must describe the model that ships.
+    """
+
+    def test_importance_matches_the_shipped_bundle(self):
+        """
+        Same method as F0-1 used to catch the old file: recompute and compare.
+        Fails if the shipped file drifts from the bundle, in value or in rank.
+        """
+        import subprocess
+
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        result = subprocess.run(
+            [sys.executable, os.path.join(repo, "scripts/regen_heart_importance.py"), "--verify"],
+            capture_output=True, text=True, cwd=repo,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_importance_covers_exactly_the_features_the_model_reads(self):
+        """
+        The old file listed Oldpeak, ExerciseAngina, MaxHR and ST_Slope -- four
+        features the shipped model does not read. That is what made it wrong
+        rather than merely stale.
+        """
+        import json
+
+        from backend.heart_glm import stack
+
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(repo, "evaluation_evidence/heart/heart_l3_glm_importance.json")) as fh:
+            data = json.load(fh)
+        assert set(data["importance"]) == set(stack.MODEL_FEATURES)
+        assert data["rank"][0] == "cp_anginal", "chest pain is the model's strongest feature"
+        # The scale limit must travel with the numbers.
+        assert "not an attribution" in data["scale_limit"].lower()
