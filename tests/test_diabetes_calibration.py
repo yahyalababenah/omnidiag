@@ -203,19 +203,24 @@ HEART_CASES = {
         "ExerciseAngina": "N", "Oldpeak": 0.0, "ST_Slope": "Up",
     },
 }
-# Golden heart outputs, RECAPTURED 2026-09-20 from OmniDiagRouter.predict on
-# deploy/v2-platform after the heart_full_tuned.pkl Pipeline replacement
-# (see backend/model_loader.py commit "feat(heart): load heart_full_tuned.pkl
-# as a self-contained sklearn Pipeline"). This is a DELIBERATE break of the
-# previous safety net, not drift: the heart model itself changed (new
-# Pipeline, new training data, new threshold 0.3695 instead of argmax 0.5),
-# so its outputs on these exact patients are expected to differ from every
-# prior capture. From this commit on, any further drift here again means
-# something leaked into heart that shouldn't have.
+# Golden heart outputs, RECAPTURED 2026-09-26 on phase8/heart-fixes-and-monitoring
+# after the Spline-GLM + Venn-Abers + Mondrian conformal replacement (Gate 8.1).
+# This is a DELIBERATE break of the previous net, not drift: the model, its
+# feature set, its calibration and its decision rule all changed.
+#
+# `typical_up_slope` is GONE rather than updated. Its old expectation
+# (Negative, 0.3386) WAS the HF-1 defect being asserted as correct behaviour:
+# UCI's chest-pain codes are inverted, so a patient the clinician records as
+# typical angina scored LOW. That property now has a test of its own, stated
+# as a property rather than a captured number, in
+# tests/test_heart_glm_backend.py::test_typical_angina_outranks_no_anginal_features_*.
+#
+# `confidence` here is the Venn-Abers probability, and a patient whose
+# conformal set is not a singleton is reported as a referral for further
+# evaluation (prediction 1) — see backend/heart_glm/core.py.
 HEART_GOLDEN = {
-    "asymptomatic_flat": {"prediction": 1, "confidence": 0.9833390712738037, "diagnosis": "Positive"},
-    "typical_up_slope": {"prediction": 0, "confidence": 0.33861273527145386, "diagnosis": "Negative"},
-    "young_female": {"prediction": 0, "confidence": 0.039755821228027344, "diagnosis": "Negative"},
+    "asymptomatic_flat": {"prediction": 1, "confidence": 0.6875, "diagnosis": "Uncertain — refer for further evaluation"},
+    "young_female": {"prediction": 0, "confidence": 0.023809523809523808, "diagnosis": "Negative"},
 }
 
 CORRECTION_KEYS = {
@@ -368,17 +373,17 @@ class TestDiabetesPredictApi:
 
     @pytest.mark.parametrize("case", sorted(HEART_CASES))
     async def test_heart_response_has_no_correction_fields(self, live_client, case):
-        # Heart still applies no prevalence correction (unaffected by the
-        # Pipeline replacement), but now states its own decision threshold
-        # like diabetes does — CORRECTION_KEYS (prevalence/risk-band fields)
-        # must still be absent; inference_threshold is the one field heart
-        # gained.
+        # Heart applies no prevalence correction, so CORRECTION_KEYS must be
+        # absent. Since Gate 8.1 it also publishes NO inference_threshold: its
+        # decision is a conformal set, and a single cut-point is exactly what
+        # produced the sex gap in sensitivity this model was built to close
+        # (HF-13). A threshold reappearing here is a regression.
         resp = await _post_predict(live_client, "heart_disease", HEART_CASES[case])
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert CORRECTION_KEYS.isdisjoint(data), CORRECTION_KEYS & set(data)
-        assert set(data) == {"prediction", "confidence", "diagnosis", "inference_threshold"}
-        assert data["inference_threshold"] == pytest.approx(0.3695)
+        assert set(data) == {"prediction", "confidence", "diagnosis"}
+        assert "inference_threshold" not in data
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -386,7 +391,7 @@ class TestDiabetesPredictApi:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestHeartNonRegression:
-    @pytest.mark.parametrize("case", sorted(HEART_CASES))
+    @pytest.mark.parametrize("case", sorted(HEART_GOLDEN))
     def test_router_output_unchanged(self, real_router, case):
         out = real_router.predict("heart_disease", dict(HEART_CASES[case]))
         golden = HEART_GOLDEN[case]
@@ -412,7 +417,7 @@ class TestHeartNonRegression:
         bad one, so a regression that lets inf/nan back in would show up as
         the two good rows failing too, not just the bad one.
         """
-        good = dict(HEART_CASES["typical_up_slope"])
+        good = dict(HEART_CASES["asymptomatic_flat"])
         bad = dict(good)
         bad["Oldpeak"] = bad_oldpeak
 
@@ -440,7 +445,7 @@ class TestHeartNonRegression:
         assert by_row[3]["status"] == "ok"
         # The two good rows are identical patients -- same result, and it
         # matches the non-regression golden value for this exact patient.
-        golden = HEART_GOLDEN["typical_up_slope"]
+        golden = HEART_GOLDEN["asymptomatic_flat"]
         for row in (1, 3):
             assert by_row[row]["prediction"] == golden["prediction"]
             assert by_row[row]["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
@@ -449,15 +454,16 @@ class TestHeartNonRegression:
     def _csv_row(patient, blank_key=None):
         return ",".join("" if k == blank_key else str(v) for k, v in patient.items())
 
-    @pytest.mark.parametrize("missing_field", ["ST_Slope", "RestingBP"], ids=["ST_Slope", "RestingBP"])
+    @pytest.mark.parametrize("missing_field", ["ST_Slope", "MaxHR"], ids=["ST_Slope", "MaxHR"])
     async def test_batch_low_impact_missing_field_succeeds_without_warning(self, live_client, doctor_token, missing_field):
         """
-        Regression guard for HM-5 (WEAKNESS_REGISTER.md). ST_Slope and
-        RestingBP are Optional on HeartDiseaseInput (the model's Pipeline
-        imputes them) but rank 10th/9th of 11 in
-        evaluation_evidence/heart/shap_importance.json -- low enough that a
-        missing value must not trigger data_completeness_warning, or the
-        warning stops meaning anything.
+        Regression guard for HM-5 (WEAKNESS_REGISTER.md). A blank field must
+        not warn unless it changes the prediction, or the warning stops meaning
+        anything. Since Gate 8.1 the model reads seven inputs (L3, D-25), so
+        ST_Slope and MaxHR are not read at all and blanking them cannot
+        possibly matter. The list now comes from the config, checked against
+        the shipped artifact, instead of from a SHAP file belonging to a model
+        that was never deployed (F0-1).
         """
         patient = dict(HEART_CASES["typical_up_slope"])
         header = ",".join(patient.keys())
@@ -475,15 +481,18 @@ class TestHeartNonRegression:
         assert data["results"][0]["status"] == "ok"
         assert data["results"][0].get("data_completeness_warning") is None
 
-    @pytest.mark.parametrize("missing_field", ["Oldpeak", "Cholesterol"], ids=["Oldpeak", "Cholesterol"])
+    @pytest.mark.parametrize(
+        "missing_field", ["Cholesterol", "FastingBS", "RestingBP"],
+        ids=["Cholesterol", "FastingBS", "RestingBP"],
+    )
     async def test_batch_high_impact_missing_field_succeeds_with_warning(self, live_client, doctor_token, missing_field):
         """
-        Regression guard for HM-5. Oldpeak (SHAP rank 2/11) and Cholesterol
-        (rank 5/11) are the two Optional fields that also sit in
-        ModelLoader._HIGH_IMPACT_FEATURES -- a missing value there must
-        still succeed (the whole point of HM-5), but with
-        data_completeness_warning naming the missing feature, visible in
-        the row the same as it would be to a clinician in the UI.
+        Regression guard for HM-5, and for HF-11. These three are Optional on
+        the schema AND read by the model, so a blank one is imputed: the row
+        must still succeed (the point of HM-5) but carry
+        data_completeness_warning naming the field. FastingBS is on the list
+        because in the previous model a blank one raised risk by 7.6 points and
+        flipped 8.1% of decisions with NO warning at all (HF-11).
         """
         patient = dict(HEART_CASES["typical_up_slope"])
         header = ",".join(patient.keys())
@@ -521,31 +530,38 @@ class TestHeartNonRegression:
         assert data["succeeded"] == 1, data
         assert "data_completeness_warning" not in data["results"][0] or data["results"][0]["data_completeness_warning"] is None
 
-    def test_threshold_is_read_from_the_model_file_not_a_constant(self, real_router):
-        # bundle["threshold"] must be the number the .pkl actually carries,
-        # and predict() must consult it at call time -- not a 0.5 argmax or
-        # any other literal baked into model_loader.py. Proven by mutating
-        # the loaded bundle's threshold in place and watching the decision
-        # for the same patient/probability flip both ways.
+    def test_decision_comes_from_the_conformal_cells_not_a_constant(self, real_router):
+        # The heart decision must be read from the bundle's Mondrian cells at
+        # call time, not from any literal in the backend. Proven the same way
+        # the old threshold test worked: mutate the loaded artifact in place
+        # and watch the same patient's decision move both ways.
         loader = real_router._get_loader("heart_disease")
-        bundle = loader.model  # forces load
-        assert bundle["threshold"] == pytest.approx(0.3695)
+        cells = loader.bundle["conformal_cells"]
+        assert set(cells) == {"F0", "F1", "M0", "M1"}
 
-        patient = HEART_CASES["typical_up_slope"]
-        proba = HEART_GOLDEN["typical_up_slope"]["confidence"]  # 0.3386...
-        original_threshold = bundle["threshold"]
+        patient = HEART_CASES["asymptomatic_flat"]
+        original = dict(cells)
         try:
-            bundle["threshold"] = proba + 0.05
-            result_above = loader.predict(dict(patient))
-            assert result_above["prediction"] == 0
-            assert result_above["inference_threshold"] == pytest.approx(proba + 0.05)
+            # Nothing is typical of class 0 -> class 0 leaves the set, leaving
+            # {1} alone: a confident referral.
+            cells["M0"] = -1.0
+            cells["M1"] = 1.0
+            assert loader.predict(dict(patient))["diagnosis"] == "Positive"
 
-            bundle["threshold"] = proba - 0.05
-            result_below = loader.predict(dict(patient))
-            assert result_below["prediction"] == 1
-            assert result_below["inference_threshold"] == pytest.approx(proba - 0.05)
+            # Mirror image: only class 0 survives -> no referral.
+            cells["M0"] = 1.0
+            cells["M1"] = -1.0
+            assert loader.predict(dict(patient))["diagnosis"] == "Negative"
+
+            # Both survive -> uncertain, and uncertain is still a referral.
+            cells["M0"] = 1.0
+            cells["M1"] = 1.0
+            uncertain = loader.predict(dict(patient))
+            assert uncertain["prediction"] == 1
+            assert uncertain["diagnosis"].startswith("Uncertain")
         finally:
-            bundle["threshold"] = original_threshold  # real_router is module-scoped
+            cells.clear()
+            cells.update(original)  # real_router is module-scoped
 
 
 # ═════════════════════════════════════════════════════════════════════════════

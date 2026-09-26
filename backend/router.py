@@ -192,8 +192,8 @@ class OmniDiagRouter:
                 detail={
                     "error": f"Counterfactual generation is not implemented for disease '{disease}'.",
                     "code": "COUNTERFACTUALS_NOT_SUPPORTED",
-                    "hint": "This feature is only available for ensemble models (e.g. diabetes). "
-                            "Heart disease uses a single XGBoost model without a counterfactual generator.",
+                    "hint": "The disease's model family provides no counterfactual generator. "
+                            "See docs/ADDING_A_MODEL_FAMILY.md.",
                 }
             )
         

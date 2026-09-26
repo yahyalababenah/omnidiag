@@ -23,4 +23,9 @@ reports/figures
 *.png
 *.csv
 *.ipynb
+
+# Exceptions: the heart model is BUILT in the image (no binary is committed),
+# so its training data and build script must reach the build context.
+!data/heart_disease/processed/uci_heart_by_site.csv
+!scripts/train_heart_glm.py
 experiment_files
