@@ -1,4 +1,10 @@
 .venv
+# Any nested virtualenv too. `.venv` alone matches only the top-level one, so
+# backend/.venv (1.1 GB, including CUDA/NCCL libraries pulled in for local dev)
+# was being copied into the production image by `COPY . .` — it is what made the
+# image export run out of disk. Nothing in the image uses it: the container has
+# its own interpreter and its own site-packages from requirements.txt.
+**/.venv
 __pycache__
 .git
 .env
