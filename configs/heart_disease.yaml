@@ -106,10 +106,29 @@ model:
   # The conformal decision and the [p_lower, p_upper] interval replace them.
   risk_bands: null
 
-  # Optional inputs this model reads: a blank one is imputed from the training
-  # data and the clinician is told. FastingBS is on this list because a blank
-  # one silently raised risk by 7.6 points in the previous model (HF-11).
-  # Re-measured against the shipped artifact in Gate 8.3.
+  # ── Which blank inputs the clinician is warned about (Gate 8.3) ───────────
+  # The RULE lives here; the NUMBERS live in the bundle (`blank_impact`,
+  # measured at build time on the artifact itself); the LIST is derived from
+  # both and is written down nowhere. A hand-written list keeps describing the
+  # model it was typed for, which is how the importance file came to describe a
+  # model that was never deployed (F0-1) -- the same risk, one level up.
+  #
+  # Warn about a blank input when its absence changes at least this share of
+  # decisions. Measured on the shipped bundle over the patients who have each
+  # field recorded:
+  #     RestingBP    3.84% of decisions change   -> warned
+  #     Cholesterol  3.48%                       -> warned
+  #     FastingBS    2.77%                       -> warned
+  #     MaxHR, Oldpeak, ST_Slope  0.00% exactly  -> not warned (unread by L3)
+  # The gap between the lowest warned field and the highest unwarned one runs
+  # from 2.77% to 0%, so any threshold in that range gives the same list: the
+  # list does not hinge on this number, and that is measured, not asserted.
+  blank_warning_min_decision_share: 0.01
+
+  # The expected result of applying that rule, kept as a CROSS-CHECK, not as the
+  # source. A test fails if the derived list and this one disagree -- so a
+  # retrain that changes the facts is reported instead of silently contradicting
+  # the config.
   high_impact_features:
     - "RestingBP"
     - "Cholesterol"

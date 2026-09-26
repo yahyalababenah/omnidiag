@@ -272,17 +272,43 @@ class HeartGlmConformalBackend(ModelBackend):
 
     # ── helpers ──────────────────────────────────────────────────────────
 
+    def _warned_blank_features(self) -> list[str]:
+        """
+        The blank inputs worth warning about: derived, not listed.
+
+        The numbers come from the bundle (`blank_impact`, measured at build time
+        on this very artifact) and the threshold from the disease config, so the
+        list is a property of the model that ships. It used to be a list typed
+        into the config -- whose docstring claimed it came from the bundle while
+        it did not -- and a typed list goes on describing the model it was typed
+        for. That is precisely how the importance file came to describe a model
+        that was never deployed (F0-1).
+
+        Falls back to the config's list for a bundle built before Gate 8.3, so
+        an older artifact degrades to the previous behaviour instead of losing
+        the warning entirely.
+        """
+        model_config = self.config.get("model", {}) or {}
+        blank_impact = self.bundle.get("blank_impact")
+        if not blank_impact:
+            return list(model_config.get("high_impact_features", []))
+        return stack.blank_warning_features(
+            blank_impact, float(model_config.get("blank_warning_min_decision_share", 0.01))
+        )
+
     def _completeness_warning(self, patient_data: Dict[str, Any]) -> str | None:
         """Warn when an input the model reads was left blank and imputed.
 
-        Read from the bundle, not from a hand-maintained constant: the previous
-        list was copied from a SHAP file belonging to a model that was never
-        shipped (F0-1), and it omitted the one field whose blank value moved
-        risk the most (HF-11).
+        The wording is deliberately not directional. Blanking these fields does
+        not simply "raise risk": measured on the shipped bundle, a blank
+        RestingBP moves the displayed probability -0.47 points on average and a
+        blank FastingBS -0.72, while a blank Cholesterol moves it +0.49. What
+        matters is that the decision can change at all -- 23 to 33 patients out
+        of ~860 per field -- not the direction.
         """
         missing = [
             feature
-            for feature in self.config.get("model", {}).get("high_impact_features", [])
+            for feature in self._warned_blank_features()
             if patient_data.get(feature) is None
         ]
         if not missing:

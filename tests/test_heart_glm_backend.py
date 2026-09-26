@@ -340,3 +340,137 @@ def test_the_build_gate_passes_on_the_real_inputs(backend):
     )
     assert result["decision_mismatches"] == 0
     assert max(result["max_abs_delta"].values()) <= 1e-6
+
+
+# ── Gate 8.3 — the blank-input warning list is derived, not typed ────────────
+
+
+def test_bundle_carries_the_blank_impact_measurement(backend):
+    """
+    The numbers behind the warning list travel with the artifact. Measured at
+    build time on the artifact itself, for every Optional input.
+    """
+    impact = backend.bundle["blank_impact"]
+    assert set(impact) == set(stack.OPTIONAL_INPUT_FEATURES)
+    for field, row in impact.items():
+        assert row["n"] > 0, f"{field}: no patient has it recorded"
+        for key in ("decision_changed", "decision_changed_share",
+                    "mean_delta_points", "p90_delta_points"):
+            assert key in row, f"{field}: missing {key}"
+
+
+def test_only_the_inputs_the_model_reads_can_change_a_decision(backend):
+    """
+    The sharpest evidence that the shipped artifact really is L3 (D-25) rather
+    than a claim in a document: blanking MaxHR, Oldpeak or ST_Slope changes
+    EXACTLY nothing -- no decision, no probability -- because the model does not
+    read them. A model that read them could not produce exact zeros.
+    """
+    impact = backend.bundle["blank_impact"]
+    read = {"FastingBS": "FastingBS_cat"}
+    for field, row in impact.items():
+        encoded_name = read.get(field, field)
+        is_read = encoded_name in stack.MODEL_FEATURES
+        moves = row["decision_changed"] > 0 or row["mean_delta_points"] != 0.0
+        assert moves == is_read, (
+            f"{field}: read_by_model={is_read} but moves={moves} ({row})"
+        )
+        if not is_read:
+            assert row["decision_changed"] == 0
+            assert row["mean_delta_points"] == 0.0
+            assert row["p90_delta_points"] == 0.0
+
+
+def test_warning_list_is_derived_and_matches_the_config_cross_check(backend, router):
+    """
+    The config keeps the expected list as a cross-check, not as the source. If a
+    retrain ever changes the facts, this fails and says so, instead of letting
+    the config quietly describe a model that no longer exists -- which is the
+    F0-1 failure mode one level up.
+    """
+    model_config = router.disease_configs["heart_disease"]["model"]
+    derived = stack.blank_warning_features(
+        backend.bundle["blank_impact"], model_config["blank_warning_min_decision_share"]
+    )
+    assert derived == model_config["high_impact_features"], (
+        f"derived {derived} != config cross-check {model_config['high_impact_features']}"
+    )
+    # And it is what the backend actually uses.
+    assert backend._warned_blank_features() == derived
+
+
+def test_the_list_does_not_hinge_on_the_chosen_threshold(backend):
+    """
+    Answers the obvious objection to a threshold picked after seeing the data.
+    The gap between the lowest warned field and the highest unwarned one runs
+    from ~2.8% to exactly 0%, so every threshold in that range gives the same
+    list. Measured rather than asserted -- if a retrain narrowed the gap, this
+    test would start failing and the threshold would need a real argument.
+    """
+    impact = backend.bundle["blank_impact"]
+    baseline = stack.blank_warning_features(impact, 0.01)
+    for threshold in (0.001, 0.005, 0.01, 0.02, 0.027):
+        assert stack.blank_warning_features(impact, threshold) == baseline, threshold
+
+    shares = {f: r["decision_changed_share"] for f, r in impact.items()}
+    warned = [shares[f] for f in baseline]
+    unwarned = [s for f, s in shares.items() if f not in baseline]
+    assert min(warned) > max(unwarned), "the gap this test relies on has closed"
+
+
+def test_an_unread_blank_input_is_not_warned_about(backend):
+    """
+    Warning about a field that cannot move anything is not extra caution, it is
+    noise that costs the warning its meaning. ST_Slope is the field that
+    surfaced HM-5 in the first place, and the shipped model does not read it.
+    """
+    patient = {
+        "Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 140,
+        "Cholesterol": 289, "FastingBS": 0, "RestingECG": "Normal",
+        "MaxHR": 122, "ExerciseAngina": "N", "Oldpeak": 0.0, "ST_Slope": None,
+    }
+    assert backend._completeness_warning(patient) is None
+
+    blanked = dict(patient, ST_Slope="Flat", Cholesterol=None)
+    warning = backend._completeness_warning(blanked)
+    assert warning is not None and "Cholesterol" in warning
+
+
+def test_the_warning_does_not_claim_a_direction(backend):
+    """
+    Blanking these fields does not simply raise risk: measured on this bundle,
+    RestingBP -0.47 points and FastingBS -0.72 on average, Cholesterol +0.49. A
+    directional wording would be wrong for two of the three, so the message must
+    not carry one.
+    """
+    impact = backend.bundle["blank_impact"]
+    directions = {f: impact[f]["mean_delta_points"] > 0 for f in backend._warned_blank_features()}
+    assert len(set(directions.values())) > 1, (
+        "the measured directions agree now, so re-check whether the wording "
+        f"should say one: {directions}"
+    )
+    warning = backend._completeness_warning(
+        {"Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": None,
+         "Cholesterol": 289, "FastingBS": 0, "RestingECG": "Normal"}
+    )
+    assert warning is not None
+    lowered = warning.lower()
+    for claim in ("raise", "raises", "higher risk", "increase"):
+        assert claim not in lowered, f"the warning claims a direction: {warning!r}"
+
+
+def test_a_pre_8_3_bundle_falls_back_to_the_config_list(backend, router):
+    """
+    An artifact built before this gate carries no blank_impact. It must degrade
+    to the config's list rather than lose the warning altogether -- a silent
+    loss of the data-completeness warning is worse than an unmeasured list.
+    """
+    model_config = router.disease_configs["heart_disease"]["model"]
+    original = backend.bundle.pop("blank_impact")
+    try:
+        assert backend._warned_blank_features() == model_config["high_impact_features"]
+    finally:
+        backend.bundle["blank_impact"] = original
+    assert backend._warned_blank_features() == stack.blank_warning_features(
+        original, model_config["blank_warning_min_decision_share"]
+    )

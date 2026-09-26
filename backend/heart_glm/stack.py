@@ -74,6 +74,14 @@ INPUT_FEATURES: List[str] = [
 #: API fields accepted by the schema that this model does NOT read (L3, D-25).
 UNUSED_INPUT_FEATURES: List[str] = ["MaxHR", "Oldpeak", "ExerciseAngina", "ST_Slope"]
 
+#: The inputs HeartDiseaseInput accepts as Optional, i.e. the ones that can
+#: arrive blank and be imputed. Which of these deserve a clinician-facing
+#: warning is not decided here and not hand-listed anywhere: it is derived from
+#: `blank_impact`, measured into the bundle at build time (Gate 8.3).
+OPTIONAL_INPUT_FEATURES: List[str] = [
+    "RestingBP", "Cholesterol", "FastingBS", "MaxHR", "Oldpeak", "ST_Slope",
+]
+
 #: Encoded columns, in the order the ColumnTransformer expects.
 MODEL_FEATURES: List[str] = [
     "Age", "RestingBP", "Cholesterol", "Sex_m", "cp_anginal", "FastingBS_cat", "RestingECG",
@@ -367,6 +375,72 @@ def sha256_of(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def measure_blank_impact(
+    pipeline: Pipeline, cells: Mapping[str, float], oof: np.ndarray,
+    y: np.ndarray, frame: pd.DataFrame,
+) -> Dict[str, Dict[str, float]]:
+    """
+    For each Optional input: what changes if a clinician leaves it blank?
+
+    Measured at build time, on the artifact being built, against the patients
+    who actually have the field recorded. Reported on what the clinician is
+    shown -- the IVAP probability and the conformal decision -- not on the raw
+    score, because the raw score is not what anyone acts on.
+
+    This exists so that the data-completeness warning list is a property of the
+    MODEL rather than a list somebody typed into a config. A typed list keeps
+    describing the model it was written for: that is exactly how the importance
+    file came to describe a model that was never deployed (F0-1), and a warning
+    list carries the same risk one level up. Retraining now moves these numbers,
+    and the warning list moves with them.
+    """
+    impact: Dict[str, Dict[str, float]] = {}
+    for field in OPTIONAL_INPUT_FEATURES:
+        present = frame[frame[field].notna()]
+        if present.empty:
+            impact[field] = {"n": 0, "decision_changed": 0, "decision_changed_share": 0.0,
+                             "mean_delta_points": 0.0, "p90_delta_points": 0.0}
+            continue
+
+        def shown(rows: pd.DataFrame) -> Tuple[np.ndarray, List[str]]:
+            raw = pipeline.predict_proba(encode_for_training(rows))[:, 1]
+            prob = ivap(oof, y.astype(float), raw)[0]
+            decisions = [decide(float(s), g, cells)[0] for s, g in zip(raw, rows["Sex"])]
+            return prob, decisions
+
+        p_present, dec_present = shown(present)
+        p_blank, dec_blank = shown(present.assign(**{field: np.nan}))
+        delta = (p_blank - p_present) * 100.0
+        changed = [a != b for a, b in zip(dec_present, dec_blank)]
+        impact[field] = {
+            "n": int(len(present)),
+            "decision_changed": int(sum(changed)),
+            "decision_changed_share": round(float(np.mean(changed)), 6),
+            "mean_delta_points": round(float(delta.mean()), 4),
+            "p90_delta_points": round(float(np.percentile(delta, 90)), 4),
+        }
+    return impact
+
+
+def blank_warning_features(
+    blank_impact: Mapping[str, Mapping[str, float]], min_decision_share: float,
+) -> List[str]:
+    """
+    Which blank inputs are worth telling a clinician about: the ones whose
+    absence actually changes decisions, at or above the declared share.
+
+    The rule is the config's, the numbers are the bundle's, and the list is
+    neither's -- it is derived from both. Warning about a field that changes
+    nothing is not extra caution, it is noise that costs the warning its
+    meaning.
+    """
+    return [
+        field
+        for field in OPTIONAL_INPUT_FEATURES
+        if blank_impact.get(field, {}).get("decision_changed_share", 0.0) >= min_decision_share
+    ]
+
+
 def build_bundle(csv_path: str | Path, experiments_git_ref: str = "") -> Dict[str, Any]:
     """Fit the deployable stack on all 920 UCI patients.
 
@@ -417,6 +491,7 @@ def build_bundle(csv_path: str | Path, experiments_git_ref: str = "") -> Dict[st
         "shap_background_mean": design.mean(axis=0),
         "shap_column_groups": _column_groups(pipeline),
         "review_queue_width_cut": float(np.quantile(_ivap_width(oof, y, oof), 0.10)),
+        "blank_impact": measure_blank_impact(pipeline, cells, oof, y, frame),
         "model_card": {
             "family": "glm_ivap_conformal",
             "model": f"Spline-GLM (SplineTransformer n_knots={N_KNOTS}) + LogisticRegression C={GLM_C}",
