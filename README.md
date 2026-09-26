@@ -43,6 +43,52 @@ The full research record — every decision, its alternatives, and the measureme
 
 > **What the screenshots in the research repo do and do not show.** They show that the system behaves as designed — that the interface reports the model's decision faithfully. **They do not show that it is clinically understood.** No clinician has read these screens. Around 40 % of patients land in `uncertain`, and what a physician does with that has not been tested with any physician. **Clinical review is a declared next step before any real use.**
 
+### The three answers, on screen
+
+The heart module returns **one of three answers**, and the interface reports
+whichever one the model gave. These are real screens, captured from this branch
+against a local backend (Gate 8.6-b, 2026-09-27).
+
+| Referral | No referral | Uncertain |
+|---|---|---|
+| <img src="docs/assets/screenshots/10_referral_result.png" alt="Referral: the result panel reads Refer — confirmatory testing recommended, with the calibrated interval 85.9%–87.1%" width="280"> | <img src="docs/assets/screenshots/10_no_referral_result.png" alt="No referral: the result panel reads No referral indicated, with the calibrated interval 11.8%–25.0%" width="280"> | <img src="docs/assets/screenshots/10_uncertain_result.png" alt="Uncertain: the result panel reads Uncertain — refer for further evaluation, in amber, with the calibrated interval 71.4%–73.3%" width="280"> |
+| `Refer — confirmatory testing recommended` | `No referral indicated` | `Uncertain — refer for further evaluation` |
+
+**"Uncertain" is a third decision, not a middle band of risk.** The conformal set
+contains *both* labels, which means the model is declining to rank this patient
+at the guaranteed error rate — it is not saying "moderate risk". It is amber
+rather than red or green for that reason, it **counts as a referral everywhere in
+the system**, and it is where about 40 % of patients land. The module publishes
+no threshold and no risk bands, so there is no middle band for it to be.
+
+The generated report says the same thing in prose, including for the uncertain
+patient — [`20_uncertain_report.png`](docs/assets/screenshots/20_uncertain_report.png).
+
+**These screens show that the interface reports the model faithfully. They do not
+show that it is clinically understood** — the limit stated above applies to these
+four images too.
+
+### The measurements behind the model
+
+Every figure below is copied from the experiments repository, where it was
+produced; none is a live plot. Each caption names the gate that produced it, the
+script that drew it, and the date of the commit it was taken from.
+
+| | |
+|---|---|
+| <img src="docs/assets/research/fig_ladder_auc.png" alt="Forest plot of pooled leave-one-hospital-out AUC for the seven feature-set layers, each with its HKSJ interval" width="330"> | <img src="docs/assets/research/fig_models_forest.png" alt="Forest plot of pooled AUC for the six model families on two feature sets" width="330"> |
+| **The seven-layer feature ladder**, pooled leave-one-hospital-out AUC with HKSJ intervals. Gate 3 · `scripts/p3_figures.py` · research repo `0e0047d`, 2026-09-25 | **The six model families**, on the shipped feature set and the wider one. Gate 4 · `scripts/p4_figures.py` · research repo `3c5d88a`, 2026-09-25 |
+| <img src="docs/assets/research/fig_ablation_forest.png" alt="Forest plot comparing nine training-objective ablation arms by pooled AUC" width="330"> | <img src="docs/assets/research/fig_hf13_options.png" alt="Sensitivity by sex under four decision-rule options, showing the single-threshold gap and the Mondrian option" width="330"> |
+| **Nine training objectives** compared on the same split. Gate 5 · `scripts/p5_figures.py` · research repo `0e0047d`, 2026-09-25 | **The sex-sensitivity gap (HF-13)** and the four decision rules considered; O3, the Mondrian rule, is what ships. Gate 7 · `scripts/p7_hf13_figure.py` · research repo `f2e17a3`, 2026-09-26 |
+| <img src="docs/assets/research/fig_tehran_layers.png" alt="External Tehran cohort AUC across feature-set layers" width="330"> | <img src="docs/assets/research/fig_tehran_cp_only.png" alt="Chest-pain coding comparison between the UCI and Tehran cohorts" width="330"> |
+| **External validation, Tehran cohort** — a different country, a different decade, a different recording convention. Gate 1 · `scripts/p3_figures.py` · research repo `0e0047d`, 2026-09-25 | **Why chest-pain coding matters** between the two cohorts. Gate 4 · `scripts/p4_figures.py` · research repo `3c5d88a`, 2026-09-25 |
+
+The pooled figure is never the whole story here: the widest single-hospital
+interval spans 0.40 AUC, and the 95 % prediction interval for a *new* hospital
+runs from 0.36 to 0.97. Both are in the research repo's `results.md`, with the
+per-hospital tables the plots summarise.
+
+
 > **What is actually running in the deployed Space** (verified 2026-09-23, see
 > [docs/FEATURE_VERIFICATION.md](docs/FEATURE_VERIFICATION.md)):
 >
@@ -276,9 +322,25 @@ Disease-specific now, not uniform: **diabetes** implements a [`BaseFeatureEngine
 
 ### MLflow Experiment Tracking
 
-> **Deployment status:** not live. MLflow is installed in the Space image and
-> creates an empty tracking database on first call; `list_recent_runs()`
-> returns an empty list because nothing logs to it there.
+> **Deployment status, corrected 2026-09-27 (Gate 8.6-b).** The sentence that
+> stood here — that `list_recent_runs()` returns an empty list because nothing
+> logs to it — stopped being true in Gate 8.6 and is replaced, not appended,
+> because this section describes what the code does now.
+>
+> `scripts/train_heart_glm.py` logs **one run per image build** into the store
+> baked into the image, recording that artifact's provenance and no accuracy
+> figure; the admin endpoint reports a `status` of `unavailable` / `unreachable`
+> / `empty` / `ok` instead of `count: 0` for all three. What is still **not**
+> live is a tracking *server*: with no `MLFLOW_TRACKING_URI` the store is a
+> SQLite file inside the image, holding exactly that image's build, and a new
+> build replaces it.
+>
+> The **research** history — the seven-layer ladder, the six model families, the
+> nine ablation arms, the calibration candidates, HF-13 and the external Tehran
+> cohort, 45 runs in all — lives in a permanent store in the experiments
+> repository, not here and not in the image. Each of those runs is tagged
+> `post_hoc: true` with the commit of the results file it was read from: they are
+> **readings of saved results, not re-runs**, and none of them was tracked live.
 
 [`log_model_info()`](backend/monitoring/mlflow_tracker.py:63) and [`log_drift_metrics()`](backend/monitoring/mlflow_tracker.py:110) in [`mlflow_tracker.py`](backend/monitoring/mlflow_tracker.py) log all runs under the `"OmniDiag"` experiment. [`ensure_experiment()`](backend/monitoring/mlflow_tracker.py:46) is idempotent — it creates the experiment on first call and returns the existing `experiment_id` on subsequent calls. Model runs log `disease` and `model_version` as MLflow **tags**, evaluation metrics as MLflow **metrics** (via `mlflow.log_metrics()` — a separate mechanism from tags), and `.pkl` artifacts from `models/{disease}/`. Drift runs log `drift_share`, `drifted_columns`, `total_columns`, and `sample_size` as metrics with a `run_type=drift` tag. The retraining pipeline calls `_log_to_mlflow()` automatically after each incremental update. [`list_recent_runs(n=20)`](backend/monitoring/mlflow_tracker.py:143) backs the admin dashboard endpoint.
 

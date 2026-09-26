@@ -35,3 +35,9 @@ reports/figures
 !data/heart_disease/processed/uci_heart_by_site.csv
 !scripts/train_heart_glm.py
 experiment_files
+
+# Gate 8.6-b: README illustrations. `*.png` and `*.md` above match ROOT-level
+# files only -- measured, not assumed: a probe build showed
+# docs/assets/research/fig.png and docs/guide.md both reaching the context.
+# Nothing in the image reads these 1.4 MB of figures and screenshots.
+docs/assets/
