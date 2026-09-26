@@ -44,7 +44,8 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #     reproduce F0-1.
 #   * Whether the config's list is the right one is Gate 8.3's decision, on the
 #     measured ranking; it is deliberately not settled here.
-_HIGH_IMPACT_FEATURES = ["ChestPainType", "Oldpeak", "ExerciseAngina", "Sex", "Cholesterol"]
+# Serves no disease. The live source is `high_impact_features` in the disease config.
+_LEGACY_HIGH_IMPACT_FEATURES_UNUSED = ["ChestPainType", "Oldpeak", "ExerciseAngina", "Sex", "Cholesterol"]
 
 
 def _completeness_warning(patient_data: Dict[str, Any]) -> Optional[str]:
@@ -57,7 +58,7 @@ def _completeness_warning(patient_data: Dict[str, Any]) -> Optional[str]:
     inputs, not the patient's actual value, and a clinician reading the
     prediction should know that. See WEAKNESS_REGISTER.md HM-5.
     """
-    missing = [f for f in _HIGH_IMPACT_FEATURES if patient_data.get(f) is None]
+    missing = [f for f in _LEGACY_HIGH_IMPACT_FEATURES_UNUSED if patient_data.get(f) is None]
     if not missing:
         return None
     plural = len(missing) > 1
