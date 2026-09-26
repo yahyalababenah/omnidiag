@@ -3,7 +3,7 @@ Family "glm_ivap_conformal" — Spline-GLM + Venn-Abers + Mondrian conformal.
 
 The model is a bundle built by `scripts/train_heart_glm.py` at image build time
 (no binary is committed). Its contents and the decisions behind them are
-documented in `backend/heart_glm/core.py`.
+documented in `backend/heart_glm/stack.py`.
 
 What makes this family different from `sklearn_pipeline`:
 
@@ -30,7 +30,7 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-from backend.heart_glm import core
+from backend.heart_glm import stack
 from backend.model_backends.base import (
     BackendCapabilities,
     ModelBackend,
@@ -97,14 +97,14 @@ class HeartGlmConformalBackend(ModelBackend):
 
     def predict_proba(self, df: pd.DataFrame) -> np.ndarray:
         """Raw GLM score — the model's own scale, before calibration."""
-        encoded = core.encode_for_inference(df[self.feature_names])
+        encoded = stack.encode_for_inference(df[self.feature_names])
         return self.bundle["pipeline"].predict_proba(encoded)[:, 1]
 
     def shap_values(self, df: pd.DataFrame) -> ShapResult:
-        encoded = core.encode_for_inference(df[self.feature_names])
-        values, base = core.shap_log_odds(self.bundle, encoded)
+        encoded = stack.encode_for_inference(df[self.feature_names])
+        values, base = stack.shap_log_odds(self.bundle, encoded)
         return ShapResult(
-            values=values, base_value=base, feature_names=list(core.MODEL_FEATURES)
+            values=values, base_value=base, feature_names=list(stack.MODEL_FEATURES)
         )
 
     # ── service level ────────────────────────────────────────────────────
@@ -117,18 +117,18 @@ class HeartGlmConformalBackend(ModelBackend):
             return []
         bundle = self.bundle
         frame = pd.DataFrame(patients_data)
-        encoded = core.encode_for_inference(frame[self.feature_names])
+        encoded = stack.encode_for_inference(frame[self.feature_names])
         raw = bundle["pipeline"].predict_proba(encoded)[:, 1]
-        probability, lower, upper = core.ivap(
+        probability, lower, upper = stack.ivap(
             bundle["cal_scores"], bundle["cal_labels"], raw
         )
 
         results = []
         for patient, score, p, p0, p1 in zip(patients_data, raw, probability, lower, upper):
-            decision, conformal = core.decide(
+            decision, conformal = stack.decide(
                 float(score), patient.get("Sex"), bundle["conformal_cells"]
             )
-            referred = decision in (core.DECISION_REFERRAL, core.DECISION_UNCERTAIN)
+            referred = decision in (stack.DECISION_REFERRAL, stack.DECISION_UNCERTAIN)
             result = {
                 # 1 for referral AND for uncertain: both mean "this patient
                 # goes on for further evaluation". Counting only the confident
@@ -137,8 +137,8 @@ class HeartGlmConformalBackend(ModelBackend):
                 "prediction": 1 if referred else 0,
                 "confidence": float(p),
                 "diagnosis": (
-                    core.UNCERTAIN_DIAGNOSIS
-                    if decision == core.DECISION_UNCERTAIN
+                    stack.UNCERTAIN_DIAGNOSIS
+                    if decision == stack.DECISION_UNCERTAIN
                     else "Positive" if referred else "Negative"
                 ),
             }
@@ -151,9 +151,9 @@ class HeartGlmConformalBackend(ModelBackend):
     def explain(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
         result = super().explain(patient_data)
         result["shap_scale"] = "log_odds_raw_score"
-        encoded = core.encode_for_inference([patient_data])
+        encoded = stack.encode_for_inference([patient_data])
         imputed = {
-            column: bool(pd.isna(encoded.iloc[0][column])) for column in core.MODEL_FEATURES
+            column: bool(pd.isna(encoded.iloc[0][column])) for column in stack.MODEL_FEATURES
         }
         for item in result.get("chart_data", []):
             item["imputed"] = imputed.get(item["feature"], False)

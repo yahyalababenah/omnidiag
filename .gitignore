@@ -10,8 +10,10 @@ mlruns.db
 # Kaggle backup files (too large for HF Spaces)
 *.kaggle_backup
 
-# Core dump files (Linux)
-core.*
+# Core dump files (Linux). Narrowed from `core.*`, which also matched source
+# files named core.py and silently dropped one from a commit.
+core
+core.[0-9]*
 
 # Hugging Face Spaces — binary files rejected by HF
 mlruns.db

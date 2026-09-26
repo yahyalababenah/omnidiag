@@ -33,7 +33,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.heart_glm import core  # noqa: E402
+from backend.heart_glm import stack  # noqa: E402
 
 TRAINING_CSV = PROJECT_ROOT / "data/heart_disease/processed/uci_heart_by_site.csv"
 BUNDLE_PATH = PROJECT_ROOT / "models/heart_disease/heart_l3_glm_stack.pkl"
@@ -64,17 +64,17 @@ def main() -> int:
     args = parser.parse_args()
 
     print(f"training CSV : {TRAINING_CSV}")
-    print(f"sha256       : {core.sha256_of(TRAINING_CSV)}")
+    print(f"sha256       : {stack.sha256_of(TRAINING_CSV)}")
 
-    bundle = core.build_bundle(TRAINING_CSV, experiments_git_ref=_experiments_git_ref())
+    bundle = stack.build_bundle(TRAINING_CSV, experiments_git_ref=_experiments_git_ref())
 
     if args.write_reference:
         REFERENCE_PATH.write_text(
-            json.dumps(core.reference_scores(bundle, TRAINING_CSV), indent=1) + "\n"
+            json.dumps(stack.reference_scores(bundle, TRAINING_CSV), indent=1) + "\n"
         )
         print(f"reference    : written to {REFERENCE_PATH}")
     elif args.verify:
-        result = core.verify_against_reference(
+        result = stack.verify_against_reference(
             bundle, TRAINING_CSV, REFERENCE_PATH, args.tolerance
         )
         deltas = ", ".join(f"{k} {v:.2e}" for k, v in result["max_abs_delta"].items())
@@ -86,7 +86,7 @@ def main() -> int:
 
     size_kb = BUNDLE_PATH.stat().st_size / 1024
     print(f"bundle       : {BUNDLE_PATH} ({size_kb:.1f} KB)")
-    print(f"pkl sha256   : {core.sha256_of(BUNDLE_PATH)}   (informational — pickle bytes vary by library build)")
+    print(f"pkl sha256   : {stack.sha256_of(BUNDLE_PATH)}   (informational — pickle bytes vary by library build)")
     return 0
 
 

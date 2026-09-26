@@ -44,7 +44,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backend.heart_glm import core
+from backend.heart_glm import stack
 from backend.model_backends import registered_families
 from backend.router import OmniDiagRouter
 
@@ -115,7 +115,7 @@ def test_typical_angina_outranks_no_anginal_features_for_every_patient(router, t
         variant = frame.copy()
         variant["ChestPainType"] = code
         raw = backend.predict_proba(variant)
-        calibrated, _, _ = core.ivap(
+        calibrated, _, _ = stack.ivap(
             backend.bundle["cal_scores"], backend.bundle["cal_labels"], raw
         )
         scores[code] = (raw, calibrated)
@@ -133,7 +133,7 @@ def test_typical_angina_outranks_no_anginal_features_through_predict(router):
 
 def test_the_two_chest_pain_maps_are_never_crossed():
     """Source-level: each encoder reads exactly one map."""
-    source = ast.parse(open(core.__file__).read())
+    source = ast.parse(open(stack.__file__).read())
     functions = {
         node.name: ast.dump(node)
         for node in source.body
@@ -147,7 +147,7 @@ def test_the_two_chest_pain_maps_are_never_crossed():
 
 def test_inference_rejects_an_unknown_chest_pain_code():
     with pytest.raises(ValueError, match="clinical meaning"):
-        core.encode_for_inference([{**PATIENT, "ChestPainType": "unknown"}])
+        stack.encode_for_inference([{**PATIENT, "ChestPainType": "unknown"}])
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -157,15 +157,15 @@ def test_inference_rejects_an_unknown_chest_pain_code():
 def test_bundle_matches_the_recorded_fingerprint(backend, training_frame):
     """Same check the Docker build runs: decisions absolute, probabilities to 1e-6."""
     reference = json.load(open(_REFERENCE))
-    assert core.sha256_of(_TRAINING_CSV) == reference["training_csv_sha256"]
+    assert stack.sha256_of(_TRAINING_CSV) == reference["training_csv_sha256"]
 
-    encoded = core.encode_for_training(training_frame)
+    encoded = stack.encode_for_training(training_frame)
     raw = backend.bundle["pipeline"].predict_proba(encoded)[:, 1]
-    probability, _, _ = core.ivap(
+    probability, _, _ = stack.ivap(
         backend.bundle["cal_scores"], backend.bundle["cal_labels"], raw
     )
     decisions = [
-        core.decide(float(s), g, backend.bundle["conformal_cells"])[0]
+        stack.decide(float(s), g, backend.bundle["conformal_cells"])[0]
         for s, g in zip(raw, training_frame["Sex"])
     ]
     assert decisions == reference["decision"]
@@ -185,11 +185,11 @@ def test_uncertain_is_a_referral(backend, training_frame):
 
     for row, result in zip(rows, results):
         raw = backend.predict_proba(pd.DataFrame([row])[backend.feature_names])[0]
-        decision, _ = core.decide(float(raw), row["Sex"], backend.bundle["conformal_cells"])
-        if decision == core.DECISION_UNCERTAIN:
+        decision, _ = stack.decide(float(raw), row["Sex"], backend.bundle["conformal_cells"])
+        if decision == stack.DECISION_UNCERTAIN:
             assert result["prediction"] == 1
-            assert result["diagnosis"] == core.UNCERTAIN_DIAGNOSIS
-        elif decision == core.DECISION_REFERRAL:
+            assert result["diagnosis"] == stack.UNCERTAIN_DIAGNOSIS
+        elif decision == stack.DECISION_REFERRAL:
             assert result["prediction"] == 1 and result["diagnosis"] == "Positive"
         else:
             assert result["prediction"] == 0 and result["diagnosis"] == "Negative"
@@ -236,7 +236,7 @@ def test_shap_matches_shaps_own_linear_and_permutation_explainers(backend, train
     bundle = backend.bundle
     pipeline = bundle["pipeline"]
     rows = training_frame.head(10)[backend.feature_names]
-    encoded = core.encode_for_inference(rows)
+    encoded = stack.encode_for_inference(rows)
     design = np.asarray(pipeline.named_steps["prep"].transform(encoded), dtype=float)
     background = np.asarray(bundle["shap_background_mean"], dtype=float)
     groups = bundle["shap_column_groups"]
@@ -255,7 +255,7 @@ def test_shap_matches_shaps_own_linear_and_permutation_explainers(backend, train
 
     for i in range(len(rows)):
         ours = backend.shap_values(pd.DataFrame([rows.iloc[i]])).values
-        for j, feature in enumerate(core.MODEL_FEATURES):
+        for j, feature in enumerate(stack.MODEL_FEATURES):
             columns = groups[feature]
             assert abs(ours[j] - linear[i][columns].sum()) < 1e-6
             assert abs(ours[j] - permutation[i][columns].sum()) < 1e-6
@@ -269,7 +269,7 @@ def test_explain_declares_the_scale_and_flags_imputed_values(router):
     assert flags["Cholesterol"] is True
     assert flags["Age"] is False
     # Inputs this model does not read never appear in an explanation of it.
-    assert set(flags) == set(core.MODEL_FEATURES)
+    assert set(flags) == set(stack.MODEL_FEATURES)
 
 
 # ═════════════════════════════════════════════════════════════════════════════

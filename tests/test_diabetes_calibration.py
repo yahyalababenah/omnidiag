@@ -217,7 +217,7 @@ HEART_CASES = {
 #
 # `confidence` here is the Venn-Abers probability, and a patient whose
 # conformal set is not a singleton is reported as a referral for further
-# evaluation (prediction 1) — see backend/heart_glm/core.py.
+# evaluation (prediction 1) — see backend/heart_glm/stack.py.
 HEART_GOLDEN = {
     "asymptomatic_flat": {"prediction": 1, "confidence": 0.6875, "diagnosis": "Uncertain — refer for further evaluation"},
     "young_female": {"prediction": 0, "confidence": 0.023809523809523808, "diagnosis": "Negative"},
