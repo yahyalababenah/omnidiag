@@ -43,9 +43,13 @@ class HeartDiseaseInput(BaseModel):
     pre-encoded integers. The ModelLoader applies label encoding internally.
     """
     # Required: no legitimate way to triage a patient without these, and
-    # ChestPainType/ExerciseAngina rank #1/#3 in the shipped model's SHAP
-    # importance (evaluation_evidence/heart/shap_importance.json) -- missing
-    # values for those are rejected outright, not silently imputed.
+    # ChestPainType is the shipped model's strongest feature by a wide margin
+    # (mean |phi| 0.93 against 0.35 for the next one) -- a missing value there
+    # is rejected outright, not silently imputed. Measured on the artifact that
+    # ships, in evaluation_evidence/heart/heart_l3_glm_importance.json. The
+    # ranking this comment used to cite (shap_importance.json) belongs to a
+    # model that was never deployed and counts ExerciseAngina, which the
+    # shipped model does not read at all (F0-1, Gate 8.2).
     Age: int = Field(..., description="Age in years", ge=20, le=100)
     Sex: Literal['M', 'F'] = Field(..., description="Sex: 'M' or 'F' (or encoded 0/1)")
     ChestPainType: Literal['TA', 'ATA', 'NAP', 'ASY'] = Field(..., description="Chest pain type: 'TA', 'ATA', 'NAP', or 'ASY' (or encoded 0-3)")

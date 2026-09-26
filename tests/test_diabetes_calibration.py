@@ -19,6 +19,9 @@ and the mock restored cleanly). No network, no external data.
 
 import os
 import sys
+from pathlib import Path
+
+from backend.heart_glm import stack as stack_module
 
 import numpy as np
 import pytest
@@ -780,6 +783,37 @@ class TestBatchChestPainCodingGuard:
         assert set(stack.CP_RAW_TO_CLINICAL) == set(stack.CP_MAP_UCI_RAW)
         # No code maps to itself: the two codings disagree on all four values.
         assert not any(k == v for k, v in stack.CP_RAW_TO_CLINICAL.items())
+
+    def test_derived_map_is_pinned_literally(self):
+        """
+        The derivation is sound only while the anginal-feature count is a unique
+        key in both maps; a repeated count would silently drop a code and leave
+        a three-entry map that still passes "count-preserving" and "own
+        inverse" for the codes it kept. stack.py refuses to import in that case
+        (asserted below), and this pins the result so a change has to be
+        deliberate.
+        """
+        from backend.heart_glm import stack
+
+        assert stack.CP_RAW_TO_CLINICAL == {
+            "ASY": "TA", "NAP": "ATA", "ATA": "NAP", "TA": "ASY",
+        }
+
+    def test_a_repeated_anginal_count_refuses_to_import(self):
+        """
+        The check lives in the module, not only here: a build that cannot derive
+        the map correctly must fail to start rather than serve mistranslated
+        chest pain. Exercised by re-executing the module source with one map
+        mutated, which is the only way to test an import-time guard.
+        """
+        source = Path(stack_module.__file__).read_text()
+        mutated = source.replace(
+            '{"ASY": 3.0, "NAP": 2.0, "ATA": 1.0, "TA": 0.0}',
+            '{"ASY": 3.0, "NAP": 2.0, "ATA": 2.0, "TA": 0.0}',
+        )
+        assert mutated != source, "the map literal moved -- update this test"
+        with pytest.raises(ImportError, match="repeated anginal-feature count"):
+            exec(compile(mutated, stack_module.__file__, "exec"), {"__name__": "mutated_stack"})
 
     def test_translation_passes_through_rows_it_cannot_map(self):
         """

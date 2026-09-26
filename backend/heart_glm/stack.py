@@ -101,6 +101,28 @@ CP_RAW_TO_CLINICAL: Dict[str, str] = {
     if clinical_count == count
 }
 
+# The derivation above matches on anginal-feature count, which is only sound
+# while the count is a UNIQUE key in both maps. If a count were ever repeated,
+# the comprehension would drop a code silently and leave a three-entry map that
+# still satisfies "count-preserving" and "own inverse" for the codes it kept --
+# the batch path would then translate one code wrongly and no test would say so.
+# So this is checked at import, not only in the tests: a module that cannot
+# build this map correctly must refuse to load, because the alternative is a
+# process that starts up and mistranslates chest pain.
+if len(set(CP_MAP_UCI_RAW.values())) != len(CP_MAP_UCI_RAW):
+    raise ImportError(f"CP_MAP_UCI_RAW has a repeated anginal-feature count: {CP_MAP_UCI_RAW}")
+if len(set(CP_MAP_CLINICAL.values())) != len(CP_MAP_CLINICAL):
+    raise ImportError(f"CP_MAP_CLINICAL has a repeated anginal-feature count: {CP_MAP_CLINICAL}")
+if len(CP_RAW_TO_CLINICAL) != len(CP_MAP_UCI_RAW):
+    raise ImportError(
+        f"CP_RAW_TO_CLINICAL lost a code in derivation: {CP_RAW_TO_CLINICAL} "
+        f"from {CP_MAP_UCI_RAW} / {CP_MAP_CLINICAL}"
+    )
+if set(CP_RAW_TO_CLINICAL) != set(CP_RAW_TO_CLINICAL.values()):
+    raise ImportError(
+        f"CP_RAW_TO_CLINICAL is not a permutation of the same four codes: {CP_RAW_TO_CLINICAL}"
+    )
+
 #: Human-readable label per anginal-feature count, for explanations.
 CP_LABEL: Dict[float, str] = {
     3.0: "typical angina", 2.0: "atypical angina",
