@@ -147,6 +147,17 @@ class ModelBackend(ABC):
     # ── service-level (router-facing) ────────────────────────────────────
 
     @property
+    def unused_input_features(self) -> list:
+        """
+        Inputs this module ACCEPTS but does not read.
+
+        Empty for a module that reads everything it accepts. A module that
+        accepts more than it uses overrides this from its own artifact, so the
+        list can never drift from the model the way a hand-written one would.
+        """
+        return []
+
+    @property
     def decision_threshold(self) -> float:
         """
         The cut-point this module decides by.

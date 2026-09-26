@@ -233,10 +233,21 @@ export default function EngineeringMode() {
                         : null
                     }
                   />
+                  {/* "Prediction: Positive" underneath "Uncertain" reads as a
+                      contradiction, even though it is the correct Q4 answer:
+                      `prediction` is 1 for uncertain because an uncertain
+                      patient IS referred. For a module that reports a decision
+                      the row says what that 1 means instead. The API field is
+                      unchanged; this is display only, and it keys off
+                      output_type rather than the disease name. */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Prediction</span>
+                    <span className="text-sm text-gray-600">
+                      {result.output_type === 'conformal_decision' ? 'Outcome' : 'Prediction'}
+                    </span>
                     <span className="text-sm font-mono font-semibold">
-                      {result.prediction === 1 ? 'Positive' : 'Negative'}
+                      {result.output_type === 'conformal_decision'
+                        ? (result.decision_is_referral ? 'Referred' : 'Not referred')
+                        : result.prediction === 1 ? 'Positive' : 'Negative'}
                     </span>
                   </div>
 

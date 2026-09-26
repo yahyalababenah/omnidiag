@@ -147,6 +147,11 @@ export function parseSchema(schema) {
   }
 
   const requiredFields = new Set(schema.required || []);
+  // Inputs the module accepts but does not read, reported by the server from
+  // the artifact itself (Gate 8.9). The form shows every accepted field, so
+  // without this a clinician typing a maximum heart rate has no way to know it
+  // changes nothing — and Gate 8.3 measured that it changes exactly nothing.
+  const unusedByModel = new Set(schema.x_unused_by_model || []);
 
   return Object.entries(schema.properties).map(([name, rawProp]) => {
     const prop = unwrapNullable(rawProp);
@@ -167,6 +172,7 @@ export function parseSchema(schema) {
       component: resolveComponentType({ ...prop, type: fieldType, name }),
       validation,
       description: prop.description || '',
+      unusedByModel: unusedByModel.has(name),
       default: extractDefault(name, schema),
       category: null, // assigned later by featureCategorizer
     };

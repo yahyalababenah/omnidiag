@@ -367,6 +367,15 @@ async def get_disease_schema(disease: str, response: Response):
 
     schema = get_schema_for_disease(disease)
     result = schema.model_json_schema()
+    # Which of the accepted inputs the model does not read, from the artifact
+    # itself (Gate 8.9). The form shows every field in the schema, and without
+    # this a clinician cannot tell that three of heart's eleven change nothing.
+    try:
+        unused = router._get_loader(disease).unused_input_features
+        if unused:
+            result["x_unused_by_model"] = list(unused)
+    except Exception as exc:  # noqa: BLE001 — never fail a schema read over a label
+        log.debug("schema: could not read unused features for %s — %s", disease, exc)
     await cache_set(key, result, ttl=SCHEMA_TTL_SECONDS)
     response.headers["Cache-Hit"] = "false"
     return result

@@ -299,6 +299,19 @@ class HeartGlmConformalBackend(ModelBackend):
 
     # ── helpers ──────────────────────────────────────────────────────────
 
+    @property
+    def unused_input_features(self) -> list:
+        """
+        Read from the artifact, never listed here.
+
+        The schema accepts 11 inputs and this model reads 7 (L3, D-25). A
+        clinician typing a maximum heart rate has no way to know it changes
+        nothing, and Gate 8.3 measured that it changes EXACTLY nothing. The UI
+        labels these, and takes the list from here so a retrain on a different
+        feature set moves the labels with it.
+        """
+        return list(self.bundle.get("unused_input_features", []))
+
     def _warned_blank_features(self) -> list[str]:
         """
         The blank inputs worth warning about: derived, not listed.

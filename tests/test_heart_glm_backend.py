@@ -599,3 +599,29 @@ def test_no_module_branches_on_a_disease_name_for_its_decision_shape():
                 if "'diabetes'" in code or '"diabetes"' in code:
                     offenders.append(f"{rel}:{lineno}: {line.strip()}")
     assert not offenders, "disease-name branch in a decision-shape path:\n" + "\n".join(offenders)
+
+
+# ── Gate 8.9 — the UI is told what the model does not read ──────────────────
+
+
+def test_unused_inputs_come_from_the_artifact(backend):
+    """
+    The schema accepts 11 inputs and this model reads 7 (L3, D-25). The four it
+    ignores are reported from the bundle, never listed in the UI or the route,
+    so a retrain on a different feature set moves the labels with it.
+    """
+    unused = backend.unused_input_features
+    assert set(unused) == {"MaxHR", "Oldpeak", "ExerciseAngina", "ST_Slope"}
+    assert set(unused).isdisjoint(stack.MODEL_FEATURES)
+    # And it agrees with the measurement: an input the model does not read
+    # cannot change anything when blanked (Gate 8.3).
+    impact = backend.bundle["blank_impact"]
+    for field in unused:
+        if field in impact:
+            assert impact[field]["decision_changed"] == 0, field
+            assert impact[field]["mean_delta_points"] == 0.0, field
+
+
+def test_a_module_that_reads_everything_reports_no_unused_inputs(router):
+    """The default is empty, so only a module that really ignores inputs labels any."""
+    assert router._get_loader("diabetes").unused_input_features == []
