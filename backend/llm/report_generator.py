@@ -30,18 +30,42 @@ log = logging.getLogger("omnidiag.llm")
 
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
-# Fallback display bands for a disease that configures none. These are the
-# same numbers as DEFAULT_RISK_BANDS in frontend/src/constants/thresholds.js.
-# heart_disease is the only disease that falls back to this constant (it
-# configures no risk_bands in configs/heart_disease.yaml) — but its actual
-# decision threshold is 0.3695 (models/heart_disease/heart_full_tuned.pkl,
-# read at runtime in backend/model_loader.py), NOT the 0.5 argmax cut-point
-# these numbers used to assume. That leaves a real gap: a patient with
-# probability in [0.3695, 0.4) is classified Positive by predict() but still
-# displays as the LOW band here, since 0.4 is the "moderate" cut-point.
-# A disease WITH configured bands (diabetes) always passes them in; this
-# constant is never its band source.
+# Fallback display bands for a THRESHOLD module that configures none.
+#
+# It is no longer heart's fallback, and must never become one again. Heart
+# configures `risk_bands: null` deliberately (D-32): Gate 6 measured that the
+# probability's meaning does not transport between hospitals, so a HIGH /
+# MODERATE / LOW badge on it claims a precision the model does not have. Until
+# Gate 8.4 this constant was silently supplying that badge anyway -- and the
+# comment here justified it with the ARCHIVED model's threshold (0.3695,
+# heart_full_tuned.pkl), a model that has not shipped since Gate 8.1.
+#
+# A module whose output_type is 'conformal_decision' gets NO band at all; it
+# reports its decision and its Venn-Abers interval instead. Missing bands are
+# not 0.7/0.4, and a missing threshold is not 0.5. The absence is information.
 DEFAULT_RISK_BANDS: Dict[str, float] = {"high": 0.7, "moderate": 0.4}
+
+#: Recommended-action blocks keyed on a CONFORMAL DECISION rather than a band.
+#: A conformal module has no band to key on, and "uncertain" is a real third
+#: answer -- not a middle amount of risk -- so it gets its own block.
+_CONFORMAL_ACTIONS: Dict[str, str] = {
+    "referral": (
+        "- Specialist referral recommended\n"
+        "- Order confirmatory investigations\n"
+        "- Review the current care plan with the treating clinician"
+    ),
+    "uncertain": (
+        "- Refer for further evaluation: the model could not place this patient "
+        "confidently in either group\n"
+        "- Treat the estimate as provisional and weigh the clinical picture\n"
+        "- Additional information about this patient is likely to change the answer"
+    ),
+    "no_referral": (
+        "- Routine follow-up\n"
+        "- Reinforce preventive measures\n"
+        "- Rescreen per local guidance"
+    ),
+}
 
 
 def _get_api_key() -> str:
@@ -124,13 +148,19 @@ def forbidden_content(text: str) -> list:
             found.append(f"{label}: '{m.group(0)}'")
     return found
 
-_USER_PROMPT_TEMPLATE = """Generate a clinical assessment report for the following patient.
-
-Disease Module: {disease_display}
-Risk Probability: {probability:.1%}  (calibrated to real-world prevalence)
+# How the module decides, stated for the LLM in terms that are TRUE of the
+# module that produced the numbers. Before Gate 8.4 there was one block, written
+# for a threshold model on a prevalence-corrected probability, and heart was
+# handed it unchanged: it was told heart's probability was "calibrated to
+# real-world prevalence" (it is calibrated to the training hospitals' mix), that
+# the label said "which side of the decision threshold" the patient fell on
+# (heart has no threshold), and it was given a HIGH/MODERATE/LOW band heart
+# configures none of. Five false premises, before the model wrote a word -- in
+# the text a reviewer reads.
+_THRESHOLD_DECISION_BLOCK = """Risk Probability: {probability:.1%}  (calibrated to real-world prevalence)
 Decision Threshold: {threshold_note}
 Risk Label: {label}
-Risk Band: {confidence_band}
+Risk Band: {band}
 
 Note: this probability is stated on the deployment population's prevalence, so
 it is NOT comparable to a 50% cut-off. Judge it against the decision threshold
@@ -141,7 +171,68 @@ other: the LABEL says which side of the decision threshold this patient falls
 (whether to act at all), the BAND says how urgently among those flagged. A
 Positive patient in the MODERATE band is above the threshold and warrants
 follow-up; do not describe such a patient as low risk, and do not describe a
-Negative patient as flagged.
+Negative patient as flagged."""
+
+_CONFORMAL_DECISION_BLOCK = """Estimated Probability: {probability:.1%}{interval_note}
+Decision: {decision_text}
+
+This module does NOT compare a probability against a cut-off, and there is no
+decision threshold and no HIGH/MODERATE/LOW risk band to report. Do not invent
+either one, and do not describe the probability as high, moderate or low risk.
+The decision above is the model's answer; the probability is context for it.
+
+{scale_note}
+
+{uncertain_note}"""
+
+
+def _decision_block(
+    probability: float, label: str, band: Optional[str], threshold_note: str,
+    output_type: Optional[str], probability_scale: Optional[str],
+    decision: Optional[str], lower: Optional[float], upper: Optional[float],
+) -> str:
+    """The prompt's description of how this module decided, per module."""
+    if output_type != "conformal_decision":
+        return _THRESHOLD_DECISION_BLOCK.format(
+            probability=probability, threshold_note=threshold_note, label=label, band=band,
+        )
+
+    interval = (
+        f"  (Venn-Abers interval {lower:.1%} to {upper:.1%})"
+        if lower is not None and upper is not None else ""
+    )
+    decision_text = {
+        "referral": "REFER for further evaluation",
+        "no_referral": "DO NOT refer; no further evaluation indicated on this estimate",
+        "uncertain": (
+            "UNCERTAIN — refer for further evaluation. The model could not place this "
+            "patient confidently in either group"
+        ),
+    }.get(decision or "", label)
+
+    scale_note = (
+        "This probability is calibrated to the mix of the four teaching hospitals the "
+        "model was trained on, NOT to the population of the hospital reading it. Do not "
+        "present it as this patient's population risk."
+        if probability_scale == "ivap_calibrated_training_mix"
+        else "State no assumption about what this probability is calibrated to."
+    )
+    uncertain_note = (
+        "An UNCERTAIN result is not a middle amount of risk; it means the evidence did "
+        "not separate the two groups for this patient. Say that plainly rather than "
+        "describing it as moderate risk."
+        if decision == "uncertain" else ""
+    )
+    return _CONFORMAL_DECISION_BLOCK.format(
+        probability=probability, interval_note=interval, decision_text=decision_text,
+        scale_note=scale_note, uncertain_note=uncertain_note,
+    ).strip()
+
+
+_USER_PROMPT_TEMPLATE = """Generate a clinical assessment report for the following patient.
+
+Disease Module: {disease_display}
+{decision_block}
 
 Top Risk Factors (SHAP-ranked):
 {shap_summary}
@@ -270,7 +361,22 @@ def _rule_based_report(
     features: Optional[Dict[str, Any]] = None,
     risk_bands: Optional[Mapping[str, float]] = None,
     decision_threshold: Optional[float] = None,
+    output_type: Optional[str] = None,
+    probability_scale: Optional[str] = None,
+    decision: Optional[str] = None,
+    probability_lower: Optional[float] = None,
+    probability_upper: Optional[float] = None,
 ) -> str:
+    """
+    The report written without the LLM -- which is what runs with no API key,
+    and therefore what a demo usually shows.
+
+    For a conformal module this must not talk about bands or population
+    prevalence. Until Gate 8.4 it told a heart patient their result was
+    "<n>% probability on this population's prevalence, classified against the
+    module's own risk bands": the probability is calibrated to the training
+    hospitals' mix, and heart configures no risk bands at all.
+    """
     shap_values = shap_values or []
     features = features or {}
     top = sorted(shap_values, key=lambda x: abs(x.get("shap_value", 0)), reverse=True)[:3]
@@ -280,23 +386,59 @@ def _rule_based_report(
         "MODERATE": "- Schedule follow-up within 4 weeks\n- Lifestyle modification counselling\n- Monitor key biomarkers",
         "LOW": "- Routine follow-up\n- Reinforce preventive measures\n- Rescreen in 12 months",
     }
+    drivers = "\n".join(f"- {s['feature']} (SHAP {s['shap_value']:+.3f})" for s in top)
+
+    if output_type == "conformal_decision":
+        interval = (
+            f" (interval {probability_lower:.1%} to {probability_upper:.1%})"
+            if probability_lower is not None and probability_upper is not None else ""
+        )
+        scale_sentence = (
+            "calibrated to the mix of the four teaching hospitals this model was "
+            "trained on, not to the population of the hospital reading it"
+            if probability_scale == "ivap_calibrated_training_mix"
+            else "on the scale this module reports"
+        )
+        stratification = (
+            # Phrased without the words "risk band" on purpose: the test that
+            # guards this text checks for them bluntly, and a blunt check that
+            # cannot be argued with is worth more than a sentence that mentions
+            # what it is denying.
+            "This module reports a decision rather than a severity rating: the estimate is "
+            f"{probability_corrected:.1%}{interval}, {scale_sentence}. "
+            + (
+                "An uncertain result means the evidence did not separate the two "
+                "groups for this patient, which is why the referral stands."
+                if decision == "uncertain"
+                else "There is no decision threshold to compare it against."
+            )
+        )
+        return (
+            f"**Clinical Summary**\n"
+            f"Patient assessed for {disease_display} risk. "
+            f"Model estimate: {probability_corrected:.1%}{interval} — {label}. "
+            f"Top contributing factors: {', '.join(top_names)}.\n\n"
+            f"**Key Risk Drivers**\n{drivers}\n\n"
+            f"**Recommended Actions**\n"
+            f"{_CONFORMAL_ACTIONS.get(decision or '', _CONFORMAL_ACTIONS['uncertain'])}\n\n"
+            f"**Decision Note**\n{stratification}"
+        )
+
     band = band_for_report(
         probability_corrected, risk_bands or DEFAULT_RISK_BANDS, decision_threshold
     )
-    report = (
+    return (
         f"**Clinical Summary**\n"
         f"Patient assessed for {disease_display} risk. "
         f"Model probability: {probability_corrected:.1%} ({label}). "
         f"Top contributing factors: {', '.join(top_names)}.\n\n"
-        f"**Key Risk Drivers**\n"
-        + "\n".join(f"- {s['feature']} (SHAP {s['shap_value']:+.3f})" for s in top)
-        + f"\n\n**Recommended Actions**\n{actions.get(band, actions['MODERATE'])}\n\n"
+        f"**Key Risk Drivers**\n{drivers}\n\n"
+        f"**Recommended Actions**\n{actions.get(band, actions['MODERATE'])}\n\n"
         f"**Risk Stratification Note**\n"
         f"This assessment is {band.lower()} priority: a {probability_corrected:.1%} "
         f"probability on this population's prevalence, classified against the "
         f"module's own risk bands."
     )
-    return report
 
 
 async def generate_report(
@@ -309,9 +451,20 @@ async def generate_report(
     model: str = "deepseek-chat",
     risk_bands: Optional[Mapping[str, float]] = None,
     decision_threshold: Optional[float] = None,
+    output_type: Optional[str] = None,
+    probability_scale: Optional[str] = None,
+    decision: Optional[str] = None,
+    probability_lower: Optional[float] = None,
+    probability_upper: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Generate a structured clinical report.
+
+    `output_type` decides how the report talks about the decision, and it comes
+    from the disease config -- never from the disease name. 'conformal_decision'
+    means there is no threshold and no band: the report states the decision and
+    the Venn-Abers interval, and says so. Anything else keeps the
+    threshold-and-band wording, which is what diabetes needs.
 
     `probability_corrected` and `risk_bands` must be on the same scale — both
     come straight from the /predict response for this disease.
@@ -345,17 +498,30 @@ async def generate_report(
     probability_corrected = float(probability_corrected)
     shap_values = shap_values or []
     features = features or {}
-    bands = risk_bands or DEFAULT_RISK_BANDS
-    band = band_for_report(probability_corrected, bands, decision_threshold)
-    if confidence_band and confidence_band != band:
+    # A conformal module has NO band -- not a default one and not a floored one.
+    # It configures none because its probability's meaning does not transport
+    # between hospitals (D-32), so no band is computed here at all: computing one
+    # and then dropping it would still log a "discarding caller band" line that
+    # implies a correct band exists.
+    is_conformal = output_type == "conformal_decision"
+    bands = None if is_conformal else (risk_bands or DEFAULT_RISK_BANDS)
+    band = None if is_conformal else band_for_report(
+        probability_corrected, bands, decision_threshold
+    )
+    if confidence_band and not is_conformal and confidence_band != band:
         log.info(
             "Discarding caller-supplied confidence_band=%r; %.4f against bands %r is %r",
             confidence_band, probability_corrected, dict(bands), band,
         )
+    elif confidence_band and is_conformal:
+        log.info(
+            "Discarding caller-supplied confidence_band=%r: %s reports a decision, not a band",
+            confidence_band, disease_display,
+        )
     threshold_note = (
         f"{decision_threshold:.4f} — at or above this the patient is classified Positive"
         if decision_threshold is not None
-        else "not exposed by this module (argmax)"
+        else "this module does not decide by a threshold"
     )
 
     api_key = _get_api_key()
@@ -365,7 +531,8 @@ async def generate_report(
         return {
             "report": _rule_based_report(
                 disease_display, probability_corrected, label, shap_values,
-                features, bands, decision_threshold,
+                features, bands, decision_threshold, output_type,
+                probability_scale, decision, probability_lower, probability_upper,
             ),
             "source": "rule_based",
             "risk_band": band,
@@ -382,10 +549,11 @@ async def generate_report(
 
         user_prompt = _USER_PROMPT_TEMPLATE.format(
             disease_display=disease_display,
-            probability=probability_corrected,
-            threshold_note=threshold_note,
-            label=label,
-            confidence_band=band,
+            decision_block=_decision_block(
+                probability_corrected, label, band, threshold_note,
+                output_type, probability_scale, decision,
+                probability_lower, probability_upper,
+            ),
             shap_summary=_format_shap(shap_values),
             glossary_summary=_format_glossary(shap_values),
         )
@@ -412,7 +580,8 @@ async def generate_report(
             return {
                 "report": _rule_based_report(
                     disease_display, probability_corrected, label, shap_values,
-                    features, bands, decision_threshold,
+                    features, bands, decision_threshold, output_type,
+                    probability_scale, decision, probability_lower, probability_upper,
                 ),
                 "source": "rule_based",
                 "risk_band": band,
@@ -432,7 +601,8 @@ async def generate_report(
         return {
             "report": _rule_based_report(
                 disease_display, probability_corrected, label, shap_values,
-                features, bands, decision_threshold,
+                features, bands, decision_threshold, output_type,
+                probability_scale, decision, probability_lower, probability_upper,
             ),
             "source": "rule_based",
             "risk_band": band,

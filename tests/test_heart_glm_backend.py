@@ -474,3 +474,128 @@ def test_a_pre_8_3_bundle_falls_back_to_the_config_list(backend, router):
     assert backend._warned_blank_features() == stack.blank_warning_features(
         original, model_config["blank_warning_min_decision_share"]
     )
+
+
+# ── Gate 8.4 — the decision is consistent down the whole live path ───────────
+
+
+def test_o3_identity_holds_for_every_one_of_the_920(backend, training_frame):
+    """
+    The O3 rule as a DEFINITION, over every patient, through the service-level
+    call the API uses: a patient is counted positive exactly when the decision is
+    `referral` or `uncertain`. Counting only the confident referrals is the
+    silent sensitivity drop this model family exists to prevent, so this is
+    checked as an identity with no tolerance rather than as a rate.
+
+    Not compared with p7's O3 numbers: p7 scored each patient with a model fitted
+    without them, this scores them with the model fitted on all 920. Different
+    estimands -- see results/p8_4_live_o3.json in the research repo.
+    """
+    frame = training_frame.drop(columns=["HeartDisease", "site"])
+    # The CSV carries RAW UCI chest-pain codes and this path reads clinical
+    # ones, so they are converted first -- feeding them straight in is HF-1.
+    patients = stack.translate_raw_codes(frame.to_dict("records"))
+    results = backend.predict_batch(patients)
+
+    assert len(results) == len(training_frame)
+    for i, r in enumerate(results):
+        goes_forward = r["decision"] in (stack.DECISION_REFERRAL, stack.DECISION_UNCERTAIN)
+        assert (r["prediction"] == 1) == goes_forward, (i, r)
+        assert r["decision_is_referral"] == goes_forward, (i, r)
+        # A response that omitted these would satisfy the identity vacuously.
+        assert r["probability_lower"] <= r["confidence"] <= r["probability_upper"], (i, r)
+        assert r["output_type"] == "conformal_decision"
+        assert r["probability_scale"] == "ivap_calibrated_training_mix"
+
+    # All three decisions must actually occur, or the identity is being checked
+    # against a degenerate case.
+    seen = {r["decision"] for r in results}
+    assert seen == {
+        stack.DECISION_REFERRAL, stack.DECISION_NO_REFERRAL, stack.DECISION_UNCERTAIN
+    }, seen
+
+
+def test_the_response_publishes_no_threshold_and_no_bands(backend):
+    """
+    Consumers were fabricating both. The response must not offer either, so
+    nothing can read one by accident, and must say what it DOES decide by.
+    """
+    result = backend.predict({
+        "Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 140,
+        "Cholesterol": 289, "FastingBS": 0, "RestingECG": "Normal",
+    })
+    assert "inference_threshold" not in result
+    assert "risk_bands" not in result
+    assert result["output_type"] == "conformal_decision"
+
+
+def test_no_consumer_needs_to_read_the_diagnosis_sentence(backend):
+    """
+    `diagnosis` is prose for a human. The machine-readable answer is `decision`,
+    and this asserts the two agree so nothing has an excuse to parse the text.
+    """
+    cases = [
+        {"Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 140,
+         "Cholesterol": 289, "FastingBS": 0, "RestingECG": "Normal"},
+        {"Age": 29, "Sex": "F", "ChestPainType": "NAP", "RestingBP": 100,
+         "Cholesterol": 180, "FastingBS": 0, "RestingECG": "Normal"},
+    ]
+    for result in backend.predict_batch(cases):
+        if result["decision"] == stack.DECISION_UNCERTAIN:
+            assert result["diagnosis"] == stack.UNCERTAIN_DIAGNOSIS
+        elif result["decision"] == stack.DECISION_REFERRAL:
+            assert result["diagnosis"] == "Positive"
+        else:
+            assert result["diagnosis"] == "Negative"
+
+
+def test_the_review_queue_reads_the_model_s_own_uncertainty(backend):
+    """
+    Gate 8.4, and the sharpest fault this gate fixed.
+
+    Auto-queueing for human review used to run every module through
+    `should_queue_for_review`, which scores entropy around a decision threshold.
+    Heart has no threshold, so it was given the 0.5 default -- and the result was
+    wrong in both directions: a patient the model itself called UNCERTAIN at
+    p=0.95 (an empty conformal set: atypical for BOTH classes) was not queued,
+    while a confidently decided patient at p=0.52 was. The consumer whose only
+    job is catching uncertainty was ignoring the model's own statement of it.
+
+    This pins the arithmetic that made it wrong, so the rule cannot quietly be
+    routed back through it.
+    """
+    from backend.active_learning.sampler import should_queue_for_review
+
+    # The old path, at probabilities a conformal module really can produce.
+    assert should_queue_for_review(0.95, decision_threshold=0.5) is False
+    assert should_queue_for_review(0.52, decision_threshold=0.5) is True
+
+    # That the new rule is actually wired into the endpoint is asserted end to
+    # end, against the database, in
+    # tests/test_diabetes_calibration.py::TestReviewQueueUsesTheModelsDecision --
+    # restating the rule as a comparison here would be a tautology.
+
+
+def test_no_module_branches_on_a_disease_name_for_its_decision_shape():
+    """
+    The rule this gate enforces: behaviour follows what the config declares, not
+    what the disease is called. Two branches in the frontend read the disease
+    name to decide what to display, and both were producing numbers the model
+    does not have -- a 0.5 threshold, and 0.7/0.4 bands the config sets to null.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    watched = [
+        "frontend/src/constants/thresholds.js",
+        "frontend/src/components/BatchUpload.jsx",
+        "backend/llm/report_generator.py",
+    ]
+    offenders = []
+    for rel in watched:
+        with open(os.path.join(root, rel)) as fh:
+            for lineno, line in enumerate(fh, 1):
+                code = line.split("//")[0].split("#")[0]
+                if "'heart_disease'" in code or '"heart_disease"' in code:
+                    offenders.append(f"{rel}:{lineno}: {line.strip()}")
+                if "'diabetes'" in code or '"diabetes"' in code:
+                    offenders.append(f"{rel}:{lineno}: {line.strip()}")
+    assert not offenders, "disease-name branch in a decision-shape path:\n" + "\n".join(offenders)

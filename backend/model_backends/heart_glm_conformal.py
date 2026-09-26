@@ -116,6 +116,7 @@ class HeartGlmConformalBackend(ModelBackend):
         if not patients_data:
             return []
         bundle = self.bundle
+        model_config = self.config.get("model", {}) or {}
         frame = pd.DataFrame(patients_data)
         encoded = stack.encode_for_inference(frame[self.feature_names])
         raw = bundle["pipeline"].predict_proba(encoded)[:, 1]
@@ -141,6 +142,32 @@ class HeartGlmConformalBackend(ModelBackend):
                     if decision == stack.DECISION_UNCERTAIN
                     else "Positive" if referred else "Negative"
                 ),
+                # The decision as DATA, not as a sentence to match on. Every
+                # consumer that needs "does this patient go forward" used to
+                # have to either trust `prediction` or pattern-match the
+                # diagnosis string; one of those is fragile and the other is
+                # invisible. Gate 8.4.
+                "decision": decision,
+                "conformal_set": conformal,
+                # The critical condition stated outright rather than re-derived
+                # at each consumer: uncertain counts as a referral.
+                "decision_is_referral": bool(referred),
+                # Computed since Gate 8.1 and thrown away until now. This is
+                # what D-32 says replaces risk bands for this model, so it has
+                # to reach the caller.
+                "probability_lower": float(p0),
+                "probability_upper": float(p1),
+                # Declared so no consumer has to infer them from the disease
+                # name. A missing threshold is not 0.5 and missing bands are
+                # not 0.7/0.4 -- the absence is the information.
+                "output_type": model_config.get("output_type"),
+                "probability_scale": model_config.get("probability_scale"),
+                # risk_bands is NOT sent here. Bands are a property of the
+                # disease, not of one prediction, and GET /api/v4/diseases
+                # already reports them (null for this module). Sending them per
+                # prediction would also collide with the prevalence-correction
+                # key set, where `risk_bands` means "these were corrected".
+                # `output_type` is what tells a consumer there are no bands.
             }
             warning = self._completeness_warning(patient)
             if warning:

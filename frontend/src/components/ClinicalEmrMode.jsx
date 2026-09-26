@@ -694,13 +694,26 @@ export default function ClinicalEmrMode() {
                           {confidencePct}%
                         </span>
                         <p className="text-xs text-gray-500 mt-1">
-                          Risk Probability{thresholdPct != null ? ` (threshold: ${thresholdPct}%)` : ''}
+                          Risk Probability{thresholdPct != null
+                        ? ` (threshold: ${thresholdPct}%)`
+                        : result.probability_lower != null && result.probability_upper != null
+                          ? ` (${(result.probability_lower * 100).toFixed(1)}%–${(result.probability_upper * 100).toFixed(1)}%)`
+                          : ''}
                         </p>
                       </div>
                     </div>
 
                     {/* Probability vs. threshold bar */}
-                    <ThresholdBar probability={result.confidence} threshold={displayThreshold} />
+                    <ThresholdBar
+                      probability={result.confidence}
+                      threshold={displayThreshold}
+                      decision={result.decision ?? null}
+                      interval={
+                        result.probability_lower != null && result.probability_upper != null
+                          ? { lower: result.probability_lower, upper: result.probability_upper }
+                          : null
+                      }
+                    />
 
                     {/* Key metrics row */}
                     <div className="grid grid-cols-3 gap-4">

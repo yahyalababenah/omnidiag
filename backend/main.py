@@ -495,11 +495,14 @@ async def predict_disease(
                 # By contract every probability leaving a loader's predict() is
                 # on the deployment (corrected) scale — see
                 # backend/probability_scale.py. The threshold travels with it in
-                # the same response, on the same scale; diseases that expose no
-                # threshold (heart) use sklearn's argmax cut-point.
+                # the same response, on the same scale.
                 confidence_corrected = float(result.get("confidence", 0.0))
-                decision_threshold = float(
-                    result.get("inference_threshold", DEFAULT_DECISION_THRESHOLD)
+                # None, not 0.5, for a module that decides without one. The old
+                # default sent heart down the entropy path around a cut-point it
+                # does not have -- see the review-queue note below.
+                raw_threshold = result.get("inference_threshold")
+                decision_threshold = (
+                    float(raw_threshold) if raw_threshold is not None else None
                 )
                 # Which scale this module reports: corrected for diabetes, the
                 # model's own (raw) scale for heart. Read from the result, not
@@ -514,24 +517,50 @@ async def predict_disease(
                     confidence=confidence_corrected,
                     probability_scale=reported_scale,
                     diagnosis=result.get("diagnosis"),
+                    # Present only for a module that decides instead of
+                    # thresholding; None for diabetes, by construction.
+                    decision=result.get("decision"),
+                    probability_lower=result.get("probability_lower"),
+                    probability_upper=result.get("probability_upper"),
                     created_by=current_user.id,
                 )
                 db.add(record)
                 await db.flush()
 
                 # Auto-queue uncertain predictions for human review (Feature 1.3).
-                # Uncertainty is measured around the decision boundary, not
-                # around 0.5 — see backend/active_learning/sampler.py.
-                if should_queue_for_review(
-                    confidence_corrected, decision_threshold=decision_threshold
-                ):
+                #
+                # A module that STATES its uncertainty is believed (Gate 8.4). For
+                # a conformal module, `decision == 'uncertain'` is the model's own
+                # verdict that it could not place this patient, so that is what
+                # queues the row. Routing it through entropy around a threshold
+                # instead was wrong in both directions, and measurably so: a
+                # patient the model called uncertain at p=0.95 -- an empty
+                # conformal set, atypical for BOTH classes -- was not queued,
+                # while a confidently decided patient at p=0.52 was. The consumer
+                # whose entire job is catching uncertainty was the one ignoring
+                # the model's statement of it.
+                #
+                # A threshold module (diabetes) keeps the entropy rule unchanged:
+                # it publishes no per-patient uncertainty, so proximity to its
+                # boundary is the only signal available.
+                if result.get("decision") is not None:
+                    queue_row = result.get("decision") == "uncertain"
+                    uncertainty_score = 1.0 if queue_row else 0.0
+                else:
+                    queue_row = should_queue_for_review(
+                        confidence_corrected,
+                        decision_threshold=decision_threshold or DEFAULT_DECISION_THRESHOLD,
+                    )
+                    uncertainty_score = prediction_entropy(
+                        confidence_corrected,
+                        decision_threshold=decision_threshold or DEFAULT_DECISION_THRESHOLD,
+                    )
+                if queue_row:
                     from backend.db_models.review_queue import ReviewQueue
                     rq = ReviewQueue(
                         id=str(_uuid.uuid4()),
                         prediction_id=record.id,
-                        uncertainty_score=prediction_entropy(
-                            confidence_corrected, decision_threshold=decision_threshold
-                        ),
+                        uncertainty_score=uncertainty_score,
                         uncertainty_scale=reported_scale,
                         decision_threshold=decision_threshold,
                     )
@@ -596,6 +625,11 @@ async def explain_disease(
                     confidence=confidence_corrected,
                     probability_scale=reported_scale,
                     diagnosis=result.get("diagnosis"),
+                    # Present only for a module that decides instead of
+                    # thresholding; None for diabetes, by construction.
+                    decision=result.get("decision"),
+                    probability_lower=result.get("probability_lower"),
+                    probability_upper=result.get("probability_upper"),
                     shap_chart_data=result.get("chart_data"),
                     created_by=current_user.id,
                 )
@@ -968,6 +1002,14 @@ class ReportRequest(BaseModel):
     """
 
     disease: str
+    # From the /predict response for this patient (Gate 8.4). This endpoint does
+    # not re-score, so a conformal module's decision has to travel with the
+    # request; without it the report says so rather than inferring one from the
+    # label text. output_type and probability_scale are NOT accepted from the
+    # client -- they are read from the disease config, server-side.
+    decision: str | None = None
+    probability_lower: float | None = None
+    probability_upper: float | None = None
     probability_corrected: float | None = None
     probability: float | None = Field(
         None,
@@ -1021,11 +1063,13 @@ async def generate_clinical_report(
     # probability (router.get_disease_info corrects them for diabetes). The
     # client's own band, if any, is advisory and discarded downstream.
     risk_bands = (disease_info or {}).get("risk_bands")
-    decision_threshold = (
-        router.disease_configs.get(body.disease, {})
-        .get("model", {})
-        .get("inference_threshold")
-    )
+    model_config = router.disease_configs.get(body.disease, {}).get("model", {}) or {}
+    decision_threshold = model_config.get("inference_threshold")
+    # How this module decides, from its own config -- never from its name. A
+    # conformal module has no threshold and no bands, and the report must say
+    # that instead of substituting 0.5 and 0.7/0.4 (Gate 8.4).
+    output_type = model_config.get("output_type")
+    probability_scale = model_config.get("probability_scale")
 
     if _generate_report is None:
         # Fallback when the LLM client package is not installed
@@ -1038,6 +1082,11 @@ async def generate_clinical_report(
             body.features,
             risk_bands,
             decision_threshold,
+            output_type,
+            probability_scale,
+            body.decision,
+            body.probability_lower,
+            body.probability_upper,
         )
         return {"disease": body.disease, "report": report_text, "source": "rule_based"}
 
@@ -1050,6 +1099,11 @@ async def generate_clinical_report(
         features=body.features,
         risk_bands=risk_bands,
         decision_threshold=decision_threshold,
+        output_type=output_type,
+        probability_scale=probability_scale,
+        decision=body.decision,
+        probability_lower=body.probability_lower,
+        probability_upper=body.probability_upper,
     )
     return {"disease": body.disease, **result}
 

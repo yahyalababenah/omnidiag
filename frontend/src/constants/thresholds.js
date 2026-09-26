@@ -19,37 +19,50 @@
  * The raw model output is in `result.probability_raw` /
  * `result.inference_threshold_raw` for auditing — do not mix the two scales.
  *
- * ── Heart disease ───────────────────────────────────────────────────────
- * `ModelLoader.predict()` (backend/model_loader.py) has no configurable
- * threshold at all — it just takes the model's own argmax (the sklearn
- * default 0.5 cutoff) and none of the API endpoints (/predict, /explain,
- * /schema, /api/v4/diseases) expose that number. Verified by reading all
- * four response shapes — see PR discussion. So it is defined here as a
- * fallback constant. If the backend is ever changed to return it, delete
- * this constant and read it from the API exactly like diabetes.
+ * ── Modules that decide without a threshold ─────────────────────────────
+ * A module whose response carries `output_type: 'conformal_decision'` does
+ * not compare a probability to a cut-point at all: it returns a decision
+ * (`referral` / `no_referral` / `uncertain`) plus a Venn-Abers interval.
+ * There is no threshold to display, and `getDisplayThreshold` returns null.
+ *
+ * Until Gate 8.4 this file exported a HEART_DISEASE_DEFAULT_THRESHOLD of 0.5
+ * and showed it on three screens. The shipped heart model has no threshold of
+ * any kind, so that number was invented here and displayed to a clinician as
+ * if it came from the model. Never reintroduce a per-disease fallback: an
+ * absent threshold is information, not a gap to fill.
  */
-export const HEART_DISEASE_DEFAULT_THRESHOLD = 0.5;
 
 /**
  * Resolve the decision threshold to display alongside a prediction result.
  *
- * Prefers the live value from the API response (`result.inference_threshold`,
- * present for diabetes). Falls back to the heart-disease constant above
- * only when the API genuinely provides nothing — never invents a number
- * for a disease that isn't heart disease.
+ * Reads the live value from the API response and invents nothing. Returns null
+ * both when the module decides without a threshold (`conformal_decision`) and
+ * when the response simply does not carry one — in either case the caller must
+ * show no threshold rather than a placeholder.
  *
- * @param {string} disease - disease key, e.g. 'diabetes' | 'heart_disease'
+ * `disease` is kept in the signature for the call sites and is deliberately
+ * unused: behaviour follows what the response declares, never the disease name.
+ *
+ * @param {string} _disease - unused; kept so existing call sites are unchanged
  * @param {object} result - the /predict (or /explain) response object
- * @returns {number|null} threshold in [0, 1], or null if unknown
+ * @returns {number|null} threshold in [0, 1], or null when there is none
  */
-export function getDisplayThreshold(disease, result) {
+export function getDisplayThreshold(_disease, result) {
   if (typeof result?.inference_threshold === 'number') {
     return result.inference_threshold;
   }
-  if (disease === 'heart_disease') {
-    return HEART_DISEASE_DEFAULT_THRESHOLD;
-  }
   return null;
+}
+
+/**
+ * True when this module reports a decision instead of thresholding a
+ * probability. Screens use it to show the decision and its interval in place
+ * of a threshold-and-band readout.
+ *
+ * @param {object|null} source - a /predict response or a disease-info object
+ */
+export function isConformalDecision(source) {
+  return source?.output_type === 'conformal_decision';
 }
 
 /**
@@ -66,8 +79,15 @@ export function getDisplayThreshold(disease, result) {
  * raw for heart disease. Never compare a band to a probability from a
  * different scale.
  *
- * Heart disease configures no bands, so it falls back to the constants
- * below — the same numbers it has always used.
+ * A module that configures NO bands gets none: `getRiskBands` returns null and
+ * `classifyRisk` returns null, and the caller shows the decision and interval
+ * instead of a badge.
+ *
+ * Heart is that module, on purpose (D-32). Gate 6 measured that its
+ * probability's meaning does not transport between hospitals, so a
+ * HIGH/MODERATE/LOW badge on it claims a precision the model does not have.
+ * Until Gate 8.4 this file substituted 0.7/0.4 for it anyway and the badge
+ * appeared on screen — silently undoing the decision the config recorded.
  */
 export const DEFAULT_RISK_BANDS = { high: 0.7, moderate: 0.4 };
 
@@ -83,6 +103,11 @@ export function getRiskBands(source) {
   if (bands && typeof bands.high === 'number' && typeof bands.moderate === 'number') {
     return { high: bands.high, moderate: bands.moderate };
   }
+  // An explicit null from a module that configures no bands is an answer, not a
+  // missing value, and so is `output_type: 'conformal_decision'` on a /predict
+  // response (which carries no risk_bands key at all). Only a source that says
+  // nothing either way falls back.
+  if (source && ('risk_bands' in source || isConformalDecision(source))) return null;
   return DEFAULT_RISK_BANDS;
 }
 
@@ -91,11 +116,12 @@ export function getRiskBands(source) {
  *
  * @param {number} probability - on the same scale the API returned
  * @param {object|null} source - /predict response or disease-info object
- * @returns {'HIGH'|'MODERATE'|'LOW'}
+ * @returns {'HIGH'|'MODERATE'|'LOW'|null} null when the module has no bands
  */
 export function classifyRisk(probability, source) {
-  const { high, moderate } = getRiskBands(source);
-  if (probability >= high) return 'HIGH';
-  if (probability >= moderate) return 'MODERATE';
+  const bands = getRiskBands(source);
+  if (!bands) return null;
+  if (probability >= bands.high) return 'HIGH';
+  if (probability >= bands.moderate) return 'MODERATE';
   return 'LOW';
 }

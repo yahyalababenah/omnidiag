@@ -391,16 +391,37 @@ class TestDiabetesPredictApi:
     @pytest.mark.parametrize("case", sorted(HEART_CASES))
     async def test_heart_response_has_no_correction_fields(self, live_client, case):
         # Heart applies no prevalence correction, so CORRECTION_KEYS must be
-        # absent. Since Gate 8.1 it also publishes NO inference_threshold: its
-        # decision is a conformal set, and a single cut-point is exactly what
-        # produced the sex gap in sensitivity this model was built to close
-        # (HF-13). A threshold reappearing here is a regression.
+        # absent. It also publishes NO inference_threshold: its decision is a
+        # conformal set, and a single cut-point is exactly what produced the sex
+        # gap in sensitivity this model was built to close (HF-13). A threshold
+        # reappearing here is a regression.
+        #
+        # The response was pinned to exactly three keys until Gate 8.4. It now
+        # carries its decision as data -- the decision itself, the referral flag,
+        # the Venn-Abers interval, and what it is calibrated to -- because every
+        # consumer that lacked them was inferring from the disease name instead:
+        # the frontend showed a 0.5 threshold this model does not have, and the
+        # review queue judged uncertainty by entropy around that same 0.5. The
+        # key set is still pinned, so a field cannot be added without a decision.
         resp = await _post_predict(live_client, "heart_disease", HEART_CASES[case])
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert CORRECTION_KEYS.isdisjoint(data), CORRECTION_KEYS & set(data)
-        assert set(data) == {"prediction", "confidence", "diagnosis"}
+        assert set(data) == {
+            "prediction", "confidence", "diagnosis",
+            "decision", "conformal_set", "decision_is_referral",
+            "probability_lower", "probability_upper",
+            "output_type", "probability_scale",
+        }, sorted(data)
         assert "inference_threshold" not in data
+        # The absences are declared, not merely missing: `output_type` is what
+        # tells a consumer there is no threshold and no band to look for, so it
+        # never has to guess from the disease name. Bands themselves belong to
+        # GET /api/v4/diseases, which reports null for this module.
+        assert data["output_type"] == "conformal_decision"
+        assert data["probability_scale"] == "ivap_calibrated_training_mix"
+        # And the interval brackets the probability it belongs to.
+        assert data["probability_lower"] <= data["confidence"] <= data["probability_upper"]
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -861,3 +882,124 @@ class TestHeartImportanceFile:
         assert data["rank"][0] == "cp_anginal", "chest pain is the model's strongest feature"
         # The scale limit must travel with the numbers.
         assert "not an attribution" in data["scale_limit"].lower()
+
+
+class TestReviewQueueUsesTheModelsDecision:
+    """
+    Gate 8.4, end to end against the database.
+
+    Auto-queue for human review used to score entropy around a decision
+    threshold for every module. Heart has none, so it got the 0.5 default, and
+    the outcome was wrong both ways: a patient the model called UNCERTAIN far
+    from 0.5 was not queued, and a confidently decided patient near 0.5 was. The
+    endpoint now queues on the module's own decision when it publishes one.
+    """
+
+    BASE = {
+        "Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 140,
+        "Cholesterol": 289, "FastingBS": 0, "RestingECG": "Normal",
+        "MaxHR": 122, "ExerciseAngina": "N", "Oldpeak": 0.0, "ST_Slope": "Flat",
+    }
+
+    async def _predict(self, live_client, doctor_token, patient):
+        return await live_client.post(
+            "/api/v4/heart_disease/predict",
+            json=patient,
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+
+    @staticmethod
+    async def _stored_record(db_session, patient):
+        """
+        The prediction row for THIS patient, matched on its stored inputs.
+
+        Not "the most recent heart row": created_at has one-second resolution on
+        SQLite, so rows written by sibling tests in the same module tie and the
+        lookup silently returned another case's record.
+        """
+        from sqlalchemy import select
+
+        from backend.db_models.prediction import Prediction
+
+        rows = (await db_session.execute(
+            select(Prediction).where(Prediction.disease == "heart_disease")
+        )).scalars().all()
+        matched = [
+            r for r in rows
+            if r.input_features.get("Age") == patient["Age"]
+            and r.input_features.get("ChestPainType") == patient["ChestPainType"]
+            and r.input_features.get("Sex") == patient["Sex"]
+            and r.input_features.get("RestingBP") == patient["RestingBP"]
+        ]
+        assert matched, f"no stored prediction for Age={patient['Age']} {patient['ChestPainType']}"
+        return matched[-1]
+
+    # Every case here is one where the OLD rule and the new one DISAGREE, which
+    # is the only kind that tests anything: the first three fixtures tried were
+    # patients both rules happened to treat alike, so the test passed even with
+    # the fix reverted. Each row notes what the old entropy-around-0.5 rule did.
+    @pytest.mark.parametrize(
+        "patient, decision, should_queue",
+        [
+            # UNCERTAIN at p=0.72 -- far enough from 0.5 that the old rule left
+            # it unqueued, though the model had said it could not place them.
+            (dict(Age=25, Sex="M", ChestPainType="TA", RestingBP=100,
+                  Cholesterol=150, RestingECG="Normal"), "uncertain", True),
+            # A CONFIDENT referral at p=0.576 -- close enough to 0.5 that the old
+            # rule sent a decided patient for review.
+            (dict(Age=31, Sex="F", ChestPainType="TA", RestingBP=180,
+                  Cholesterol=350, RestingECG="ST"), "referral", False),
+            # And a confident non-referral, which neither rule queues.
+            (dict(Age=54, Sex="M", ChestPainType="NAP", RestingBP=140,
+                  Cholesterol=289, RestingECG="Normal"), "no_referral", False),
+        ],
+        ids=["uncertain_far_from_half", "confident_near_half", "no_referral"],
+    )
+    async def test_only_an_uncertain_decision_is_queued(
+        self, live_client, doctor_token, db_session, patient, decision, should_queue
+    ):
+        from sqlalchemy import select
+
+        from backend.db_models.review_queue import ReviewQueue
+
+        patient = dict(self.BASE, **patient)
+        resp = await self._predict(live_client, doctor_token, patient)
+        assert resp.status_code == 200, resp.text
+        # The fixture drives the rule, so a changed model must change the fixture
+        # rather than silently weaken the test.
+        assert resp.json()["decision"] == decision, resp.json()
+
+        record = await self._stored_record(db_session, patient)
+        # The decision and its interval are stored, not just returned.
+        assert record.decision == decision
+        assert record.probability_lower <= record.confidence <= record.probability_upper
+
+        queued = (await db_session.execute(
+            select(ReviewQueue).where(ReviewQueue.prediction_id == record.id)
+        )).scalars().first()
+        assert (queued is not None) is should_queue, (
+            f"decision={decision}: queued={queued is not None}, expected {should_queue}"
+        )
+
+    async def test_the_stored_threshold_is_null_not_a_default(
+        self, live_client, doctor_token, db_session
+    ):
+        """
+        A queued heart row must not record a decision_threshold: writing 0.5
+        there would make the audit trail claim the model used a cut-point.
+        """
+        from sqlalchemy import select
+
+        from backend.db_models.prediction import Prediction
+        from backend.db_models.review_queue import ReviewQueue
+
+        resp = await self._predict(live_client, doctor_token, dict(self.BASE))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["decision"] == "uncertain"
+
+        record = await self._stored_record(db_session, dict(self.BASE))
+        queued = (await db_session.execute(
+            select(ReviewQueue).where(ReviewQueue.prediction_id == record.id)
+        )).scalars().first()
+        assert queued is not None
+        assert queued.decision_threshold is None, queued.decision_threshold

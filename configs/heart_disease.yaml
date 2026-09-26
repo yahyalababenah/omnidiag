@@ -93,6 +93,11 @@ model:
   # this module exposes NO inference_threshold. One threshold is precisely what
   # produced the sex gap this model was built to close (HF-13: sensitivity 0.74
   # for women against 0.94 for men).
+  # Largest batch this module accepts, and why, in the words the UI shows
+  # before uploading. Declared here rather than branched on the disease name
+  # in the frontend (Gate 8.4).
+  max_batch_rows: 500
+  max_batch_rows_reason: "server limit"
   output_type: "conformal_decision"
   conformal_alpha: 0.10
   conformal_groups: ["Sex"]

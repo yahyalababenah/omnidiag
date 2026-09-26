@@ -35,14 +35,23 @@ SHAP = [
 ]
 
 
-def build_prompt(features=RAW_FEATURES, shap=SHAP):
-    """The user prompt exactly as generate_report() assembles it."""
+def build_prompt(features=RAW_FEATURES, shap=SHAP, output_type=None,
+                 probability_scale=None, decision=None, lower=None, upper=None):
+    """
+    The user prompt exactly as generate_report() assembles it.
+
+    Since Gate 8.4 the how-it-decided part of the prompt is a block chosen by
+    the module's output_type, so this builds it the same way generate_report
+    does. The default arguments keep the threshold wording, which is what the
+    privacy tests below were written against.
+    """
     return rg._USER_PROMPT_TEMPLATE.format(
         disease_display="Coronary Artery Disease Risk",
-        probability=0.63,
-        threshold_note="0.3695 — at or above this the patient is classified Positive",
-        label="Positive",
-        confidence_band="HIGH",
+        decision_block=rg._decision_block(
+            0.63, "Positive", "HIGH",
+            "0.3695 — at or above this the patient is classified Positive",
+            output_type, probability_scale, decision, lower, upper,
+        ),
         shap_summary=rg._format_shap(shap),
         glossary_summary=rg._format_glossary(shap),
     )
@@ -237,3 +246,79 @@ class TestEveryFallbackPathUsesTheFlooredBand:
         assert result["source"] == "rule_based"
         assert result["risk_band"] == "MODERATE"
         assert "Rescreen in 12 months" not in result["report"]
+
+
+class TestConformalModuleReportSaysWhatTheModelActuallyDid:
+    """
+    Gate 8.4. Until this gate, a heart report was generated from a prompt built
+    for a threshold model on a prevalence-corrected probability, and every
+    premise in it was false for the shipped model: it was told the probability
+    was "calibrated to real-world prevalence" (it is calibrated to the training
+    hospitals' mix), that the label said which side of a decision threshold the
+    patient fell on (there is no threshold), and it was handed a
+    HIGH/MODERATE/LOW band that heart configures none of. The rule-based
+    fallback -- which is what runs with no API key, and so what a demo shows --
+    told the patient their result was "<n>% probability on this population's
+    prevalence, classified against the module's own risk bands".
+
+    This is the text a reviewer reads, so it is pinned.
+    """
+
+    CONFORMAL = dict(
+        output_type="conformal_decision",
+        probability_scale="ivap_calibrated_training_mix",
+    )
+    SHAP = [{"feature": "cp_anginal", "shap_value": 0.31},
+            {"feature": "Age", "shap_value": 0.12}]
+
+    def _report(self, decision="uncertain", label="Uncertain — refer for further evaluation"):
+        return rg._rule_based_report(
+            "Heart Disease", 0.4763, label, self.SHAP, None, None, None,
+            self.CONFORMAL["output_type"], self.CONFORMAL["probability_scale"],
+            decision, 0.4643, 0.4872,
+        )
+
+    @pytest.mark.parametrize("decision", ["referral", "no_referral", "uncertain"])
+    def test_no_band_language_reaches_the_report(self, decision):
+        text = self._report(decision=decision).lower()
+        for claim in ("high priority", "moderate priority", "low priority",
+                      "risk band", "risk stratification note"):
+            assert claim not in text, f"{decision}: report still says {claim!r}"
+
+    @pytest.mark.parametrize("decision", ["referral", "no_referral", "uncertain"])
+    def test_the_report_does_not_claim_a_population_prevalence(self, decision):
+        text = self._report(decision=decision).lower()
+        assert "this population's prevalence" not in text
+        assert "real-world prevalence" not in text
+        # It must say what the number IS calibrated to, not merely omit the lie.
+        assert "four teaching hospitals" in text
+
+    def test_the_interval_is_in_the_report(self):
+        assert "46.4% to 48.7%" in self._report()
+
+    def test_an_uncertain_result_is_not_described_as_middling_risk(self):
+        text = self._report(decision="uncertain")
+        assert "did not separate the two groups" in text
+        assert "moderate" not in text.lower()
+
+    def test_actions_follow_the_decision_not_a_band(self):
+        assert "Routine follow-up" in self._report(
+            decision="no_referral", label="Negative")
+        assert "Specialist referral" in self._report(decision="referral", label="Positive")
+
+    def test_the_prompt_for_a_conformal_module_states_no_threshold(self):
+        prompt = build_prompt(
+            output_type="conformal_decision",
+            probability_scale="ivap_calibrated_training_mix",
+            decision="uncertain", lower=0.4643, upper=0.4872,
+        )
+        assert "does NOT compare a probability against a cut-off" in prompt
+        assert "Risk Band:" not in prompt
+        assert "Decision Threshold:" not in prompt
+        assert "calibrated to real-world prevalence" not in prompt
+
+    def test_a_threshold_module_keeps_its_wording(self):
+        """Diabetes must be untouched: its prompt still names both."""
+        prompt = build_prompt()
+        assert "Decision Threshold:" in prompt
+        assert "Risk Band: HIGH" in prompt

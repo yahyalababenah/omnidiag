@@ -27,11 +27,24 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.s
 // raw-scale number and will be plotted against corrected bands. The
 // patient_visits table is currently empty, so nothing is mis-plotted today,
 // but the endpoint should take an explicit scale — tracked as a register item.
-function RiskBadge({ score, bands }) {
-  const band = classifyRisk(score, bands ? { risk_bands: bands } : null);
+function RiskBadge({ score, bandSource }) {
+  // `bandSource` is passed through whole so an explicit `risk_bands: null` --
+  // a module that configures none on purpose (D-32) -- stays distinguishable
+  // from "no disease selected". classifyRisk returns null for the former, and
+  // falling through to LOW there would have labelled a referred patient low
+  // risk on a badge the model never authorised (Gate 8.4).
+  const band = classifyRisk(score, bandSource);
   if (band === 'HIGH') return <span className="badge-positive text-xs">HIGH</span>;
   if (band === 'MODERATE') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">MOD</span>;
-  return <span className="badge-negative text-xs">LOW</span>;
+  if (band === 'LOW') return <span className="badge-negative text-xs">LOW</span>;
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
+      title="This module reports a decision, not a risk band"
+    >
+      —
+    </span>
+  );
 }
 
 function TrendIcon({ visits }) {
@@ -105,8 +118,10 @@ export default function PatientRiskTimeline({ patientId, disease }) {
   const selectedInfo = selectedDisease
     ? availableDiseases?.find((d) => d.name === selectedDisease)
     : null;
-  const bands = selectedInfo?.risk_bands ?? null;
-  const highBand = getRiskBands(bands ? { risk_bands: bands } : null).high;
+  // Passed whole, not unwrapped: `risk_bands: null` from a module that declares
+  // no bands must not be re-filled with the 0.7/0.4 default.
+  const bandSource = selectedInfo ?? null;
+  const highBand = getRiskBands(bandSource)?.high ?? null;
   // Decision threshold from the API, on the same scale as the bands. Null
   // (line hidden) when several diseases are shown at once or the module
   // exposes none — a fixed 50% line was wrong for diabetes, whose threshold
@@ -175,7 +190,12 @@ export default function PatientRiskTimeline({ patientId, disease }) {
                     }}
                   />
                 )}
-                <ReferenceLine y={highBand} stroke="#ef4444" strokeDasharray="4 4" label={{ value: `HIGH ${(highBand * 100).toFixed(0)}%`, fontSize: 10, fill: '#ef4444' }} />
+                {/* Hidden when the module declares no bands: drawing a HIGH line
+                    at the 0.7 default would put a threshold on the chart that
+                    this model does not have (Gate 8.4). */}
+                {highBand !== null && (
+                  <ReferenceLine y={highBand} stroke="#ef4444" strokeDasharray="4 4" label={{ value: `HIGH ${(highBand * 100).toFixed(0)}%`, fontSize: 10, fill: '#ef4444' }} />
+                )}
                 <Line
                   type="monotone"
                   dataKey="risk"
@@ -213,7 +233,7 @@ export default function PatientRiskTimeline({ patientId, disease }) {
                       {(v.risk_score * 100).toFixed(1)}%
                     </td>
                     <td className="py-2 px-3">
-                      <RiskBadge score={v.risk_score} bands={bands} />
+                      <RiskBadge score={v.risk_score} bandSource={bandSource} />
                     </td>
                     <td className="py-2 px-3 text-xs text-gray-500 dark:text-gray-400 max-w-[200px] truncate">
                       {v.notes || '—'}

@@ -57,7 +57,18 @@ class Prediction(Base):
     # backend/probability_scale.py. NULL means "written before this column
     # existed, scale unknown".
     probability_scale = Column(String(16), nullable=True)
-    diagnosis = Column(String(100), nullable=True)  # "Positive" / "Negative"
+    diagnosis = Column(String(100), nullable=True)  # "Positive" / "Negative" / uncertain label
+    # The decision a conformal module made, and the Venn-Abers interval around
+    # `confidence` (Gate 8.4). NULL for a threshold module, which has neither,
+    # and for rows written before this column existed.
+    #
+    # Recorded rather than left to the response: the interval is what D-32 says
+    # replaces risk bands for this model, and an interval that is shown once and
+    # never stored cannot be reviewed afterwards -- which is the whole point of
+    # keeping a prediction record.
+    decision = Column(String(32), nullable=True)   # 'referral' | 'no_referral' | 'uncertain'
+    probability_lower = Column(Float, nullable=True)
+    probability_upper = Column(Float, nullable=True)
     # Free text the clinician wrote about this screening. Stored verbatim and
     # used for nothing else: it never reaches a model, a feature vector, the
     # retraining set or the LLM report. It exists so the note the doctor made

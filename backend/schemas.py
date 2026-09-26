@@ -191,8 +191,13 @@ class PredictResponse(BaseModel):
 
     Two shapes share this model:
 
-    * heart_disease returns only prediction / confidence / diagnosis, on the
-      model's own scale with an argmax 0.5 cut-point.
+    * heart_disease returns a CONFORMAL DECISION, not a probability against a
+      cut-point: `decision` is referral / no_referral / uncertain, and
+      `decision_is_referral` is true for the first and the last. It carries no
+      inference_threshold and no risk_bands, and that absence is deliberate
+      (D-32) -- a consumer must not substitute 0.5 or 0.7/0.4 for it.
+      `confidence` is Venn-Abers calibrated to the TRAINING hospitals' mix,
+      bracketed by probability_lower / probability_upper.
     * diabetes additionally returns the prevalence-correction audit fields.
       Its `confidence` is on the DEPLOYMENT prior and must be compared with
       `inference_threshold` (same scale), never with 0.5.
@@ -218,7 +223,48 @@ class PredictResponse(BaseModel):
         ge=0.0,
         le=1.0,
     )
-    diagnosis: str = Field(..., description="'Positive' or 'Negative'")
+    diagnosis: str = Field(..., description="'Positive', 'Negative', or an uncertain-referral label")
+
+    # ── The decision, for modules that make one instead of thresholding ──────
+    # Gate 8.4. Sent as data so no consumer has to pattern-match `diagnosis`
+    # or infer behaviour from the disease name.
+    decision: Optional[str] = Field(
+        None, description="'referral' | 'no_referral' | 'uncertain' (conformal modules)"
+    )
+    conformal_set: Optional[List[int]] = Field(
+        None, description="The conformal label set: [1], [0], [0,1] or [] (empty = atypical for both)"
+    )
+    decision_is_referral: Optional[bool] = Field(
+        None,
+        description=(
+            "True when this patient goes forward for evaluation. TRUE FOR "
+            "'uncertain' as well as 'referral' -- counting only the confident "
+            "referrals is the silent sensitivity drop this model family exists "
+            "to avoid. Stated here so every consumer reads it instead of "
+            "re-deriving it."
+        ),
+    )
+    probability_lower: Optional[float] = Field(
+        None, description="Lower end of the Venn-Abers interval around confidence", ge=0.0, le=1.0
+    )
+    probability_upper: Optional[float] = Field(
+        None, description="Upper end of the Venn-Abers interval around confidence", ge=0.0, le=1.0
+    )
+    output_type: Optional[str] = Field(
+        None,
+        description=(
+            "How this module decides: 'conformal_decision' means there is no "
+            "threshold to compare against. Consumers branch on this, never on "
+            "the disease name."
+        ),
+    )
+    probability_scale: Optional[str] = Field(
+        None,
+        description=(
+            "What the probability is calibrated to, e.g. "
+            "'ivap_calibrated_training_mix' -- NOT a deployment prevalence."
+        ),
+    )
 
     probability_raw: Optional[float] = Field(
         None, description="Ensemble output on the training prior (50/50 resample)", ge=0.0, le=1.0
