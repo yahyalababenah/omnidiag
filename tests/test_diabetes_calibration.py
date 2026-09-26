@@ -186,18 +186,30 @@ DIABETES_MIN = {**{k: 0 for k in _BINARY}, "BMI": 10.0, "MentHlth": 0, "PhysHlth
 DIABETES_MAX = {**{k: 1 for k in _BINARY}, "BMI": 100.0, "MentHlth": 30, "PhysHlth": 30,
                 "GenHlth": 5, "Age": 13, "Education": 6, "Income": 8}
 
+# Case names state the CLINICAL meaning of the chest pain and the API code that
+# carries it, because the previous names did not and one of them was wrong in
+# exactly the way HF-1 was: "typical_up_slope" sends ChestPainType "ATA", which
+# is ATYPICAL angina. A case name that misdescribes its own input is how an
+# inverted encoding survives a test suite.
+#
+#   API code -> clinical meaning (the meaning the API has always documented)
+#   TA  -> typical angina        ATA -> atypical angina
+#   NAP -> non-anginal pain      ASY -> asymptomatic (no anginal features)
 HEART_CASES = {
-    "typical_up_slope": {
+    # ChestPainType "ATA" = atypical angina.
+    "clinical_atypical_angina_up_slope": {
         "Age": 55, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 130,
         "Cholesterol": 250, "FastingBS": 0, "RestingECG": "Normal", "MaxHR": 150,
         "ExerciseAngina": "N", "Oldpeak": 1.5, "ST_Slope": "Up",
     },
-    "asymptomatic_flat": {
+    # ChestPainType "ASY" = asymptomatic, i.e. no anginal features.
+    "clinical_no_anginal_features_flat": {
         "Age": 63, "Sex": "M", "ChestPainType": "ASY", "RestingBP": 145,
         "Cholesterol": 233, "FastingBS": 1, "RestingECG": "LVH", "MaxHR": 108,
         "ExerciseAngina": "Y", "Oldpeak": 2.6, "ST_Slope": "Flat",
     },
-    "young_female": {
+    # ChestPainType "NAP" = non-anginal pain.
+    "clinical_non_anginal_pain_young_female": {
         "Age": 34, "Sex": "F", "ChestPainType": "NAP", "RestingBP": 118,
         "Cholesterol": 210, "FastingBS": 0, "RestingECG": "Normal", "MaxHR": 175,
         "ExerciseAngina": "N", "Oldpeak": 0.0, "ST_Slope": "Up",
@@ -208,7 +220,8 @@ HEART_CASES = {
 # This is a DELIBERATE break of the previous net, not drift: the model, its
 # feature set, its calibration and its decision rule all changed.
 #
-# `typical_up_slope` is GONE rather than updated. Its old expectation
+# The atypical-angina case (formerly `typical_up_slope`) is GONE rather than
+# updated. Its old expectation
 # (Negative, 0.3386) WAS the HF-1 defect being asserted as correct behaviour:
 # UCI's chest-pain codes are inverted, so a patient the clinician records as
 # typical angina scored LOW. That property now has a test of its own, stated
@@ -219,8 +232,8 @@ HEART_CASES = {
 # conformal set is not a singleton is reported as a referral for further
 # evaluation (prediction 1) — see backend/heart_glm/stack.py.
 HEART_GOLDEN = {
-    "asymptomatic_flat": {"prediction": 1, "confidence": 0.6875, "diagnosis": "Uncertain — refer for further evaluation"},
-    "young_female": {"prediction": 0, "confidence": 0.023809523809523808, "diagnosis": "Negative"},
+    "clinical_no_anginal_features_flat": {"prediction": 1, "confidence": 0.6875, "diagnosis": "Uncertain — refer for further evaluation"},
+    "clinical_non_anginal_pain_young_female": {"prediction": 0, "confidence": 0.023809523809523808, "diagnosis": "Negative"},
 }
 
 CORRECTION_KEYS = {
@@ -417,7 +430,7 @@ class TestHeartNonRegression:
         bad one, so a regression that lets inf/nan back in would show up as
         the two good rows failing too, not just the bad one.
         """
-        good = dict(HEART_CASES["asymptomatic_flat"])
+        good = dict(HEART_CASES["clinical_no_anginal_features_flat"])
         bad = dict(good)
         bad["Oldpeak"] = bad_oldpeak
 
@@ -445,7 +458,7 @@ class TestHeartNonRegression:
         assert by_row[3]["status"] == "ok"
         # The two good rows are identical patients -- same result, and it
         # matches the non-regression golden value for this exact patient.
-        golden = HEART_GOLDEN["asymptomatic_flat"]
+        golden = HEART_GOLDEN["clinical_no_anginal_features_flat"]
         for row in (1, 3):
             assert by_row[row]["prediction"] == golden["prediction"]
             assert by_row[row]["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
@@ -465,7 +478,7 @@ class TestHeartNonRegression:
         the shipped artifact, instead of from a SHAP file belonging to a model
         that was never deployed (F0-1).
         """
-        patient = dict(HEART_CASES["typical_up_slope"])
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
         header = ",".join(patient.keys())
         row = self._csv_row(patient, blank_key=missing_field)
         csv_bytes = "\n".join([header, row]).encode("utf-8")
@@ -494,7 +507,7 @@ class TestHeartNonRegression:
         because in the previous model a blank one raised risk by 7.6 points and
         flipped 8.1% of decisions with NO warning at all (HF-11).
         """
-        patient = dict(HEART_CASES["typical_up_slope"])
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
         header = ",".join(patient.keys())
         row = self._csv_row(patient, blank_key=missing_field)
         csv_bytes = "\n".join([header, row]).encode("utf-8")
@@ -515,7 +528,7 @@ class TestHeartNonRegression:
     async def test_batch_complete_row_has_no_warning(self, live_client, doctor_token):
         """HM-5: a fully complete row is unaffected -- no warning key at all,
         exactly like every /batch response before this change."""
-        patient = dict(HEART_CASES["typical_up_slope"])
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
         header = ",".join(patient.keys())
         row = self._csv_row(patient)
         csv_bytes = "\n".join([header, row]).encode("utf-8")
@@ -539,7 +552,7 @@ class TestHeartNonRegression:
         cells = loader.bundle["conformal_cells"]
         assert set(cells) == {"F0", "F1", "M0", "M1"}
 
-        patient = HEART_CASES["asymptomatic_flat"]
+        patient = HEART_CASES["clinical_no_anginal_features_flat"]
         original = dict(cells)
         try:
             # Nothing is typical of class 0 -> class 0 leaves the set, leaving

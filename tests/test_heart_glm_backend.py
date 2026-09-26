@@ -283,3 +283,60 @@ def test_single_patient_latency_is_reasonable(backend):
         backend.predict(dict(PATIENT))
     elapsed_ms = (time.perf_counter() - start) / 20 * 1000
     assert elapsed_ms < 250, f"{elapsed_ms:.0f} ms per patient"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# The build gate must actually refuse
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# A check that has never been seen to fail is not known to work. Each test here
+# breaks one input and asserts the build refuses, so the Docker build step
+# cannot quietly degrade into a no-op.
+
+def test_build_refuses_a_training_csv_with_one_row_changed(tmp_path, training_frame):
+    """Condition 1: the CSV hash. One cell is enough."""
+    tampered = training_frame.copy()
+    tampered.loc[0, "Cholesterol"] = float(tampered.loc[0, "Cholesterol"]) + 1
+    path = tmp_path / "tampered.csv"
+    tampered.to_csv(path, index=False)
+
+    bundle = stack.build_bundle(path)
+    with pytest.raises(ValueError, match="sha256 does not match"):
+        stack.verify_against_reference(bundle, path, _REFERENCE, 1e-6)
+
+
+def test_build_refuses_a_model_whose_decisions_moved(backend, monkeypatch):
+    """Condition 2: decisions are absolute, whatever the probability delta.
+
+    The conformal cells are nudged so that a few patients change side. No
+    tolerance may absorb that — the message says so in as many words.
+    """
+    tampered = dict(backend.bundle)
+    tampered["conformal_cells"] = {
+        key: value * 0.97 for key, value in backend.bundle["conformal_cells"].items()
+    }
+    with pytest.raises(ValueError, match="not a tolerance to relax"):
+        stack.verify_against_reference(tampered, _TRAINING_CSV, _REFERENCE, 1e-6)
+
+
+def test_build_refuses_probabilities_outside_the_tolerance(backend):
+    """Condition 3: the probability tolerance, with the decisions left alone."""
+    reference = json.load(open(_REFERENCE))
+    shifted = dict(reference)
+    shifted["raw"] = [min(1.0, v + 1e-4) for v in reference["raw"]]
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+        json.dump(shifted, handle)
+        path = handle.name
+    with pytest.raises(ValueError, match="exceeds the declared tolerance"):
+        stack.verify_against_reference(backend.bundle, _TRAINING_CSV, path, 1e-6)
+
+
+def test_the_build_gate_passes_on_the_real_inputs(backend):
+    """Guards the three tests above against passing because everything fails."""
+    result = stack.verify_against_reference(
+        backend.bundle, _TRAINING_CSV, _REFERENCE, 1e-6
+    )
+    assert result["decision_mismatches"] == 0
+    assert max(result["max_abs_delta"].values()) <= 1e-6
