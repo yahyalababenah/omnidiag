@@ -301,6 +301,7 @@ export default function ClinicalEmrMode() {
             gender: selectedPatient?.gender ?? selectedPatient?.sex ?? '—',
           }}
           disease={selectedDisease}
+          scopeNote={currentDiseaseInfo?.scope_note ?? null}
           result={result}
           shapText={shapData?.text_explanation}
           counterfactuals={counterfactualsData}
@@ -679,14 +680,28 @@ export default function ClinicalEmrMode() {
                           <p className="text-[11px] uppercase tracking-wide text-gray-500">
                             {SCREENING_LABEL} — {diseaseLabel}
                           </p>
-                          <p className="text-lg font-bold" style={{ color: isPositive ? '#dc2626' : '#16a34a' }}>
+                          {/* Amber and its own sentence for `uncertain`: the
+                              binary pair called a patient the model could not
+                              place "elevated risk", in the clinician-facing
+                              panel (Gate 8.9). */}
+                          <p
+                            className="text-lg font-bold"
+                            style={{ color: result.decision === 'uncertain' ? '#d97706' : isPositive ? '#dc2626' : '#16a34a' }}
+                          >
                             {screeningText(result)}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {isPositive
-                              ? 'AI analysis indicates elevated risk. Clinical correlation recommended.'
-                              : 'AI analysis indicates low risk. Continue routine monitoring.'}
+                            {result.decision === 'uncertain'
+                              ? 'The model could not place this patient confidently in either group. Refer for further evaluation.'
+                              : isPositive
+                                ? 'AI analysis indicates elevated risk. Clinical correlation recommended.'
+                                : 'AI analysis indicates low risk. Continue routine monitoring.'}
                           </p>
+                          {currentDiseaseInfo?.scope_note && (
+                            <p className="text-[11px] leading-snug text-gray-500 mt-1.5 border-l-2 border-gray-200 pl-2">
+                              {currentDiseaseInfo.scope_note}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">

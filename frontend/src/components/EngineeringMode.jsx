@@ -194,6 +194,15 @@ export default function EngineeringMode() {
                 const thresholdPct = displayThreshold != null ? (displayThreshold * 100).toFixed(1) : null;
                 return (
                 <div className="space-y-4">
+                  {/* What this number applies to, beside the number itself. The
+                      text is the module's own (`scope_note` in its YAML), so a
+                      clinical statement is not compiled into a component, and a
+                      module that declares none shows nothing (Gate 8.9). */}
+                  {currentDiseaseInfo?.scope_note && (
+                    <p className="text-[11px] leading-snug text-gray-500 dark:text-slate-400 border-l-2 border-gray-200 dark:border-slate-700 pl-2">
+                      {currentDiseaseInfo.scope_note}
+                    </p>
+                  )}
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-gray-600 shrink-0">{SCREENING_LABEL}</span>
                     {/* Amber for `uncertain`: it is a third answer, not a

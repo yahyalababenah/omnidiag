@@ -3,7 +3,16 @@
 **IEEE AI Expo Technical Documentation**
 
 **Version:** 4.0.0  
-**Last Updated:** June 2026  
+**Last Updated:** June 2026
+
+> **Superseded for the heart module (2026-09-26).** Every description of
+> heart_disease below — the XGBoost Pipeline in `heart_full_tuned.pkl`, the 0.3695
+> decision threshold, and `model.ensemble` dispatch — describes the archived model
+> and the pre-registry router. The shipped module is a Spline-GLM with Venn-Abers
+> calibration and a Mondrian conformal decision (referral / no referral /
+> uncertain) that publishes no threshold and no risk bands, dispatched by
+> `model.family`. See `README.md`. The **diabetes** sections are unaffected: that
+> module was not touched in Phase 8.  
 **Repository:** [`github.com/yahyoha/omnidiag`](https://github.com/yahyoha/omnidiag)  
 
 ---

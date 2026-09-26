@@ -18,6 +18,17 @@
 disease:
   name: "heart_disease"
   display_name: "Coronary Artery Disease Risk"
+
+  # One line shown BESIDE EVERY RESULT, on screen and in the printed report.
+  # The long `description` above is read once in a selector tooltip; this is the
+  # sentence a clinician has in front of them while reading a number, and it is
+  # the sentence that keeps the number from being read as a general screen.
+  # Text, not code: a clinical statement belongs in the module's own config, not
+  # compiled into a React component (Gate 8.9).
+  scope_note: >-
+    Applies to patients already referred for catheterisation. Not a
+    general-population screen, and not a diagnosis.
+
   description: >-
     Ranks patients ALREADY REFERRED FOR CATHETERISATION by the probability of
     a >50% stenosis. Not a general-population screen: every patient it learned

@@ -96,6 +96,7 @@ const styles = StyleSheet.create({
 
   // ── Risk probability bar ──────────────────────────────────────────────────
   confLabel: { fontSize: 7, color: C.muted, marginBottom: 3 },
+  scopeNote: { fontSize: 7, color: C.muted, marginBottom: 6, lineHeight: 1.4 },
   confBarBg: { height: 6, backgroundColor: C.border, borderRadius: 3, width: 160 },
   confBarFill: { height: 6, borderRadius: 3 },
 
@@ -183,6 +184,8 @@ export default function PDFReport({
   doctorNotes = null,
   patientData = null,
   shapImageUrl,
+  // The module's own scope sentence, from its config via GET /api/v4/diseases.
+  scopeNote = null,
   doctorName,
   clinicName,
   reportDate,
@@ -275,6 +278,9 @@ export default function PDFReport({
         {/* ── Screening Summary ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>AI Screening Summary</Text>
+          {/* The printed report outlives the screen and gets read without the
+              app around it, so the module's scope travels with it. */}
+          {scopeNote ? <Text style={styles.scopeNote}>{scopeNote}</Text> : null}
           <View style={styles.badgeRow}>
             <Text style={badgeStyle}>{diagnosisLabel}</Text>
             <View>

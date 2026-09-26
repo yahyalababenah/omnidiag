@@ -108,6 +108,10 @@ class OmniDiagRouter:
             "name": config.get("disease", {}).get("name"),
             "display_name": config.get("disease", {}).get("display_name"),
             "description": config.get("disease", {}).get("description"),
+            # One line to show beside every result for this module. Absent for a
+            # module that declares none, and the UI then shows nothing rather
+            # than inventing a scope (Gate 8.9).
+            "scope_note": config.get("disease", {}).get("scope_note"),
             "version": config.get("disease", {}).get("version"),
             "model_type": config.get("model", {}).get("type"),
             "explainer_type": config.get("model", {}).get("explainer_type"),

@@ -2,6 +2,23 @@
 
 Status: implemented on `feat/model-family-registry` (2026-09-21). Not merged.
 
+> **Addendum, 2026-09-26 (Phase 8).** This document describes the state of the
+> code on 2026-09-21 and is left as written, because the "before" tables below are
+> a record of what was true then. Two things in it no longer describe the shipped
+> system:
+>
+> * **Heart no longer predicts by a threshold.** `bundle["threshold"]` (0.3695) and
+>   `heart_full_tuned.pkl` belong to the archived model. The module that ships is
+>   `HeartGlmConformalBackend` over `heart_l3_glm_stack.pkl`, and it answers with a
+>   conformal decision — referral / no referral / uncertain — publishing no
+>   threshold at all. `BaseModelBackend.decision_threshold` now raises for such a
+>   module rather than returning a 0.5 default.
+> * **`model.ensemble` dispatch** was replaced by the `model.family` registry this
+>   document proposed; heart declares `family: glm_ivap_conformal`.
+>
+> The registry design itself was adopted and is what made the heart swap a config
+> change rather than a rewrite.
+
 ## 1. Where the code assumed a specific model family (before)
 
 | Concern | Location | Assumption |
