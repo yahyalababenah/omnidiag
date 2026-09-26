@@ -23,7 +23,7 @@ import {
   Font,
 } from '@react-pdf/renderer'
 import { summariseWhatIf, SUBTITLE, SCENARIOS_TITLE } from '../utils/whatIfSummary'
-import { SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening'
+import { screeningText } from '../utils/screening'
 
 // ── Colour palette (matches Tailwind clinical theme) ──────────────────────────
 const C = {
@@ -192,11 +192,17 @@ export default function PDFReport({
   // Same scale as `confidence` — both come from the /predict response.
   const threshold =
     typeof result?.inference_threshold === 'number' ? result.inference_threshold : null
-  const diagnosisLabel = isPositive ? SCREENING_ELEVATED : SCREENING_BELOW
-  const badgeStyle = isPositive
-    ? { ...styles.badge, backgroundColor: '#fee2e2', color: C.positive }
-    : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
-  const barColor = isPositive ? C.positive : C.negative
+  // The printed report carries the module's own three-way answer, so a PDF
+  // handed to a colleague cannot say "Elevated risk" about a patient the model
+  // reported as UNCERTAIN (Gate 8.8).
+  const diagnosisLabel = screeningText(result)
+  const isUncertain = result?.decision === 'uncertain'
+  const badgeStyle = isUncertain
+    ? { ...styles.badge, backgroundColor: '#fef3c7', color: '#b45309' }
+    : isPositive
+      ? { ...styles.badge, backgroundColor: '#fee2e2', color: C.positive }
+      : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
+  const barColor = isUncertain ? '#d97706' : isPositive ? C.positive : C.negative
 
   // Classified by the SAME module the on-screen card uses, so the printed
   // report cannot say something different from the screen it was exported

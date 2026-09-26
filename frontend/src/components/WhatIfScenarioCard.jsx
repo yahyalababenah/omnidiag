@@ -1,7 +1,7 @@
 import { Zap, Lightbulb, TrendingDown, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 import { normaliseScenario } from '../utils/counterfactuals';
 import {
-  SUBTITLE, NO_CROSSING_MESSAGE, NO_IMPROVEMENT_MESSAGE, NO_LEVERS_MESSAGE,
+  SUBTITLE, noCrossingMessage, stillFlaggedClause, NO_IMPROVEMENT_MESSAGE, NO_LEVERS_MESSAGE,
   LOW_RISK_HEADLINE, LOW_RISK_MESSAGE,
 } from '../utils/whatIfSummary';
 import MedicalTooltip from './MedicalTooltip';
@@ -43,6 +43,9 @@ export default function WhatIfScenarioCard({
   bestAchievable = null,
   error = null,
   message = null,
+  // The /predict response, so the wording can follow what the module reports
+  // rather than assuming a threshold exists (Gate 8.8).
+  result = null,
 }) {
   /* ════════════════════════════════════════
      State 1 — Loading spinner
@@ -120,7 +123,7 @@ export default function WhatIfScenarioCard({
                 ? NO_IMPROVEMENT_MESSAGE
                 : !best && message
                   ? message
-                  : NO_CROSSING_MESSAGE}
+                  : noCrossingMessage(result)}
             </p>
             {best && improves ? (
               <div className="mt-3">
@@ -146,7 +149,7 @@ export default function WhatIfScenarioCard({
                     <> — relative reduction {Math.round(relative)}%</>
                   )}
                   {absolute !== null && <> ({absolute.toFixed(1)} pts absolute)</>}
-                  {' '}— still above the threshold.
+                  {stillFlaggedClause(result)}
                 </p>
               </div>
             ) : !best && !message ? (

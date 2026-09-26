@@ -232,6 +232,14 @@ NO_IMPROVEMENT_MESSAGE = (
     "recommended."
 )
 
+#: The same message for a module that decides without a threshold. It has none
+#: to remain above, and saying so described a model that has not shipped since
+#: Gate 8.1 (found by the manual run in Gate 8.8).
+NO_IMPROVEMENT_MESSAGE_DECISION = (
+    "No change to the modifiable factors lowers the estimated risk for this "
+    "patient, and the decision does not change. Referral is recommended."
+)
+
 
 class CounterfactualGenerator:
     """

@@ -148,7 +148,23 @@ class ModelBackend(ABC):
 
     @property
     def decision_threshold(self) -> float:
-        return float(self.config.get("model", {}).get("inference_threshold", 0.5))
+        """
+        The cut-point this module decides by.
+
+        A module that declares `output_type: conformal_decision` has none, and
+        asking for one is a bug in the caller rather than a 0.5 to hand back: the
+        0.5 default is exactly how a fabricated threshold reached three screens,
+        the LLM report and the review queue before Gate 8.4. Heart overrides
+        predict() so it never reaches here today -- this makes that an invariant
+        instead of a coincidence, for the next such module.
+        """
+        model_config = self.config.get("model", {}) or {}
+        if model_config.get("output_type") == "conformal_decision":
+            raise AttributeError(
+                f"{type(self).__name__} decides by a conformal set and has no "
+                f"decision threshold; read `decision` from the result instead"
+            )
+        return float(model_config.get("inference_threshold", 0.5))
 
     def _frame(self, patient_data: Dict[str, Any]) -> pd.DataFrame:
         return pd.DataFrame([patient_data])[list(self.feature_names)]

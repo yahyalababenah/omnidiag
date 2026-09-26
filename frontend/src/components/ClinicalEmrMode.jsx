@@ -35,7 +35,7 @@ import ClinicalNotesInput from './ClinicalNotesInput';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
 import { getDisplayThreshold } from '../constants/thresholds';
-import { SCREENING_LABEL, SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening';
+import { SCREENING_LABEL, screeningText } from '../utils/screening';
 import {
   FAVOURABLE_BINARY,
   NEUTRAL_FIELDS,
@@ -680,7 +680,7 @@ export default function ClinicalEmrMode() {
                             {SCREENING_LABEL} — {diseaseLabel}
                           </p>
                           <p className="text-lg font-bold" style={{ color: isPositive ? '#dc2626' : '#16a34a' }}>
-                            {isPositive ? SCREENING_ELEVATED : SCREENING_BELOW}
+                            {screeningText(result)}
                           </p>
                           <p className="text-sm text-gray-600">
                             {isPositive
@@ -799,6 +799,7 @@ export default function ClinicalEmrMode() {
                       error={counterfactualsError}
                       message={counterfactualsMessage}
                       prediction={result?.prediction}
+                      result={result}
                       patientData={selectedPatient?.data ?? null}
                     />
                   </div>

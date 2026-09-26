@@ -22,9 +22,30 @@ export const SUBTITLE =
   "Scenarios show how the model's estimate responds to modifiable factors. " +
   'They are not a predicted treatment effect.';
 
+// Two wordings, because a module that decides without a threshold has none to
+// stay above. Before Gate 8.8 the heart what-if panel said "remains above the
+// threshold" twice about a model whose decision is a conformal set.
 export const NO_CROSSING_MESSAGE =
   'Even with every modifiable factor improved, the estimated risk remains above the threshold. ' +
   'The dominant factors are not modifiable. Referral is recommended.';
+
+export const NO_CROSSING_MESSAGE_DECISION =
+  'Even with every modifiable factor improved, the decision does not change. ' +
+  'The dominant factors are not modifiable. Referral is recommended.';
+
+/** The no-crossing wording for a module, chosen by what it reports. */
+export function noCrossingMessage(result) {
+  return result?.output_type === 'conformal_decision'
+    ? NO_CROSSING_MESSAGE_DECISION
+    : NO_CROSSING_MESSAGE;
+}
+
+/** The trailing clause on a scenario that did not flip the answer. */
+export function stillFlaggedClause(result) {
+  return result?.output_type === 'conformal_decision'
+    ? ' — the decision is unchanged.'
+    : ' — still above the threshold.';
+}
 
 export const NO_IMPROVEMENT_MESSAGE =
   'No change to the modifiable factors lowers the estimated risk for this patient. ' +

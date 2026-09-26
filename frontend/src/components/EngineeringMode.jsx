@@ -13,7 +13,7 @@ import { useDisease } from '../context/DiseaseContext';
 import DynamicClinicalForm from './DynamicClinicalForm';
 import ShapBarChart from './ShapBarChart';
 import WhatIfScenarioCard from './WhatIfScenarioCard';
-import { SCREENING_LABEL, SCREENING_ELEVATED, SCREENING_BELOW, isElevated } from '../utils/screening';
+import { SCREENING_LABEL, isElevated, screeningText } from '../utils/screening';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
 import { getDisplayThreshold } from '../constants/thresholds';
@@ -196,11 +196,18 @@ export default function EngineeringMode() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-gray-600 shrink-0">{SCREENING_LABEL}</span>
-                    <span className={isElevated(result) ? 'badge-positive' : 'badge-negative'}>
+                    {/* Amber for `uncertain`: it is a third answer, not a
+                        milder version of elevated. Red/green alone would tell a
+                        clinician the model had decided when it had not. */}
+                    <span className={
+                      result.decision === 'uncertain'
+                        ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700'
+                        : isElevated(result) ? 'badge-positive' : 'badge-negative'
+                    }>
                       {isElevated(result) ? (
-                        <><AlertCircle className="w-3.5 h-3.5" /> {SCREENING_ELEVATED}</>
+                        <><AlertCircle className="w-3.5 h-3.5" /> {screeningText(result)}</>
                       ) : (
-                        <><CheckCircle2 className="w-3.5 h-3.5" /> {SCREENING_BELOW}</>
+                        <><CheckCircle2 className="w-3.5 h-3.5" /> {screeningText(result)}</>
                       )}
                     </span>
                   </div>
@@ -284,6 +291,7 @@ export default function EngineeringMode() {
                     message={counterfactualsMessage}
                     loading={counterfactualsLoading}
                     prediction={result?.prediction}
+                    result={result}
                     patientData={lastFormData ?? null}
                   />
                 </div>

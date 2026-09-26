@@ -194,7 +194,7 @@ class HeartGlmConformalBackend(ModelBackend):
         ChestPainType, RestingECG -- is immutable.
         """
         from backend.counterfactual_generator import (
-            NO_IMPROVEMENT_MESSAGE, all_improvements, lowest_achievable, policy_violations,
+            NO_IMPROVEMENT_MESSAGE_DECISION, all_improvements, lowest_achievable, policy_violations,
         )
 
         policy = {
@@ -289,7 +289,7 @@ class HeartGlmConformalBackend(ModelBackend):
                 "referred for further evaluation. The dominant factors are not "
                 "modifiable. Referral is recommended."
                 if best_achievable else
-                NO_IMPROVEMENT_MESSAGE
+                NO_IMPROVEMENT_MESSAGE_DECISION
                 if levers else
                 "No modifiable factor is available for this patient (none was "
                 "supplied, or each is already at its target). This patient is still "

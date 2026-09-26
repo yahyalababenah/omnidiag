@@ -99,8 +99,10 @@ CAD_PATIENTS = [
                 "ST_Slope": "Flat",
             },
             "prediction": 1,
-            "confidence": 0.72,
-            "diagnosis": "Positive",
+            # No confidence or diagnosis literal: the shipped model supplies both
+            # at seed time (_score_heart). The values that used to sit here --
+            # 0.72 / 0.91 / 0.84 -- came from heart_full_tuned.pkl, archived since
+            # Gate 8.1, and disagreed with the shipped model by up to 44 points.
         },
     },
     {
@@ -125,8 +127,10 @@ CAD_PATIENTS = [
                 "ST_Slope": "Down",
             },
             "prediction": 1,
-            "confidence": 0.91,
-            "diagnosis": "Positive",
+            # No confidence or diagnosis literal: the shipped model supplies both
+            # at seed time (_score_heart). The values that used to sit here --
+            # 0.72 / 0.91 / 0.84 -- came from heart_full_tuned.pkl, archived since
+            # Gate 8.1, and disagreed with the shipped model by up to 44 points.
         },
     },
     {
@@ -151,8 +155,10 @@ CAD_PATIENTS = [
                 "ST_Slope": "Up",
             },
             "prediction": 0,
-            "confidence": 0.84,
-            "diagnosis": "Negative",
+            # No confidence or diagnosis literal: the shipped model supplies both
+            # at seed time (_score_heart). The values that used to sit here --
+            # 0.72 / 0.91 / 0.84 -- came from heart_full_tuned.pkl, archived since
+            # Gate 8.1, and disagreed with the shipped model by up to 44 points.
         },
     },
 ]
@@ -194,6 +200,50 @@ def _score_diabetes(input_features: dict) -> dict:
         "diagnosis": result["diagnosis"],
         "probability_scale": scale_of_result(result).value,
     }
+
+_HEART_LOADER = None
+
+
+def _score_heart(input_features: dict) -> dict:
+    """
+    Score one seeded CAD patient with the shipped model.
+
+    The same rule the diabetes seeder already followed, applied to heart, which
+    it was not: the three CAD patients carried hardcoded `confidence` literals
+    (0.72, 0.91, 0.84) and a "Positive" / "Negative" label. Those belong to
+    heart_full_tuned.pkl, which has not shipped since Gate 8.1. The shipped model
+    scores the same three patients at 0.476, 0.465 and 0.087 and calls two of
+    them UNCERTAIN, so the demo database was showing a reviewer risk figures from
+    an archived model -- 91% where the current model says 46.5%.
+
+    Also returns the conformal decision and its interval, so a seeded row is
+    indistinguishable from one written by /predict.
+
+    Deliberately has no fallback, for the same reason as diabetes: a fabricated
+    probability in a clinical demo database is worse than no row.
+    """
+    global _HEART_LOADER
+    if _HEART_LOADER is None:
+        from backend.router import OmniDiagRouter
+
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _HEART_LOADER = OmniDiagRouter(
+            configs_dir=os.path.join(root, "configs")
+        )._get_loader("heart_disease")
+
+    from backend.probability_scale import scale_of_result
+
+    result = _HEART_LOADER.predict(input_features)
+    return {
+        "prediction": int(result["prediction"]),
+        "confidence": float(result["confidence"]),
+        "diagnosis": result["diagnosis"],
+        "probability_scale": scale_of_result(result).value,
+        "decision": result.get("decision"),
+        "probability_lower": result.get("probability_lower"),
+        "probability_upper": result.get("probability_upper"),
+    }
+
 
 # Diabetes patients.
 #
@@ -388,22 +438,31 @@ async def seed_database(db_url: str) -> None:
                     session.add(patient)
                     await session.flush()
 
-                    # Create prediction
+                    # Create prediction from the real model, not a literal
                     pred = pat_data["prediction"]
+                    scored = _score_heart(pred["input_features"])
                     prediction = Prediction(
                         id=str(uuid.uuid4()),
                         patient_id=patient_id,
                         disease=pred["disease"],
                         input_features=pred["input_features"],
-                        prediction=pred["prediction"],
-                        confidence=pred["confidence"],
-                        diagnosis=pred["diagnosis"],
+                        prediction=scored["prediction"],
+                        confidence=scored["confidence"],
+                        probability_scale=scored["probability_scale"],
+                        diagnosis=scored["diagnosis"],
+                        decision=scored["decision"],
+                        probability_lower=scored["probability_lower"],
+                        probability_upper=scored["probability_upper"],
                         created_by=doctor_id,
                     )
                     session.add(prediction)
                     stats["patients"] += 1
                     stats["predictions"] += 1
-                    print(f"  ➕ Created CAD patient: {pat_data['full_name']} ({pat_data['mrn']})")
+                    print(
+                        f"  ➕ Created CAD patient: {pat_data['full_name']} ({pat_data['mrn']}) "
+                        f"— model: {scored['diagnosis']}, "
+                        f"{scored['confidence']:.1%} ({scored['decision']})"
+                    )
                 else:
                     print(f"  ✓ CAD patient already exists: {pat_data['full_name']}")
 
