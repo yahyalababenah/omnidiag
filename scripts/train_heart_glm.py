@@ -68,15 +68,17 @@ def main() -> int:
 
     bundle = stack.build_bundle(TRAINING_CSV, experiments_git_ref=_experiments_git_ref())
 
+    verify_result = None
     if args.write_reference:
         REFERENCE_PATH.write_text(
             json.dumps(stack.reference_scores(bundle, TRAINING_CSV), indent=1) + "\n"
         )
         print(f"reference    : written to {REFERENCE_PATH}")
     elif args.verify:
-        result = stack.verify_against_reference(
+        verify_result = stack.verify_against_reference(
             bundle, TRAINING_CSV, REFERENCE_PATH, args.tolerance
         )
+        result = verify_result
         deltas = ", ".join(f"{k} {v:.2e}" for k, v in result["max_abs_delta"].items())
         print(f"fingerprint  : OK — decisions identical for all 920; max |delta| {deltas}")
 
@@ -87,7 +89,60 @@ def main() -> int:
     size_kb = BUNDLE_PATH.stat().st_size / 1024
     print(f"bundle       : {BUNDLE_PATH} ({size_kb:.1f} KB)")
     print(f"pkl sha256   : {stack.sha256_of(BUNDLE_PATH)}   (informational — pickle bytes vary by library build)")
+
+    _log_build_run(bundle, size_kb, verify_result)
     return 0
+
+
+def _log_build_run(bundle, size_kb: float, verify_result) -> None:
+    """
+    Record this build in MLflow: provenance, not performance.
+
+    The experiment used to be empty because nothing wrote to it -- the only
+    automatic caller was a retrain path that fails for this disease. This is the
+    moment the shipped artifact comes into existence, so it is the moment worth
+    recording (Gate 8.6).
+
+    Deliberately logs no accuracy figure. Every performance number for this model
+    is cross-fitted or leave-one-hospital-out and lives in the research
+    repository; recomputing one here, in-sample, would put a flattering number
+    next to the artifact with nothing to say it is not the headline.
+    """
+    card = bundle.get("model_card", {})
+    params = {
+        "family": card.get("family"),
+        "model": card.get("model"),
+        "feature_set": card.get("feature_set"),
+        "training_data": card.get("training_data"),
+        "training_csv_sha256": card.get("training_csv_sha256"),
+        "split": card.get("split"),
+        "calibration": card.get("calibration"),
+        "conformal_alpha": bundle.get("alpha"),
+        "features_model": ",".join(bundle.get("features_model", [])),
+        "unused_input_features": ",".join(bundle.get("unused_input_features", [])),
+        "bundle_sha256": stack.sha256_of(BUNDLE_PATH),
+        "experiments_git_ref": card.get("experiments_git_ref", ""),
+    }
+    metrics = {"bundle_size_kb": round(size_kb, 1)}
+    if verify_result is not None:
+        # The reproducibility fingerprint: evidence that this build reproduced
+        # the recorded one, not a claim about how good the model is.
+        metrics["fingerprint_decision_mismatches"] = float(verify_result["decision_mismatches"])
+        for name, value in verify_result["max_abs_delta"].items():
+            metrics[f"fingerprint_max_abs_delta_{name}"] = float(value)
+    for field, impact in (bundle.get("blank_impact") or {}).items():
+        metrics[f"blank_impact_decisions_changed_{field}"] = float(impact["decision_changed"])
+
+    from backend.monitoring.mlflow_tracker import log_build_artifact
+
+    run_id = log_build_artifact(
+        disease="heart_disease",
+        model_version=str(card.get("version", "v7.0.0")),
+        params={k: v for k, v in params.items() if v is not None},
+        metrics=metrics,
+        tags={"verified": "yes" if verify_result is not None else "no"},
+    )
+    print(f"mlflow       : {'run ' + run_id if run_id else 'not logged (see log) — build unaffected'}")
 
 
 if __name__ == "__main__":

@@ -34,6 +34,14 @@ except ImportError:
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlruns.db")
 EXPERIMENT_NAME = "OmniDiag"
 
+# MLflow's HTTP client retries a dead tracking server with backoff for minutes.
+# That is reasonable for a training job and wrong for an admin endpoint and for
+# an image build: the status check hung for over four minutes against a closed
+# port instead of answering "unreachable" (measured, Gate 8.6). Bounded here,
+# and only when the operator has not set their own values.
+os.environ.setdefault("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "1")
+os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "5")
+
 
 def _get_client():
     """Return an MLflow client pointed at the configured tracking server."""
@@ -138,6 +146,112 @@ def log_drift_metrics(
         run_id = run.info.run_id
         log.info("MLflow: logged drift metrics for %s (run_id=%s drift_share=%.2f%%)", disease, run_id, drift_share * 100)
         return run_id
+
+
+def log_build_artifact(
+    disease: str,
+    model_version: str,
+    params: Dict[str, Any],
+    metrics: Dict[str, float],
+    tags: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
+    """
+    Record the artifact that was just built, at the moment it was built.
+
+    This is the only thing in the system that logs to MLflow automatically, and
+    it exists because nothing did: the one automatic caller was `retrain_xgb`,
+    which fails for heart and is a no-op for diabetes, so the experiment was
+    empty by construction rather than by accident (Gate 8.6).
+
+    Build time is the right moment because it is the only moment the shipped
+    artifact is created. What goes in is provenance -- the training data's hash,
+    the artifact's hash, the reproducibility fingerprint, the declared limits --
+    and NOT performance figures, which are measured in the research repository
+    and are not recomputed here.
+
+    NEVER raises. A build must not fail because a tracking store was absent,
+    and on a deployment whose MLFLOW_TRACKING_URI points at a server there is no
+    server to reach during an image build. Returns the run id, or None with a
+    printed reason.
+    """
+    if not _mlflow_available:
+        log.info("mlflow not installed — build artifact not logged")
+        return None
+    try:
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+        mlflow.set_experiment(EXPERIMENT_NAME)
+        with mlflow.start_run(run_name=f"{disease}-build-{model_version}") as run:
+            mlflow.set_tags({
+                "disease": disease,
+                "model_version": model_version,
+                "run_type": "build",
+                **(tags or {}),
+            })
+            mlflow.log_params(params)
+            if metrics:
+                mlflow.log_metrics(metrics)
+            return run.info.run_id
+    except Exception as exc:  # noqa: BLE001 — tracking is never worth a failed build
+        log.warning("mlflow build logging skipped — %s: %s", type(exc).__name__, exc)
+        return None
+
+
+def tracking_state(n: int = 20) -> Dict[str, Any]:
+    """
+    What MLflow is actually doing, as four distinguishable states.
+
+    `list_recent_runs()` returns [] when the package is missing, when the store
+    is unreachable, and when the store is reachable but has no runs. The admin
+    endpoint therefore reported `count: 0` for all three, and "MLflow is empty"
+    could not be told apart from "MLflow is not installed" -- which is how the
+    empty experiment went unexplained. Each state now names itself:
+
+        unavailable  the mlflow package is not installed here
+        unreachable  installed, but the tracking store did not answer
+        empty        working, and nothing has been logged to it
+        ok           working, with runs
+
+    Returns the runs too, so a caller needs one call rather than two.
+    """
+    if not _mlflow_available:
+        return {
+            "status": "unavailable",
+            "tracking_uri": MLFLOW_TRACKING_URI,
+            "detail": "the mlflow package is not installed in this environment",
+            "runs": [],
+        }
+    try:
+        client = _get_client()
+        experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+    except Exception as exc:  # noqa: BLE001 — any store failure is one state
+        return {
+            "status": "unreachable",
+            "tracking_uri": MLFLOW_TRACKING_URI,
+            "detail": f"{type(exc).__name__}: {exc}",
+            "runs": [],
+        }
+    if experiment is None:
+        return {
+            "status": "empty",
+            "tracking_uri": MLFLOW_TRACKING_URI,
+            "detail": f"no experiment named {EXPERIMENT_NAME!r} in this store",
+            "runs": [],
+        }
+    try:
+        runs = list_recent_runs(n=n)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "unreachable",
+            "tracking_uri": MLFLOW_TRACKING_URI,
+            "detail": f"{type(exc).__name__}: {exc}",
+            "runs": [],
+        }
+    return {
+        "status": "ok" if runs else "empty",
+        "tracking_uri": MLFLOW_TRACKING_URI,
+        "detail": None if runs else "the experiment exists and has no runs",
+        "runs": runs,
+    }
 
 
 def list_recent_runs(n: int = 20) -> list:

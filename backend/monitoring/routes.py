@@ -25,7 +25,7 @@ from backend.auth.rbac import require_role, ADMIN_ROLES
 from backend.database import get_db
 from backend.monitoring.drift import get_monitor, drift_unavailable_reason
 from backend.monitoring.metrics import get_metrics_response
-from backend.monitoring.mlflow_tracker import list_recent_runs, log_model_info
+from backend.monitoring.mlflow_tracker import log_model_info, tracking_state
 
 router = APIRouter()
 
@@ -209,8 +209,18 @@ async def mlflow_runs(
     n: int = Query(20, ge=1, le=100),
     _: object = Depends(require_role(*ADMIN_ROLES)),
 ) -> Dict[str, Any]:
-    runs = list_recent_runs(n=n)
-    return {"experiment": "OmniDiag", "count": len(runs), "runs": runs}
+    # `status` distinguishes "not installed" / "store unreachable" / "working but
+    # empty" / "working", which `count: 0` alone never did -- and that ambiguity
+    # is why an empty experiment went unexplained (Gate 8.6).
+    state = tracking_state(n=n)
+    return {
+        "experiment": "OmniDiag",
+        "status": state["status"],
+        "tracking_uri": state["tracking_uri"],
+        "detail": state["detail"],
+        "count": len(state["runs"]),
+        "runs": state["runs"],
+    }
 
 
 # ── POST /admin/mlflow/register-model ─────────────────────────────────────────

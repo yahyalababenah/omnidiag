@@ -50,9 +50,33 @@ The full research record — every decision, its alternatives, and the measureme
 >   tracking are implemented in this repository but are **not live**. Evidently
 >   is installed in the image yet unusable — the code targets its 0.4 API and
 >   the pin resolves to 0.7, which removed it; the cost of each way out is
->   costed in [docs/EVIDENTLY_COST.md](docs/EVIDENTLY_COST.md). MLflow creates
->   an empty database and logs no runs. Do not present either as a working
->   feature.
+>   costed in [docs/EVIDENTLY_COST.md](docs/EVIDENTLY_COST.md).
+>
+>   **MLflow, corrected 2026-09-26 (Gate 8.6).** It logged no runs because
+>   *nothing wrote to it*: the only automatic caller was the retrain path, which
+>   fails for heart and is a no-op for diabetes, and the script that builds the
+>   shipped heart artifact logged nothing at all. Worse, the admin endpoint
+>   reported `count: 0` whether the package was missing, the store was
+>   unreachable, or the store was working and empty — so "MLflow is empty" could
+>   not be told apart from "MLflow is not installed".
+>
+>   Both are fixed. `GET /admin/mlflow/runs` now returns a `status` of
+>   `unavailable` / `unreachable` / `empty` / `ok` with the `tracking_uri` and a
+>   reason, and [`scripts/train_heart_glm.py`](scripts/train_heart_glm.py) logs
+>   one run per image build recording the artifact's provenance — the training
+>   CSV's sha256, the bundle's sha256, the reproducibility fingerprint, the
+>   conformal alpha, and the blank-input impact — and **deliberately no accuracy
+>   figure**, because every performance number for this model is cross-fitted or
+>   leave-one-hospital-out and belongs with its confidence interval, not beside
+>   an artifact hash.
+>
+>   **What this still is not:** a tracking *server*. With no `MLFLOW_TRACKING_URI`
+>   set, the store is a SQLite file baked into the image at build time, so it
+>   holds exactly one run — the model in that image — and a new build replaces
+>   it. There is no experiment comparison, and the retrain cycle that would
+>   produce one is still broken (see the Known limitation below). `docker-compose`
+>   and the k8s manifest do point at a real MLflow server, and the same code logs
+>   there when one is reachable.
 > - **Clinical notes: regex, English only.** The BioBERT path exists in the
 >   code but is never called — the frontend always sends `use_bert: false` and
 >   `transformers` is not part of the deployed dependency set. Arabic is not
@@ -183,7 +207,7 @@ Rate limiting is applied via [`SlowAPI`](backend/rate_limit.py:49) with per-rout
 
 The active learning pipeline consists of three components. [`sampler.py`](backend/active_learning/sampler.py:26) computes binary entropy **around the module's own decision threshold**, not around 0.5: the probability is first mapped by [`centre_on_threshold()`](backend/active_learning/sampler.py) — the prior-shift map with the threshold `t` sent to 0.5, strictly increasing and the identity when `t = 0.5` — and then `H(q) = -q·log₂(q) - (1-q)·log₂(1-q)` is taken. A prediction with `H ≥ 0.88` ([`_DEFAULT_ENTROPY_THRESHOLD`](backend/active_learning/sampler.py)) is queued via [`should_queue_for_review(probability_corrected, decision_threshold)`](backend/active_learning/sampler.py). For diabetes (`t = 0.108184` on the prevalence-corrected scale) that is ≈5–22 %. **Heart no longer takes this path at all:** its module reports a decision rather than a probability against a cut-point, so a row is queued when the model itself answers `uncertain` — `decision == 'uncertain'`, not an entropy score. Routing it through the threshold rule was wrong in both directions and measurably so: with the 0.5 default it left a patient the model had called UNCERTAIN at p = 0.95 unqueued while queueing a confidently decided one at p = 0.52. A queued heart row records `decision_threshold = NULL`, because writing 0.5 there would make the audit trail claim a threshold the model does not have. The distinction matters: a 0.5-centred sampler on the corrected diabetes scale queued 4,789 of 14,139 test rows, every one a confident Positive at ≥ 5× the threshold, and **0 of the 849** rows within ±20 % of the threshold; the threshold-centred sampler queues 3,566 rows including **all 849**. Each queued row records `uncertainty_scale` and `decision_threshold` beside `uncertainty_score`, so scores from different releases are never compared blindly. [`uncertainty_band()`](backend/active_learning/sampler.py) maps the same centred value to `CERTAIN` / `CONFIDENT` / `BORDERLINE` / `UNCERTAIN`. The [`routes.py`](backend/active_learning/routes.py) module exposes `GET /api/v4/review/queue` (paginated, filterable by disease), `POST /api/v4/review/{id}/annotate` (writes `label` and transitions `status → reviewed`), `POST /api/v4/review/{id}/skip`, and `GET /api/v4/review/stats`.
 
-[`run_retrain_pipeline()`](backend/active_learning/retrain.py:149) is the full async pipeline. [`get_annotated_samples()`](backend/active_learning/retrain.py:38) issues a raw SQL JOIN of `review_queue` and `predictions` filtered to `status='reviewed'` and `label IS NOT NULL`. [`retrain_xgb()`](backend/active_learning/retrain.py:84) loads the current `.pkl`, constructs an `xgb.DMatrix`, and calls `xgb.train()` with `xgb_model=model` for 20 incremental boost rounds at lr=0.05 — the existing tree structure is preserved and extended. The old model is renamed to a timestamped `.bak.pkl` before the new weights are written. On success, [`ModelLoader.invalidate()`](backend/model_loader.py) / [`EnsembleModelLoader.invalidate()`](backend/ensemble_loader.py) clears the live router's cached model object so the very next prediction lazy-reloads the new weights from disk — **no process restart required**. This hot-reload path was verified end-to-end (swap in a differently-shaped model file → confirm the next request immediately errors with a feature-mismatch specific to the *new* file, proving it was actually loaded). [`_log_to_mlflow()`](backend/active_learning/retrain.py:137) records the retrain run unconditionally, with a warning-only failure path if MLflow is unreachable.
+[`run_retrain_pipeline()`](backend/active_learning/retrain.py:149) is the full async pipeline. [`get_annotated_samples()`](backend/active_learning/retrain.py:38) issues a raw SQL JOIN of `review_queue` and `predictions` filtered to `status='reviewed'` and `label IS NOT NULL`. [`retrain_xgb()`](backend/active_learning/retrain.py:84) loads the current `.pkl`, constructs an `xgb.DMatrix`, and calls `xgb.train()` with `xgb_model=model` for 20 incremental boost rounds at lr=0.05 — the existing tree structure is preserved and extended. The old model is renamed to a timestamped `.bak.pkl` before the new weights are written. On success, [`ModelLoader.invalidate()`](backend/model_loader.py) / [`EnsembleModelLoader.invalidate()`](backend/ensemble_loader.py) clears the live router's cached model object so the very next prediction lazy-reloads the new weights from disk — **no process restart required**. This hot-reload path was verified end-to-end (swap in a differently-shaped model file → confirm the next request immediately errors with a feature-mismatch specific to the *new* file, proving it was actually loaded). [`_log_to_mlflow()`](backend/active_learning/retrain.py:137) records the retrain run unconditionally, with a warning-only failure path if MLflow is unreachable — **but it is never reached in practice, because `retrain_xgb()` fails before it for both diseases** (see the Known limitation below). Until Gate 8.6 that made it the only automatic writer to an experiment that consequently stayed empty.
 
 🚧 **Known limitation:** `retrain_xgb()` builds its training matrix directly from the raw predict-time `input_features` (`X = np.array([list(feat.values()) for feat in features_list])`) and always reads/writes the single hardcoded path `models/{disease}/omni_diag_xgb_optimized.pkl`. For **heart_disease**, that filename no longer exists at all — the shipped artifact is `models/heart_disease/heart_l3_glm_stack.pkl`, a `dict` bundle holding a Spline-GLM Pipeline with its calibration and conformal state, not a bare `XGBClassifier` — so `retrain_xgb()` fails immediately at its own `if not model_path.exists()` check, before the un-encoded-categorical-strings issue it was originally written to describe is ever reached. It is also built at image build time from the training CSV and verified against a recorded fingerprint, so retraining it from annotated rows is a larger question than swapping a file. No real annotated-sample retrain cycle for heart_disease currently completes, for a different reason than previously documented. For **diabetes**, that same hardcoded path is **not** one of the three files `EnsembleModelLoader` actually loads (`xgb_model.pkl`, `lgb_model.pkl`, `rf_model.pkl`) — so even a numerically successful run retrains a file the live ensemble never reads, a silent no-op. The hot-reload mechanism described above is implemented and tested; connecting it to a disease-aware, correctly-shaped retrain step is the next piece of work here.
 
