@@ -1,0 +1,775 @@
+{
+ "disease": "diabetes",
+ "space": "raw BRFSS columns (no encoding inversion exists for this module)",
+ "source": {
+  "path": "data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv",
+  "sha256": "873128ba0264d66a8b09bb6158f21fd4bedc10459d1ed5ecad3b94167a9539b4",
+  "rows": 70692,
+  "note": "the 50/50 BALANCED sample \u2014 the only BRFSS file in this repository"
+ },
+ "reweighting": {
+  "applied": true,
+  "formula": "P_ref(x) = p * P(x | y=1) + (1 - p) * P(x | y=0)",
+  "prevalence_of_sample": 0.5,
+  "prevalence_of_reference": 0.237,
+  "prevalence_source": "configs/diabetes.yaml: prevalence_deploy",
+  "why": "a reference built on the 50/50 sample compares real people against a sample balanced by construction, so every feature correlated with diabetes reads as drifted",
+  "declared_limit": "0.237 is Jordan's diabetes prevalence, which is what this model deploys against. It is NOT BRFSS 2015's own prevalence (~14%). The unbalanced BRFSS file is not in this repository and no new data was downloaded for this.",
+  "unchanged": "the diabetes model, its threshold (0.108184) and its prevalence correction are untouched; this is a monitoring reference only"
+ },
+ "monitored": {
+  "BMI": {
+   "kind": "numeric",
+   "edges": [
+    null,
+    22.0,
+    24.0,
+    26.0,
+    27.0,
+    29.0,
+    30.0,
+    32.0,
+    35.0,
+    39.0,
+    null
+   ],
+   "counts": [
+    5985,
+    7611,
+    9782,
+    5486,
+    11380,
+    4091,
+    7691,
+    7894,
+    5500,
+    5272,
+    0
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "ecdf": {
+    "values": [
+     12.0,
+     13.0,
+     14.0,
+     15.0,
+     16.0,
+     17.0,
+     18.0,
+     19.0,
+     20.0,
+     21.0,
+     22.0,
+     23.0,
+     24.0,
+     25.0,
+     26.0,
+     27.0,
+     28.0,
+     29.0,
+     30.0,
+     31.0,
+     32.0,
+     33.0,
+     34.0,
+     35.0,
+     36.0,
+     37.0,
+     38.0,
+     39.0,
+     40.0,
+     41.0,
+     42.0,
+     43.0,
+     44.0,
+     45.0,
+     46.0,
+     47.0,
+     48.0,
+     49.0,
+     50.0,
+     51.0,
+     52.0,
+     53.0,
+     54.0,
+     55.0,
+     56.0,
+     57.0,
+     58.0,
+     59.0,
+     60.0,
+     61.0,
+     62.0,
+     63.0,
+     64.0,
+     65.0,
+     66.0,
+     67.0,
+     68.0,
+     69.0,
+     70.0,
+     71.0,
+     72.0,
+     73.0,
+     74.0,
+     75.0,
+     76.0,
+     77.0,
+     79.0,
+     81.0,
+     82.0,
+     84.0,
+     86.0,
+     87.0,
+     89.0,
+     92.0,
+     95.0,
+     98.0
+    ],
+    "counts": [
+     2,
+     10,
+     8,
+     33,
+     86,
+     209,
+     471,
+     912,
+     1663,
+     2591,
+     3512,
+     4098,
+     5157,
+     4625,
+     5486,
+     6755,
+     4626,
+     4091,
+     4186,
+     3505,
+     3082,
+     2675,
+     2138,
+     1696,
+     1433,
+     1276,
+     1095,
+     915,
+     719,
+     525,
+     508,
+     477,
+     332,
+     252,
+     254,
+     186,
+     171,
+     123,
+     142,
+     83,
+     79,
+     77,
+     37,
+     52,
+     31,
+     30,
+     30,
+     15,
+     18,
+     16,
+     11,
+     12,
+     5,
+     6,
+     4,
+     6,
+     4,
+     3,
+     2,
+     9,
+     6,
+     15,
+     1,
+     7,
+     3,
+     20,
+     22,
+     6,
+     10,
+     15,
+     2,
+     10,
+     3,
+     9,
+     5,
+     3
+    ]
+   },
+   "note": "counts and ecdf both reweighted to prevalence_deploy; last bin is missing"
+  },
+  "MentHlth": {
+   "kind": "numeric",
+   "edges": [
+    null,
+    1.0,
+    5.0,
+    15.0,
+    null
+   ],
+   "counts": [
+    48767,
+    8687,
+    6171,
+    7067,
+    0
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "ecdf": {
+    "values": [
+     0.0,
+     1.0,
+     2.0,
+     3.0,
+     4.0,
+     5.0,
+     6.0,
+     7.0,
+     8.0,
+     9.0,
+     10.0,
+     11.0,
+     12.0,
+     13.0,
+     14.0,
+     15.0,
+     16.0,
+     17.0,
+     18.0,
+     19.0,
+     20.0,
+     21.0,
+     22.0,
+     23.0,
+     24.0,
+     25.0,
+     26.0,
+     27.0,
+     28.0,
+     29.0,
+     30.0
+    ],
+    "counts": [
+     48767,
+     2276,
+     3399,
+     2030,
+     983,
+     2557,
+     267,
+     833,
+     186,
+     29,
+     1817,
+     9,
+     128,
+     15,
+     330,
+     1620,
+     28,
+     16,
+     43,
+     7,
+     1019,
+     78,
+     22,
+     11,
+     9,
+     361,
+     19,
+     13,
+     91,
+     49,
+     3680
+    ]
+   },
+   "note": "counts and ecdf both reweighted to prevalence_deploy; last bin is missing"
+  },
+  "PhysHlth": {
+   "kind": "numeric",
+   "edges": [
+    null,
+    1.0,
+    4.0,
+    10.0,
+    null
+   ],
+   "counts": [
+    43300,
+    9594,
+    5401,
+    12397,
+    0
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "ecdf": {
+    "values": [
+     0.0,
+     1.0,
+     2.0,
+     3.0,
+     4.0,
+     5.0,
+     6.0,
+     7.0,
+     8.0,
+     9.0,
+     10.0,
+     11.0,
+     12.0,
+     13.0,
+     14.0,
+     15.0,
+     16.0,
+     17.0,
+     18.0,
+     19.0,
+     20.0,
+     21.0,
+     22.0,
+     23.0,
+     24.0,
+     25.0,
+     26.0,
+     27.0,
+     28.0,
+     29.0,
+     30.0
+    ],
+    "counts": [
+     43300,
+     3104,
+     4126,
+     2364,
+     1297,
+     2176,
+     385,
+     1242,
+     254,
+     46,
+     1664,
+     21,
+     177,
+     23,
+     726,
+     1557,
+     41,
+     25,
+     39,
+     12,
+     1007,
+     203,
+     23,
+     24,
+     21,
+     436,
+     17,
+     30,
+     172,
+     67,
+     6113
+    ]
+   },
+   "note": "counts and ecdf both reweighted to prevalence_deploy; last bin is missing"
+  },
+  "GenHlth": {
+   "kind": "numeric",
+   "edges": [
+    null,
+    2.0,
+    3.0,
+    4.0,
+    null
+   ],
+   "counts": [
+    11439,
+    23612,
+    21593,
+    14048,
+    0
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "ecdf": {
+    "values": [
+     1.0,
+     2.0,
+     3.0,
+     4.0,
+     5.0
+    ],
+    "counts": [
+     11439,
+     23612,
+     21593,
+     10001,
+     4047
+    ]
+   },
+   "note": "counts and ecdf both reweighted to prevalence_deploy; last bin is missing"
+  },
+  "Age": {
+   "kind": "numeric",
+   "edges": [
+    null,
+    4.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0,
+    10.0,
+    11.0,
+    12.0,
+    null
+   ],
+   "counts": [
+    6191,
+    7869,
+    5260,
+    7238,
+    8644,
+    9400,
+    9667,
+    6867,
+    9556,
+    0
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "ecdf": {
+    "values": [
+     1.0,
+     2.0,
+     3.0,
+     4.0,
+     5.0,
+     6.0,
+     7.0,
+     8.0,
+     9.0,
+     10.0,
+     11.0,
+     12.0,
+     13.0
+    ],
+    "counts": [
+     1412,
+     1983,
+     2796,
+     3604,
+     4266,
+     5260,
+     7238,
+     8644,
+     9400,
+     9667,
+     6867,
+     4651,
+     4904
+    ]
+   },
+   "note": "counts and ecdf both reweighted to prevalence_deploy; last bin is missing"
+  },
+  "Education": {
+   "kind": "numeric",
+   "edges": [
+    null,
+    4.0,
+    5.0,
+    null
+   ],
+   "counts": [
+    4179,
+    18074,
+    48439,
+    0
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "ecdf": {
+    "values": [
+     1.0,
+     2.0,
+     3.0,
+     4.0,
+     5.0,
+     6.0
+    ],
+    "counts": [
+     65,
+     1269,
+     2845,
+     18074,
+     19673,
+     28766
+    ]
+   },
+   "note": "counts and ecdf both reweighted to prevalence_deploy; last bin is missing"
+  },
+  "Income": {
+   "kind": "numeric",
+   "edges": [
+    null,
+    2.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    null
+   ],
+   "counts": [
+    3004,
+    8344,
+    5895,
+    7485,
+    10132,
+    35832,
+    0
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "ecdf": {
+    "values": [
+     1.0,
+     2.0,
+     3.0,
+     4.0,
+     5.0,
+     6.0,
+     7.0,
+     8.0
+    ],
+    "counts": [
+     3003,
+     3618,
+     4726,
+     5895,
+     7485,
+     10132,
+     11896,
+     23937
+    ]
+   },
+   "note": "counts and ecdf both reweighted to prevalence_deploy; last bin is missing"
+  },
+  "HighBP": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    37896,
+    32796
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "HighChol": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    38899,
+    31793
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "CholCheck": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    2415,
+    68277
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "Smoker": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    38691,
+    32001
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "Stroke": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    67423,
+    3269
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "HeartDiseaseorAttack": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    63034,
+    7658
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "PhysActivity": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    18297,
+    52395
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "Fruits": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    26463,
+    44229
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "Veggies": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    13729,
+    56963
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "HvyAlcoholConsump": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    66959,
+    3733
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "AnyHealthcare": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    3363,
+    67329
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "NoDocbcCost": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    64497,
+    6195
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "DiffWalk": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    57232,
+    13460
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  },
+  "Sex": {
+   "kind": "categorical",
+   "categories": [
+    "0.0",
+    "1.0"
+   ],
+   "counts": [
+    39209,
+    31483
+   ],
+   "n": 70692,
+   "n_missing": 0,
+   "note": "counts reweighted to prevalence_deploy"
+  }
+ },
+ "profiled_but_not_monitored": {},
+ "not_monitored_reason": "",
+ "rule": {
+  "alpha": 0.05,
+  "psi_minor": 0.1,
+  "psi_major": 0.2,
+  "min_current_rows": 50,
+  "flag": "Holm-corrected p < alpha AND PSI >= psi_major",
+  "not_measured": "output/label drift \u2014 no follow-up catheterisation result exists for any patient in this system"
+ },
+ "built_at": "2026-09-26T23:26:44+00:00"
+}

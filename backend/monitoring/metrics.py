@@ -75,7 +75,11 @@ if _prometheus_available:
 
     DRIFT_SHARE = Gauge(
         "omnidiag_drift_share",
-        "Fraction of features with detected drift (from last Evidently run)",
+        # Gate 8.7c: not Evidently, and NaN when the last run could not judge --
+        # too few rows, an unencodable window, a missing reference. A zero here
+        # would read as "measured, nothing drifted".
+        "Fraction of monitored features flagged as drifted by the last run "
+        "(KS/chi-square + PSI); NaN when the run could not judge",
         ["disease"],
     )
 

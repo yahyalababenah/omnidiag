@@ -58,6 +58,13 @@ RUN mkdir -p models/heart_disease models/diabetes/preprocessors && \
 # previous XGBoost model is two lines in configs/heart_disease.yaml.
 RUN python scripts/train_heart_glm.py --verify
 
+# Rebuild the drift reference profiles and compare them against the committed
+# ones. The heart profile is derived from the same training CSV as the model
+# above and records its sha256, so a training file that changed without the
+# profile being rebuilt fails the build here rather than showing up later as
+# drift that came from nowhere.
+RUN python scripts/build_drift_reference.py --verify
+
 # Create non-root user for security
 RUN useradd -m -u 1000 omnidiag && chown -R omnidiag:omnidiag /app
 USER omnidiag

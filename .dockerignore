@@ -34,6 +34,12 @@ reports/figures
 # so its training data and build script must reach the build context.
 !data/heart_disease/processed/uci_heart_by_site.csv
 !scripts/train_heart_glm.py
+
+# Gate 8.7c: the drift reference profiles are rebuilt and verified at build time
+# too (Dockerfile, after the model build), and `scripts` above excludes the
+# whole directory. Measured with a probe build: without this line
+# build_drift_reference.py is absent from the image and that RUN step fails.
+!scripts/build_drift_reference.py
 experiment_files
 
 # Gate 8.6-b: README illustrations. `*.png` and `*.md` above match ROOT-level
