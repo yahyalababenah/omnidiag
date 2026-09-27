@@ -43,9 +43,13 @@ class HeartDiseaseInput(BaseModel):
     pre-encoded integers. The ModelLoader applies label encoding internally.
     """
     # Required: no legitimate way to triage a patient without these, and
-    # ChestPainType/ExerciseAngina rank #1/#3 in the shipped model's SHAP
-    # importance (evaluation_evidence/heart/shap_importance.json) -- missing
-    # values for those are rejected outright, not silently imputed.
+    # ChestPainType is the shipped model's strongest feature by a wide margin
+    # (mean |phi| 0.93 against 0.35 for the next one) -- a missing value there
+    # is rejected outright, not silently imputed. Measured on the artifact that
+    # ships, in evaluation_evidence/heart/heart_l3_glm_importance.json. The
+    # ranking this comment used to cite (shap_importance.json) belongs to a
+    # model that was never deployed and counts ExerciseAngina, which the
+    # shipped model does not read at all (F0-1, Gate 8.2).
     Age: int = Field(..., description="Age in years", ge=20, le=100)
     Sex: Literal['M', 'F'] = Field(..., description="Sex: 'M' or 'F' (or encoded 0/1)")
     ChestPainType: Literal['TA', 'ATA', 'NAP', 'ASY'] = Field(..., description="Chest pain type: 'TA', 'ATA', 'NAP', or 'ASY' (or encoded 0-3)")
@@ -187,8 +191,13 @@ class PredictResponse(BaseModel):
 
     Two shapes share this model:
 
-    * heart_disease returns only prediction / confidence / diagnosis, on the
-      model's own scale with an argmax 0.5 cut-point.
+    * heart_disease returns a CONFORMAL DECISION, not a probability against a
+      cut-point: `decision` is referral / no_referral / uncertain, and
+      `decision_is_referral` is true for the first and the last. It carries no
+      inference_threshold and no risk_bands, and that absence is deliberate
+      (D-32) -- a consumer must not substitute 0.5 or 0.7/0.4 for it.
+      `confidence` is Venn-Abers calibrated to the TRAINING hospitals' mix,
+      bracketed by probability_lower / probability_upper.
     * diabetes additionally returns the prevalence-correction audit fields.
       Its `confidence` is on the DEPLOYMENT prior and must be compared with
       `inference_threshold` (same scale), never with 0.5.
@@ -214,7 +223,48 @@ class PredictResponse(BaseModel):
         ge=0.0,
         le=1.0,
     )
-    diagnosis: str = Field(..., description="'Positive' or 'Negative'")
+    diagnosis: str = Field(..., description="'Positive', 'Negative', or an uncertain-referral label")
+
+    # ── The decision, for modules that make one instead of thresholding ──────
+    # Gate 8.4. Sent as data so no consumer has to pattern-match `diagnosis`
+    # or infer behaviour from the disease name.
+    decision: Optional[str] = Field(
+        None, description="'referral' | 'no_referral' | 'uncertain' (conformal modules)"
+    )
+    conformal_set: Optional[List[int]] = Field(
+        None, description="The conformal label set: [1], [0], [0,1] or [] (empty = atypical for both)"
+    )
+    decision_is_referral: Optional[bool] = Field(
+        None,
+        description=(
+            "True when this patient goes forward for evaluation. TRUE FOR "
+            "'uncertain' as well as 'referral' -- counting only the confident "
+            "referrals is the silent sensitivity drop this model family exists "
+            "to avoid. Stated here so every consumer reads it instead of "
+            "re-deriving it."
+        ),
+    )
+    probability_lower: Optional[float] = Field(
+        None, description="Lower end of the Venn-Abers interval around confidence", ge=0.0, le=1.0
+    )
+    probability_upper: Optional[float] = Field(
+        None, description="Upper end of the Venn-Abers interval around confidence", ge=0.0, le=1.0
+    )
+    output_type: Optional[str] = Field(
+        None,
+        description=(
+            "How this module decides: 'conformal_decision' means there is no "
+            "threshold to compare against. Consumers branch on this, never on "
+            "the disease name."
+        ),
+    )
+    probability_scale: Optional[str] = Field(
+        None,
+        description=(
+            "What the probability is calibrated to, e.g. "
+            "'ivap_calibrated_training_mix' -- NOT a deployment prevalence."
+        ),
+    )
 
     probability_raw: Optional[float] = Field(
         None, description="Ensemble output on the training prior (50/50 resample)", ge=0.0, le=1.0

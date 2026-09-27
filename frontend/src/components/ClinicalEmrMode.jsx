@@ -35,7 +35,7 @@ import ClinicalNotesInput from './ClinicalNotesInput';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
 import { getDisplayThreshold } from '../constants/thresholds';
-import { SCREENING_LABEL, SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening';
+import { SCREENING_LABEL, screeningText } from '../utils/screening';
 import {
   FAVOURABLE_BINARY,
   NEUTRAL_FIELDS,
@@ -301,6 +301,7 @@ export default function ClinicalEmrMode() {
             gender: selectedPatient?.gender ?? selectedPatient?.sex ?? '—',
           }}
           disease={selectedDisease}
+          scopeNote={currentDiseaseInfo?.scope_note ?? null}
           result={result}
           shapText={shapData?.text_explanation}
           counterfactuals={counterfactualsData}
@@ -679,14 +680,28 @@ export default function ClinicalEmrMode() {
                           <p className="text-[11px] uppercase tracking-wide text-gray-500">
                             {SCREENING_LABEL} — {diseaseLabel}
                           </p>
-                          <p className="text-lg font-bold" style={{ color: isPositive ? '#dc2626' : '#16a34a' }}>
-                            {isPositive ? SCREENING_ELEVATED : SCREENING_BELOW}
+                          {/* Amber and its own sentence for `uncertain`: the
+                              binary pair called a patient the model could not
+                              place "elevated risk", in the clinician-facing
+                              panel (Gate 8.9). */}
+                          <p
+                            className="text-lg font-bold"
+                            style={{ color: result.decision === 'uncertain' ? '#d97706' : isPositive ? '#dc2626' : '#16a34a' }}
+                          >
+                            {screeningText(result)}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {isPositive
-                              ? 'AI analysis indicates elevated risk. Clinical correlation recommended.'
-                              : 'AI analysis indicates low risk. Continue routine monitoring.'}
+                            {result.decision === 'uncertain'
+                              ? 'The model could not place this patient confidently in either group. Refer for further evaluation.'
+                              : isPositive
+                                ? 'AI analysis indicates elevated risk. Clinical correlation recommended.'
+                                : 'AI analysis indicates low risk. Continue routine monitoring.'}
                           </p>
+                          {currentDiseaseInfo?.scope_note && (
+                            <p className="text-[11px] leading-snug text-gray-500 mt-1.5 border-l-2 border-gray-200 pl-2">
+                              {currentDiseaseInfo.scope_note}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -694,13 +709,26 @@ export default function ClinicalEmrMode() {
                           {confidencePct}%
                         </span>
                         <p className="text-xs text-gray-500 mt-1">
-                          Risk Probability{thresholdPct != null ? ` (threshold: ${thresholdPct}%)` : ''}
+                          Risk Probability{thresholdPct != null
+                        ? ` (threshold: ${thresholdPct}%)`
+                        : result.probability_lower != null && result.probability_upper != null
+                          ? ` (${(result.probability_lower * 100).toFixed(1)}%–${(result.probability_upper * 100).toFixed(1)}%)`
+                          : ''}
                         </p>
                       </div>
                     </div>
 
                     {/* Probability vs. threshold bar */}
-                    <ThresholdBar probability={result.confidence} threshold={displayThreshold} />
+                    <ThresholdBar
+                      probability={result.confidence}
+                      threshold={displayThreshold}
+                      decision={result.decision ?? null}
+                      interval={
+                        result.probability_lower != null && result.probability_upper != null
+                          ? { lower: result.probability_lower, upper: result.probability_upper }
+                          : null
+                      }
+                    />
 
                     {/* Key metrics row */}
                     <div className="grid grid-cols-3 gap-4">
@@ -786,6 +814,7 @@ export default function ClinicalEmrMode() {
                       error={counterfactualsError}
                       message={counterfactualsMessage}
                       prediction={result?.prediction}
+                      result={result}
                       patientData={selectedPatient?.data ?? null}
                     />
                   </div>

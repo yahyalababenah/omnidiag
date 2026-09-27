@@ -13,7 +13,7 @@ import { useDisease } from '../context/DiseaseContext';
 import DynamicClinicalForm from './DynamicClinicalForm';
 import ShapBarChart from './ShapBarChart';
 import WhatIfScenarioCard from './WhatIfScenarioCard';
-import { SCREENING_LABEL, SCREENING_ELEVATED, SCREENING_BELOW, isElevated } from '../utils/screening';
+import { SCREENING_LABEL, isElevated, screeningText } from '../utils/screening';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
 import { getDisplayThreshold } from '../constants/thresholds';
@@ -194,29 +194,69 @@ export default function EngineeringMode() {
                 const thresholdPct = displayThreshold != null ? (displayThreshold * 100).toFixed(1) : null;
                 return (
                 <div className="space-y-4">
+                  {/* What this number applies to, beside the number itself. The
+                      text is the module's own (`scope_note` in its YAML), so a
+                      clinical statement is not compiled into a component, and a
+                      module that declares none shows nothing (Gate 8.9). */}
+                  {currentDiseaseInfo?.scope_note && (
+                    <p className="text-[11px] leading-snug text-gray-500 dark:text-slate-400 border-l-2 border-gray-200 dark:border-slate-700 pl-2">
+                      {currentDiseaseInfo.scope_note}
+                    </p>
+                  )}
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-gray-600 shrink-0">{SCREENING_LABEL}</span>
-                    <span className={isElevated(result) ? 'badge-positive' : 'badge-negative'}>
+                    {/* Amber for `uncertain`: it is a third answer, not a
+                        milder version of elevated. Red/green alone would tell a
+                        clinician the model had decided when it had not. */}
+                    <span className={
+                      result.decision === 'uncertain'
+                        ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700'
+                        : isElevated(result) ? 'badge-positive' : 'badge-negative'
+                    }>
                       {isElevated(result) ? (
-                        <><AlertCircle className="w-3.5 h-3.5" /> {SCREENING_ELEVATED}</>
+                        <><AlertCircle className="w-3.5 h-3.5" /> {screeningText(result)}</>
                       ) : (
-                        <><CheckCircle2 className="w-3.5 h-3.5" /> {SCREENING_BELOW}</>
+                        <><CheckCircle2 className="w-3.5 h-3.5" /> {screeningText(result)}</>
                       )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">
-                      Risk Probability{thresholdPct != null ? ` (threshold: ${thresholdPct}%)` : ''}
+                      Risk Probability{thresholdPct != null
+                        ? ` (threshold: ${thresholdPct}%)`
+                        : result.probability_lower != null && result.probability_upper != null
+                          ? ` (${(result.probability_lower * 100).toFixed(1)}%–${(result.probability_upper * 100).toFixed(1)}%)`
+                          : ''}
                     </span>
                     <span className="text-sm font-mono font-semibold">
                       {(result.confidence * 100).toFixed(2)}%
                     </span>
                   </div>
-                  <ThresholdBar probability={result.confidence} threshold={displayThreshold} />
+                  <ThresholdBar
+                    probability={result.confidence}
+                    threshold={displayThreshold}
+                    decision={result.decision ?? null}
+                    interval={
+                      result.probability_lower != null && result.probability_upper != null
+                        ? { lower: result.probability_lower, upper: result.probability_upper }
+                        : null
+                    }
+                  />
+                  {/* "Prediction: Positive" underneath "Uncertain" reads as a
+                      contradiction, even though it is the correct Q4 answer:
+                      `prediction` is 1 for uncertain because an uncertain
+                      patient IS referred. For a module that reports a decision
+                      the row says what that 1 means instead. The API field is
+                      unchanged; this is display only, and it keys off
+                      output_type rather than the disease name. */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Prediction</span>
+                    <span className="text-sm text-gray-600">
+                      {result.output_type === 'conformal_decision' ? 'Outcome' : 'Prediction'}
+                    </span>
                     <span className="text-sm font-mono font-semibold">
-                      {result.prediction === 1 ? 'Positive' : 'Negative'}
+                      {result.output_type === 'conformal_decision'
+                        ? (result.decision_is_referral ? 'Referred' : 'Not referred')
+                        : result.prediction === 1 ? 'Positive' : 'Negative'}
                     </span>
                   </div>
 
@@ -271,6 +311,7 @@ export default function EngineeringMode() {
                     message={counterfactualsMessage}
                     loading={counterfactualsLoading}
                     prediction={result?.prediction}
+                    result={result}
                     patientData={lastFormData ?? null}
                   />
                 </div>

@@ -200,6 +200,13 @@ async def seed_demo_history(router, *, force: bool = False) -> int:
                         confidence=confidence,
                         probability_scale=scale_of_result(result).value,
                         diagnosis=result.get("diagnosis"),
+                        # The conformal decision and its interval, for a module
+                        # that reports them (Gate 8.4). Without these the demo's
+                        # own history was the only place in the system that still
+                        # stored a heart prediction with no decision attached.
+                        decision=result.get("decision"),
+                        probability_lower=result.get("probability_lower"),
+                        probability_upper=result.get("probability_upper"),
                         created_at=visit_date,
                     )
                     db.add(record)
@@ -212,18 +219,35 @@ async def seed_demo_history(router, *, force: bool = False) -> int:
                     # demonstrate the human-in-the-loop step with — the
                     # feature exists but cannot be shown. Only today's visit
                     # is considered; backdated ones are history, not work.
-                    decision_threshold = float(
-                        result.get("inference_threshold", DEFAULT_DECISION_THRESHOLD)
+                    #
+                    # "The same rule as /predict" has to be kept true, and until
+                    # Gate 8.8 it was not: this branch read
+                    # `inference_threshold` with a 0.5 default, so every heart
+                    # row was judged by entropy around a threshold the model does
+                    # not have AND recorded 0.5 as the threshold it used. The demo
+                    # queue -- the one thing shown to demonstrate
+                    # human-in-the-loop -- was the last place still doing it.
+                    raw_threshold = result.get("inference_threshold")
+                    decision_threshold = (
+                        float(raw_threshold) if raw_threshold is not None else None
                     )
-                    if steps_back == 0 and should_queue_for_review(
-                        confidence, decision_threshold=decision_threshold
-                    ):
+                    if result.get("decision") is not None:
+                        is_uncertain = result.get("decision") == "uncertain"
+                        uncertainty_score = 1.0 if is_uncertain else 0.0
+                    else:
+                        is_uncertain = should_queue_for_review(
+                            confidence,
+                            decision_threshold=decision_threshold or DEFAULT_DECISION_THRESHOLD,
+                        )
+                        uncertainty_score = prediction_entropy(
+                            confidence,
+                            decision_threshold=decision_threshold or DEFAULT_DECISION_THRESHOLD,
+                        )
+                    if steps_back == 0 and is_uncertain:
                         db.add(ReviewQueue(
                             id=str(uuid.uuid4()),
                             prediction_id=record.id,
-                            uncertainty_score=prediction_entropy(
-                                confidence, decision_threshold=decision_threshold
-                            ),
+                            uncertainty_score=uncertainty_score,
                             uncertainty_scale=scale_of_result(result).value,
                             decision_threshold=decision_threshold,
                             created_at=visit_date,

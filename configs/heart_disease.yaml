@@ -1,110 +1,209 @@
 # =============================================================================
-# OmniDiag Configuration — Heart Disease (XGBoost)
+# OmniDiag Configuration — Heart Disease (Spline-GLM + Venn-Abers + conformal)
 # =============================================================================
-# This is the single source of truth for the Heart Disease diagnostic module.
-# To add a new disease, create a new YAML file in this directory following
-# the same structure, implement a feature engineer in features/, and the
-# dynamic router will pick it up automatically.
+# Single source of truth for the Coronary Artery Disease module.
+#
+# The model changed in Phase 8 from a tuned XGBoost Pipeline to a Spline-GLM on
+# seven pre-stress-test inputs, wrapped in a Venn-Abers calibrator and a
+# Mondrian conformal decision layer. The research behind every number below is
+# in the experiments repo (gate_0.md … gate_7.md, results.md); the decisions
+# are named inline so nothing here has to be taken on trust.
+#
+# Reverting to the previous XGBoost model is a two-line change: set
+# model.family back to sklearn_pipeline and model.weights_path back to
+# models/heart_disease/heart_full_tuned.pkl. Nothing in backend/ knows which
+# one is live.
 # =============================================================================
 
 disease:
   name: "heart_disease"
   display_name: "Coronary Artery Disease Risk"
-  description: "Non-invasive CAD risk triage using an XGBoost Pipeline (IterativeImputer + StandardScaler + OrdinalEncoder, no engineered biomarkers) with SHAP explainability — 11 raw clinical features, trained on 920 patients across 4 UCI sites"
+
+  # One line shown BESIDE EVERY RESULT, on screen and in the printed report.
+  # The long `description` above is read once in a selector tooltip; this is the
+  # sentence a clinician has in front of them while reading a number, and it is
+  # the sentence that keeps the number from being read as a general screen.
+  # Text, not code: a clinical statement belongs in the module's own config, not
+  # compiled into a React component (Gate 8.9).
+  scope_note: >-
+    Applies to patients already referred for catheterisation. Not a
+    general-population screen, and not a diagnosis.
+
+  description: >-
+    Ranks patients ALREADY REFERRED FOR CATHETERISATION by the probability of
+    a >50% stenosis. Not a general-population screen: every patient it learned
+    from had been selected for catheterisation by a clinician (UCI, 1982-1987).
+    Spline-GLM on 7 pre-stress-test inputs (D-25), calibrated with exact
+    inductive Venn-Abers, with a Mondrian conformal decision by sex x class at
+    alpha = 0.10 (D-33) that answers referral / no referral / uncertain.
+    Trained on 920 patients from 4 hospitals. Leave-one-hospital-out AUC 0.802
+    (random-effects, 95% CI 0.656-0.896); the 95% prediction interval for a
+    NEW hospital is 0.36-0.97 and the worst site measured is Long Beach at
+    0.697 — four hospitals cannot promise a fifth.
+    Declared limits (D-32): calibration does NOT transport between hospitals
+    (intercept -0.67 at Hungarian, +2.37 at Zurich), the conformal guarantee is
+    marginal over the training mix and broke per site in Gate 6 (diseased women
+    at Hungarian, 0.58), and no clinical net benefit over "refer everyone" was
+    measurable at Long Beach or Zurich.
+    Family choice is a DECLARED DEVIATION (D-30): the pre-registered selection
+    rule produced no candidate at all, because diseased coverage at Hungarian
+    was below 0.85 for all three finalists (0.834 for this one) — a property of
+    the hospitals, not of the model family.
+    Stress-test features may add 3-5 AUC points (D-25); four hospitals were not
+    enough to establish that, so they are not used and not required.
   target_column: "HeartDisease"
-  version: "6.0.0"
+  version: "7.0.0"
 
 # ---------------------------------------------------------------------------
-# Data paths — all relative to project root
+# Data — the training CSV is in the repository and is hashed at build time
 # ---------------------------------------------------------------------------
 data:
   raw_path: "data/heart_disease/raw/"
   processed_path: "data/heart_disease/processed/"
-  interim_path: "data/heart_disease/interim/"
-  raw_files:
-    - "heart.csv"
-    - "Z-Alizadeh sani dataset.xlsx"
-  merged_file: "merged_heart_data.csv"
-  final_clean_file: "final_ready_data.csv"
-  heuristic_file: "data_heuristic.csv"
-  clinical_file: "data_clinical.csv"
-  medical_file: "data_medical.csv"
+  training_file: "data/heart_disease/processed/uci_heart_by_site.csv"
+  # Checked by scripts/train_heart_glm.py before fitting. A mismatch fails the
+  # build rather than shipping a model trained on something else.
+  training_csv_sha256: "6a22655183f30e85b04258104d4adb81f4d34af0933a9c9b94b3a14d59402c5b"
+  external_validation_file: "data/heart_disease/processed/z_alizadeh_translated.csv"
 
 # ---------------------------------------------------------------------------
-# Feature configuration — descriptive only. All encoding/scaling/imputation
-# runs inside the Pipeline stored in the weights file itself
-# (models/heart_disease/heart_full_tuned.pkl → bundle["pipeline"]); backend/
-# model_loader.py applies no manual preprocessing and does no feature
-# engineering. These lists exist for reference and match
-# bundle["categorical"] / bundle["numeric"].
+# Features — descriptive. The bundle carries the authoritative lists.
 # ---------------------------------------------------------------------------
 features:
-  categorical_columns:
+  # Inputs the model reads (L3, D-25).
+  model_inputs:
+    - "Age"
     - "Sex"
     - "ChestPainType"
-    - "RestingECG"
-    - "ExerciseAngina"
-    - "ST_Slope"
-  numerical_columns:
-    - "Age"
     - "RestingBP"
     - "Cholesterol"
+    - "FastingBS"
+    - "RestingECG"
+  # Accepted by the API schema but NOT read by this model. Kept so a clinician
+  # can still record them and so reverting to the XGBoost model needs no
+  # schema change.
+  accepted_but_unused:
     - "MaxHR"
     - "Oldpeak"
-    - "FastingBS"
+    - "ExerciseAngina"
+    - "ST_Slope"
 
 # ---------------------------------------------------------------------------
-# Model configuration
+# Model
 # ---------------------------------------------------------------------------
 model:
-  family: "sklearn_pipeline"         # Dispatch key: backend class registered in backend/model_backends/
-  type: "xgboost"                    # Descriptive only (shown as model_type by /diseases)
-  explainer_type: "tree"             # SHAP explainer: tree (TreeExplainer) | deep (DeepExplainer)
-  counterfactuals: true              # Enable What-If scenario generation
-  weights_path: "models/heart_disease/heart_full_tuned.pkl"
-  fallback_weights_path: "models/heart_disease/heart_full_tuned.pkl"
-  # Full sklearn Pipeline bundle (dict: pipeline, features, threshold, ...) —
-  # imputation/scaling/ordinal-encoding run inside the Pipeline itself, so
-  # there is no separate preprocessors_path to load.
-  inference_threshold: 0.3695        # From the bundle itself; mirrored here for
-                                      # the /diseases metadata endpoint (router.py)
-  best_params:
-    n_estimators: 500
-    max_depth: 4
-    learning_rate: 0.028928994165742683
-    subsample: 0.8077672166682721
-    colsample_bytree: 0.44881626783908657
-    min_child_weight: 4
-    gamma: 3.2247939623734005
-    reg_alpha: 4.970097824015917e-07
-    reg_lambda: 0.05334501049618681
-    scale_pos_weight: 1.565386715651742
-    eval_metric: "logloss"
-    random_state: 42
+  family: "glm_ivap_conformal"       # backend/model_backends/heart_glm_conformal.py
+  type: "spline_glm"                 # descriptive only (shown as model_type by /diseases)
+  explainer_type: "linear"           # exact additive SHAP on the raw log-odds score
+  counterfactuals: true
+  # Built at image build time by scripts/train_heart_glm.py; never committed.
+  weights_path: "models/heart_disease/heart_l3_glm_stack.pkl"
+  fallback_weights_path: "models/heart_disease/heart_l3_glm_stack.pkl"
+
+  # The decision is a conformal SET, not a probability against a cut-point, so
+  # this module exposes NO inference_threshold. One threshold is precisely what
+  # produced the sex gap this model was built to close (HF-13: sensitivity 0.74
+  # for women against 0.94 for men).
+  # Largest batch this module accepts, and why, in the words the UI shows
+  # before uploading. Declared here rather than branched on the disease name
+  # in the frontend (Gate 8.4).
+  max_batch_rows: 500
+  max_batch_rows_reason: "server limit"
+  output_type: "conformal_decision"
+  conformal_alpha: 0.10
+  conformal_groups: ["Sex"]
+
+  # Venn-Abers output, calibrated on the TRAINING hospitals' mix — not on the
+  # hospital reading it (D-32). Any display must say so.
+  probability_scale: "ivap_calibrated_training_mix"
+
+  # Deliberately null: HIGH/MODERATE/LOW bands assume a probability whose
+  # meaning transports between hospitals, and Gate 6 measured that it does not.
+  # The conformal decision and the [p_lower, p_upper] interval replace them.
+  risk_bands: null
+
+  # ── Which blank inputs the clinician is warned about (Gate 8.3) ───────────
+  # The RULE lives here; the NUMBERS live in the bundle (`blank_impact`,
+  # measured at build time on the artifact itself); the LIST is derived from
+  # both and is written down nowhere. A hand-written list keeps describing the
+  # model it was typed for, which is how the importance file came to describe a
+  # model that was never deployed (F0-1) -- the same risk, one level up.
+  #
+  # Warn about a blank input when its absence changes at least this share of
+  # decisions. Measured on the shipped bundle over the patients who have each
+  # field recorded:
+  #     RestingBP    3.84% of decisions change   -> warned
+  #     Cholesterol  3.48%                       -> warned
+  #     FastingBS    2.77%                       -> warned
+  #     MaxHR, Oldpeak, ST_Slope  0.00% exactly  -> not warned (unread by L3)
+  # The gap between the lowest warned field and the highest unwarned one runs
+  # from 2.77% to 0%, so any threshold in that range gives the same list: the
+  # list does not hinge on this number, and that is measured, not asserted.
+  blank_warning_min_decision_share: 0.01
+
+  # The expected result of applying that rule, kept as a CROSS-CHECK, not as the
+  # source. A test fails if the derived list and this one disagree -- so a
+  # retrain that changes the facts is reported instead of silently contradicting
+  # the config.
+  high_impact_features:
+    - "RestingBP"
+    - "Cholesterol"
+    - "FastingBS"
+
+  # ── Chest-pain coding on the batch upload path (Gate 8.2) ────────────────
+  # The raw UCI file codes ChestPainType by anginal-feature COUNT, which is the
+  # inverse of the clinical meaning the API takes (HF-1). Uploading that file
+  # as-is flips 609 of its 920 decisions and drops 130 diseased patients out of
+  # referral (measured; results/p8_2_guard_size.json). Two declared guards:
+  #
+  #   1. A CSV carrying any of these columns is a raw research export, not a
+  #      clinician's upload, and is refused with an explanation. They exist in
+  #      the UCI file and in no API schema.
+  uci_raw_marker_columns: ["site", "HeartDisease", "num"]
+  #   2. Whoever uploads states the coding. The default is the clinical meaning,
+  #      which is what the UI already sends, so no existing behaviour changes.
+  chest_pain_coding_default: "clinical"
+  chest_pain_coding_allowed: ["clinical", "uci_raw"]
+  #
+  # Declared limit: a UCI file stripped of the marker columns and uploaded under
+  # the default coding CANNOT be detected. Neither guard catches that; only the
+  # uploader declaring the coding does.
 
 # ---------------------------------------------------------------------------
-# Training configuration
+# Training / validation — what was actually run
 # ---------------------------------------------------------------------------
 training:
   random_state: 42
-  optimization_direction: "maximize"
-  optimization_metric: "roc_auc"          # Optuna objective (see evaluation_evidence/heart/hpo_threshold_summary.json)
-  validation_scheme: "leave-one-site-out" # LOSO ROC-AUC 81.30% (nested); external Tehran cohort 72.17%
-  threshold_selection_rule: "cost = 2.0*FN + 1.0*FP on out-of-fold training predictions"
+  validation_scheme: "leave-one-site-out across 4 UCI hospitals (primary); nested LOSO for tuning"
+  headline_metric: >-
+    AUC 0.802 random-effects [0.656, 0.896]; prediction interval for a new
+    hospital [0.36, 0.97]; worst site Long Beach 0.697. No pooled or
+    random-split number is reported as a headline.
+  operating_point: >-
+    Mondrian conformal by (sex x class), alpha 0.10, cross-fitted on 5-fold
+    out-of-fold predictions stratified by site x sex x label. Held out:
+    sensitivity 0.91, specificity 0.53, 41% of patients returned as uncertain.
+  external_validation: >-
+    Z-Alizadeh Sani (Tehran, n=303, prevalence 71%) is a secondary, BURNT
+    cohort — it was measured repeatedly while the chest-pain coding was being
+    resolved, so no number from it selects anything.
 
 # ---------------------------------------------------------------------------
-# SHAP explainer configuration
+# SHAP
 # ---------------------------------------------------------------------------
 explainer:
   enabled: true
   type: "shap"
-  plots_output_dir: "reports/figures/"
-  summary_bar_plot: "shap_summary_bar.png"
-  beeswarm_plot: "shap_beeswarm.png"
-  waterfall_plot_prefix: "shap_waterfall_p"
+  scale: "log_odds_raw_score"
+  # The GLM is additive on the logit scale, so the attribution is exact rather
+  # than approximate. It explains the RAW score: Venn-Abers is monotone but not
+  # linear, so the calibrated probability has no additive decomposition.
+  note: >-
+    Regenerated from the shipped bundle at build time. The previous module's
+    SHAP evidence file described a model that was never deployed (F0-1).
 
 # ---------------------------------------------------------------------------
-# API configuration
+# API
 # ---------------------------------------------------------------------------
 api:
   endpoint_prefix: "/api/v4"

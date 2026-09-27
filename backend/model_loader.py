@@ -25,19 +25,27 @@ log = logging.getLogger("omnidiag.model_loader")
 # Project root: resolve relative paths from the config
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Static, not computed from SHAP at runtime -- taken by hand from
-# evaluation_evidence/heart/shap_importance.json on 2026-09-21 (mean |SHAP|,
-# heart_full_tuned.pkl): ChestPainType 0.969, Oldpeak 0.551, ExerciseAngina
-# 0.524, Sex 0.407, Cholesterol 0.404 -- the next feature (Age, 0.366) is a
-# clear step down. Of these five, only Oldpeak and Cholesterol are actually
-# Optional on HeartDiseaseInput (backend/schemas.py); ChestPainType,
-# ExerciseAngina and Sex stay required, so a missing value there is a 422,
-# never a warning. RestingECG/RestingBP/Age were deliberately left off this
-# list even though some are Optional -- they rank near the bottom of the same
-# file and warning on them would dilute the signal for the features that
-# actually matter. If the model is ever retrained, re-check this list by
-# hand against the new shap_importance.json -- it will not update itself.
-_HIGH_IMPACT_FEATURES = ["ChestPainType", "Oldpeak", "ExerciseAngina", "Sex", "Cholesterol"]
+# NOT LIVE FOR HEART, and derived from a superseded file. Read this before
+# touching the list (Gate 8.2):
+#
+#   * Heart is served by HeartGlmConformalBackend, which takes its warning list
+#     from the disease config's model.high_impact_features -- not from here.
+#     This ModelLoader is instantiated by no serving path (only scratch/).
+#   * The five features below were taken by hand from
+#     evaluation_evidence/heart/shap_importance.json, which describes a model
+#     that was never deployed (F0-1). Two of the five -- Oldpeak and
+#     ExerciseAngina -- are not read by the shipped heart model at all, so the
+#     ranking that produced this list does not describe anything that ships.
+#   * The earlier instruction here, "re-check this list by hand against the new
+#     shap_importance.json", is withdrawn: that file is superseded by
+#     evaluation_evidence/heart/heart_l3_glm_importance.json, which is generated
+#     from the shipped bundle by scripts/regen_heart_importance.py and checked
+#     against it by a test in the suite. Re-deriving from the old file would
+#     reproduce F0-1.
+#   * Whether the config's list is the right one is Gate 8.3's decision, on the
+#     measured ranking; it is deliberately not settled here.
+# Serves no disease. The live source is `high_impact_features` in the disease config.
+_LEGACY_HIGH_IMPACT_FEATURES_UNUSED = ["ChestPainType", "Oldpeak", "ExerciseAngina", "Sex", "Cholesterol"]
 
 
 def _completeness_warning(patient_data: Dict[str, Any]) -> Optional[str]:
@@ -50,7 +58,7 @@ def _completeness_warning(patient_data: Dict[str, Any]) -> Optional[str]:
     inputs, not the patient's actual value, and a clinician reading the
     prediction should know that. See WEAKNESS_REGISTER.md HM-5.
     """
-    missing = [f for f in _HIGH_IMPACT_FEATURES if patient_data.get(f) is None]
+    missing = [f for f in _LEGACY_HIGH_IMPACT_FEATURES_UNUSED if patient_data.get(f) is None]
     if not missing:
         return None
     plural = len(missing) > 1

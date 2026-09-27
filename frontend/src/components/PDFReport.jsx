@@ -23,7 +23,7 @@ import {
   Font,
 } from '@react-pdf/renderer'
 import { summariseWhatIf, SUBTITLE, SCENARIOS_TITLE } from '../utils/whatIfSummary'
-import { SCREENING_ELEVATED, SCREENING_BELOW } from '../utils/screening'
+import { screeningText } from '../utils/screening'
 
 // ── Colour palette (matches Tailwind clinical theme) ──────────────────────────
 const C = {
@@ -96,6 +96,7 @@ const styles = StyleSheet.create({
 
   // ── Risk probability bar ──────────────────────────────────────────────────
   confLabel: { fontSize: 7, color: C.muted, marginBottom: 3 },
+  scopeNote: { fontSize: 7, color: C.muted, marginBottom: 6, lineHeight: 1.4 },
   confBarBg: { height: 6, backgroundColor: C.border, borderRadius: 3, width: 160 },
   confBarFill: { height: 6, borderRadius: 3 },
 
@@ -183,6 +184,8 @@ export default function PDFReport({
   doctorNotes = null,
   patientData = null,
   shapImageUrl,
+  // The module's own scope sentence, from its config via GET /api/v4/diseases.
+  scopeNote = null,
   doctorName,
   clinicName,
   reportDate,
@@ -192,11 +195,17 @@ export default function PDFReport({
   // Same scale as `confidence` — both come from the /predict response.
   const threshold =
     typeof result?.inference_threshold === 'number' ? result.inference_threshold : null
-  const diagnosisLabel = isPositive ? SCREENING_ELEVATED : SCREENING_BELOW
-  const badgeStyle = isPositive
-    ? { ...styles.badge, backgroundColor: '#fee2e2', color: C.positive }
-    : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
-  const barColor = isPositive ? C.positive : C.negative
+  // The printed report carries the module's own three-way answer, so a PDF
+  // handed to a colleague cannot say "Elevated risk" about a patient the model
+  // reported as UNCERTAIN (Gate 8.8).
+  const diagnosisLabel = screeningText(result)
+  const isUncertain = result?.decision === 'uncertain'
+  const badgeStyle = isUncertain
+    ? { ...styles.badge, backgroundColor: '#fef3c7', color: '#b45309' }
+    : isPositive
+      ? { ...styles.badge, backgroundColor: '#fee2e2', color: C.positive }
+      : { ...styles.badge, backgroundColor: '#dcfce7', color: C.negative }
+  const barColor = isUncertain ? '#d97706' : isPositive ? C.positive : C.negative
 
   // Classified by the SAME module the on-screen card uses, so the printed
   // report cannot say something different from the screen it was exported
@@ -269,6 +278,9 @@ export default function PDFReport({
         {/* ── Screening Summary ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>AI Screening Summary</Text>
+          {/* The printed report outlives the screen and gets read without the
+              app around it, so the module's scope travels with it. */}
+          {scopeNote ? <Text style={styles.scopeNote}>{scopeNote}</Text> : null}
           <View style={styles.badgeRow}>
             <Text style={badgeStyle}>{diagnosisLabel}</Text>
             <View>

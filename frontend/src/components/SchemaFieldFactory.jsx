@@ -16,6 +16,29 @@
 import { useController } from 'react-hook-form';
 import MedicalTooltip from './MedicalTooltip';
 
+/**
+ * Marks an input the current model does not read.
+ *
+ * The API accepts eleven inputs for heart and the shipped model reads seven
+ * (L3, D-25); blanking any of the other four changes the answer by exactly
+ * nothing, which Gate 8.3 measured. The list comes from the server, which reads
+ * it off the artifact, so a retrain on a different feature set moves these
+ * labels with it instead of leaving a stale annotation behind.
+ */
+function UnusedByModelBadge({ meta }) {
+  if (!meta?.unusedByModel) return null;
+  return (
+    <span
+      className="ml-1.5 align-middle inline-flex items-center px-1.5 py-0.5 rounded
+                 text-[10px] font-medium bg-gray-100 text-gray-500
+                 dark:bg-slate-800 dark:text-slate-400"
+      title="Accepted for the record, but the current model does not read this input — changing it does not change the result."
+    >
+      not used by the current model
+    </span>
+  );
+}
+
 const SLIDER_CLASS = `flex-1 h-2 rounded-full appearance-none cursor-pointer
                      bg-gray-200 accent-blue-600
                      [&::-webkit-slider-thumb]:appearance-none
@@ -48,6 +71,7 @@ function ToggleField({ field, meta, error }) {
         className="text-xs font-medium text-gray-700 cursor-pointer select-none"
       >
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
+        <UnusedByModelBadge meta={meta} />
       </label>
       <button
         id={meta.name}
@@ -85,6 +109,7 @@ function SegmentedField({ field, meta, error }) {
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-2">
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
+        <UnusedByModelBadge meta={meta} />
       </label>
       <div className="flex rounded-lg border border-gray-300 overflow-hidden shadow-sm" role="radiogroup">
         <button
@@ -134,6 +159,7 @@ function SelectField({ field, meta, error }) {
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
+        <UnusedByModelBadge meta={meta} />
       </label>
       <select
         id={meta.name}
@@ -167,6 +193,7 @@ function SliderField({ field, meta, error }) {
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
         {' '}
         <ValueBadge value={val} />
+        <UnusedByModelBadge meta={meta} />
       </label>
       <div className="flex items-center gap-3">
         <span className="text-xs text-gray-400 w-6 text-right">{min}</span>
@@ -213,6 +240,7 @@ function NumberField({ field, meta, error }) {
             <ValueBadge value={typeof currentVal === 'number' ? currentVal.toFixed(meta.type === 'number' ? 1 : 0) : currentVal} />
           </>
         )}
+        <UnusedByModelBadge meta={meta} />
       </label>
       <div className="flex items-center gap-3">
         {showSlider && (
@@ -270,6 +298,7 @@ function TextField({ field, meta, error }) {
     <div>
       <label htmlFor={meta.name} className="block text-xs font-medium text-gray-600 mb-1">
         <MedicalTooltip term={meta.title}>{meta.title}</MedicalTooltip>
+        <UnusedByModelBadge meta={meta} />
       </label>
       <input
         id={meta.name}

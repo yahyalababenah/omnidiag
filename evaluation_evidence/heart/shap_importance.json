@@ -1,13 +1,14 @@
 {
-  "ChestPainType":0.9687070251,
-  "Oldpeak":0.5508180261,
-  "ExerciseAngina":0.523728013,
-  "Sex":0.4069629908,
-  "Cholesterol":0.4039019942,
-  "Age":0.365711987,
-  "MaxHR":0.3569279909,
-  "FastingBS":0.2655740082,
-  "RestingBP":0.2195580006,
-  "ST_Slope":0.1349319965,
-  "RestingECG":0.0784529969
+  "_SUPERSEDED": "Describes heart_full_tuned.pkl, a model that was NEVER DEPLOYED (F0-1). It ranks Oldpeak, ExerciseAngina, MaxHR and ST_Slope, none of which the shipped model reads. The shipped model is heart_l3_glm_stack.pkl; its measured importance is in heart_l3_glm_importance.json, generated from the artifact itself by scripts/regen_heart_importance.py. Kept for the archived model only -- do not use it to pick warning lists or documentation claims (Gate 8.2).",
+  "ChestPainType": 0.9687070251,
+  "Oldpeak": 0.5508180261,
+  "ExerciseAngina": 0.523728013,
+  "Sex": 0.4069629908,
+  "Cholesterol": 0.4039019942,
+  "Age": 0.365711987,
+  "MaxHR": 0.3569279909,
+  "FastingBS": 0.2655740082,
+  "RestingBP": 0.2195580006,
+  "ST_Slope": 0.1349319965,
+  "RestingECG": 0.0784529969
 }

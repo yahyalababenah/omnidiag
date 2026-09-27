@@ -201,8 +201,37 @@ class TestRegistry:
         assert "sklearn_pipeline" in str(exc.value)
 
     def test_builtin_configs_dispatch_by_family(self, real_router):
-        assert real_router._get_loader("heart_disease").family == "sklearn_pipeline"
+        assert real_router._get_loader("heart_disease").family == "glm_ivap_conformal"
         assert real_router._get_loader("diabetes").family == "stacking_ensemble"
+
+    def test_sklearn_pipeline_still_loads_and_predicts(self, tmp_path_factory):
+        """Reverting heart to the previous XGBoost model must stay a two-line
+        config change, so the family it would revert to is kept exercised even
+        though no shipped disease uses it (Gate 8.1)."""
+        import copy
+
+        with open(os.path.join(_CONFIGS_DIR, "heart_disease.yaml")) as f:
+            config = yaml.safe_load(f)
+        legacy = copy.deepcopy(config)
+        legacy["disease"]["name"] = "heart_legacy_xgb"
+        legacy["model"]["family"] = "sklearn_pipeline"
+        legacy["model"]["weights_path"] = "models/heart_disease/heart_full_tuned.pkl"
+        legacy["model"]["fallback_weights_path"] = legacy["model"]["weights_path"]
+        legacy["model"]["explainer_type"] = "tree"
+        legacy["schema"] = {"module": "backend.schemas", "class": "HeartDiseaseInput"}
+
+        directory = _write_configs(
+            tmp_path_factory.mktemp("legacy_family"), {"heart_legacy_xgb.yaml": legacy}
+        )
+        router = _RealOmniDiagRouter(configs_dir=directory)
+        backend = router._get_loader("heart_legacy_xgb")
+        assert backend.family == "sklearn_pipeline"
+        assert backend.capabilities.supports_tree_shap
+
+        out = router.predict("heart_legacy_xgb", dict(HEART_PATIENT))
+        assert out["prediction"] in (0, 1)
+        assert 0.0 <= out["confidence"] <= 1.0
+        assert out["inference_threshold"] == pytest.approx(0.3695)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -211,27 +240,37 @@ class TestRegistry:
 
 class TestBuiltinFamiliesInterface:
     def test_heart_capabilities(self, real_router):
+        """The explainer follows the FAMILY, not the disease: a GLM is not a
+        tree, and SHAP's tree path would be wrong for it (the F0-1 class of
+        defect)."""
         caps = real_router._get_loader("heart_disease").capabilities
-        assert caps.supports_tree_shap and caps.supports_vectorized_batch
-        assert caps.explainer == "tree"
+        assert caps.supports_vectorized_batch
+        assert caps.explainer == "linear" and not caps.supports_tree_shap
 
     def test_diabetes_capabilities(self, real_router):
         caps = real_router._get_loader("diabetes").capabilities
         assert caps.supports_tree_shap and not caps.supports_vectorized_batch
         assert caps.supports_counterfactuals and caps.explainer == "tree"
 
-    def test_heart_predict_proba_matches_predict(self, real_router):
+    def test_heart_predict_proba_is_the_raw_model_scale(self, real_router):
+        """`predict_proba` is the model's own output, as the interface says.
+
+        For this family the served probability is the Venn-Abers calibration of
+        that score, so the two are related but not equal — the same split the
+        diabetes ensemble has between its raw and prevalence-corrected scales.
+        """
         backend = real_router._get_loader("heart_disease")
-        proba = backend.predict_proba(pd.DataFrame([HEART_PATIENT]))
-        assert float(proba[0]) == real_router.predict("heart_disease", dict(HEART_PATIENT))["confidence"]
-        assert backend.feature_names == list(backend.model["features"])
+        raw = float(backend.predict_proba(pd.DataFrame([HEART_PATIENT]))[0])
+        served = real_router.predict("heart_disease", dict(HEART_PATIENT))["confidence"]
+        assert 0.0 <= raw <= 1.0 and 0.0 <= served <= 1.0
+        assert backend.feature_names == list(backend.bundle["features_input"])
 
     def test_heart_shap_values_match_explain(self, real_router):
         backend = real_router._get_loader("heart_disease")
         sr = backend.shap_values(pd.DataFrame([HEART_PATIENT]))
         explained = real_router.explain("heart_disease", dict(HEART_PATIENT))
         by_name = {c["feature"]: c["shap_value"] for c in explained["chart_data"]}
-        assert sr.feature_names == backend.feature_names
+        assert sr.feature_names == list(backend.bundle["features_model"])
         assert [by_name[f] for f in sr.feature_names] == sr.values.tolist()
         assert sr.base_value == explained["base_value"]
 

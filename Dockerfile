@@ -45,6 +45,26 @@ RUN mkdir -p models/heart_disease models/diabetes/preprocessors && \
     curl -fsSL "${HF}/diabetes/preprocessors/standard_scaler.pkl" -o models/diabetes/preprocessors/standard_scaler.pkl && \
     echo "=== all models downloaded ==="
 
+# Build the live heart model from the committed training CSV. No model binary
+# is committed to the repository, so this step IS the shipping mechanism.
+#
+# The script refuses to produce a bundle unless (1) the training CSV hashes to
+# the recorded value and (2) the decision and conformal set are identical to
+# the recorded fingerprint for all 920 patients, with |delta p| <= 1e-6. A
+# failure here fails the build on purpose: a heart model whose decisions differ
+# from the measured ones must not ship silently.
+#
+# heart_full_tuned.pkl above stays in the image so that reverting to the
+# previous XGBoost model is two lines in configs/heart_disease.yaml.
+RUN python scripts/train_heart_glm.py --verify
+
+# Rebuild the drift reference profiles and compare them against the committed
+# ones. The heart profile is derived from the same training CSV as the model
+# above and records its sha256, so a training file that changed without the
+# profile being rebuilt fails the build here rather than showing up later as
+# drift that came from nowhere.
+RUN python scripts/build_drift_reference.py --verify
+
 # Create non-root user for security
 RUN useradd -m -u 1000 omnidiag && chown -R omnidiag:omnidiag /app
 USER omnidiag

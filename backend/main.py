@@ -367,6 +367,15 @@ async def get_disease_schema(disease: str, response: Response):
 
     schema = get_schema_for_disease(disease)
     result = schema.model_json_schema()
+    # Which of the accepted inputs the model does not read, from the artifact
+    # itself (Gate 8.9). The form shows every field in the schema, and without
+    # this a clinician cannot tell that three of heart's eleven change nothing.
+    try:
+        unused = router._get_loader(disease).unused_input_features
+        if unused:
+            result["x_unused_by_model"] = list(unused)
+    except Exception as exc:  # noqa: BLE001 — never fail a schema read over a label
+        log.debug("schema: could not read unused features for %s — %s", disease, exc)
     await cache_set(key, result, ttl=SCHEMA_TTL_SECONDS)
     response.headers["Cache-Hit"] = "false"
     return result
@@ -495,11 +504,14 @@ async def predict_disease(
                 # By contract every probability leaving a loader's predict() is
                 # on the deployment (corrected) scale — see
                 # backend/probability_scale.py. The threshold travels with it in
-                # the same response, on the same scale; diseases that expose no
-                # threshold (heart) use sklearn's argmax cut-point.
+                # the same response, on the same scale.
                 confidence_corrected = float(result.get("confidence", 0.0))
-                decision_threshold = float(
-                    result.get("inference_threshold", DEFAULT_DECISION_THRESHOLD)
+                # None, not 0.5, for a module that decides without one. The old
+                # default sent heart down the entropy path around a cut-point it
+                # does not have -- see the review-queue note below.
+                raw_threshold = result.get("inference_threshold")
+                decision_threshold = (
+                    float(raw_threshold) if raw_threshold is not None else None
                 )
                 # Which scale this module reports: corrected for diabetes, the
                 # model's own (raw) scale for heart. Read from the result, not
@@ -514,24 +526,50 @@ async def predict_disease(
                     confidence=confidence_corrected,
                     probability_scale=reported_scale,
                     diagnosis=result.get("diagnosis"),
+                    # Present only for a module that decides instead of
+                    # thresholding; None for diabetes, by construction.
+                    decision=result.get("decision"),
+                    probability_lower=result.get("probability_lower"),
+                    probability_upper=result.get("probability_upper"),
                     created_by=current_user.id,
                 )
                 db.add(record)
                 await db.flush()
 
                 # Auto-queue uncertain predictions for human review (Feature 1.3).
-                # Uncertainty is measured around the decision boundary, not
-                # around 0.5 — see backend/active_learning/sampler.py.
-                if should_queue_for_review(
-                    confidence_corrected, decision_threshold=decision_threshold
-                ):
+                #
+                # A module that STATES its uncertainty is believed (Gate 8.4). For
+                # a conformal module, `decision == 'uncertain'` is the model's own
+                # verdict that it could not place this patient, so that is what
+                # queues the row. Routing it through entropy around a threshold
+                # instead was wrong in both directions, and measurably so: a
+                # patient the model called uncertain at p=0.95 -- an empty
+                # conformal set, atypical for BOTH classes -- was not queued,
+                # while a confidently decided patient at p=0.52 was. The consumer
+                # whose entire job is catching uncertainty was the one ignoring
+                # the model's statement of it.
+                #
+                # A threshold module (diabetes) keeps the entropy rule unchanged:
+                # it publishes no per-patient uncertainty, so proximity to its
+                # boundary is the only signal available.
+                if result.get("decision") is not None:
+                    queue_row = result.get("decision") == "uncertain"
+                    uncertainty_score = 1.0 if queue_row else 0.0
+                else:
+                    queue_row = should_queue_for_review(
+                        confidence_corrected,
+                        decision_threshold=decision_threshold or DEFAULT_DECISION_THRESHOLD,
+                    )
+                    uncertainty_score = prediction_entropy(
+                        confidence_corrected,
+                        decision_threshold=decision_threshold or DEFAULT_DECISION_THRESHOLD,
+                    )
+                if queue_row:
                     from backend.db_models.review_queue import ReviewQueue
                     rq = ReviewQueue(
                         id=str(_uuid.uuid4()),
                         prediction_id=record.id,
-                        uncertainty_score=prediction_entropy(
-                            confidence_corrected, decision_threshold=decision_threshold
-                        ),
+                        uncertainty_score=uncertainty_score,
                         uncertainty_scale=reported_scale,
                         decision_threshold=decision_threshold,
                     )
@@ -596,6 +634,11 @@ async def explain_disease(
                     confidence=confidence_corrected,
                     probability_scale=reported_scale,
                     diagnosis=result.get("diagnosis"),
+                    # Present only for a module that decides instead of
+                    # thresholding; None for diabetes, by construction.
+                    decision=result.get("decision"),
+                    probability_lower=result.get("probability_lower"),
+                    probability_upper=result.get("probability_upper"),
                     shap_chart_data=result.get("chart_data"),
                     created_by=current_user.id,
                 )
@@ -693,6 +736,10 @@ class BatchResponse(BaseModel):
     succeeded: int
     failed: int
     results: List[BatchRowResult]
+    #: Which chest-pain coding the rows were read under (heart only; None for a
+    #: disease that declares no coding). Returned because a batch result whose
+    #: coding is not stated cannot be checked afterwards -- see Gate 8.2.
+    chest_pain_coding: Optional[str] = None
 
 
 def _run_batch_predictions(
@@ -755,6 +802,74 @@ def _run_batch_predictions(
     return results, succeeded, failed
 
 
+def _resolve_chest_pain_coding(disease: str, requested: Optional[str]) -> Optional[str]:
+    """
+    Which chest-pain coding this batch is read under, from the disease config.
+
+    A disease that declares no coding (diabetes) gets None and is untouched --
+    this is read from the config, never branched on the disease name.
+    """
+    model_config = (router.disease_configs.get(disease) or {}).get("model", {}) or {}
+    default = model_config.get("chest_pain_coding_default")
+    if default is None:
+        if requested is not None:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": f"{disease} has no chest-pain coding to declare",
+                        "code": "CODING_NOT_APPLICABLE"},
+            )
+        return None
+
+    coding = requested or default
+    allowed = model_config.get("chest_pain_coding_allowed", [default])
+    if coding not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": f"chest_pain_coding must be one of {sorted(allowed)}",
+                    "code": "INVALID_CHEST_PAIN_CODING"},
+        )
+    return coding
+
+
+def _reject_raw_research_export(disease: str, header: List[str], coding: Optional[str]) -> None:
+    """
+    Refuse a CSV that is plainly a raw UCI research export (Gate 8.2, layer 1).
+
+    Those files code ChestPainType by anginal-feature COUNT, the inverse of the
+    clinical meaning this API takes (HF-1). Read under the default coding, 609
+    of the 920 rows change decision and 130 diseased patients lose their
+    referral -- measured, not estimated.
+
+    The marker columns come from the config and exist in no API schema, so a
+    clinician's export cannot carry them. Refusing beats translating silently:
+    a silent translation guesses what the uploader meant.
+
+    This catches the file as distributed. It cannot catch one whose marker
+    columns were removed -- that limit is declared in the config and in the
+    gate report, and layer 2 (the explicit coding) is what covers it.
+    """
+    model_config = (router.disease_configs.get(disease) or {}).get("model", {}) or {}
+    markers = model_config.get("uci_raw_marker_columns") or []
+    found = sorted(set(header) & set(markers))
+    if not found or coding == "uci_raw":
+        return
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "error": (
+                f"This CSV carries the raw research columns {found}, so it looks like the "
+                f"raw UCI export. That file codes ChestPainType by anginal-feature count, "
+                f"which is the inverse of what this API means by TA/ATA/NAP/ASY -- reading "
+                f"it as clinical input would silently invert every patient's chest pain. "
+                f"Either upload a file with the clinical codes and without those columns, "
+                f"or pass chest_pain_coding=uci_raw to have the codes converted explicitly."
+            ),
+            "code": "RAW_UCI_EXPORT_REJECTED",
+            "marker_columns_found": found,
+        },
+    )
+
+
 @app.post(
     "/api/v4/{disease}/batch",
     response_model=BatchResponse,
@@ -772,6 +887,14 @@ async def batch_predict(
     request: Request,
     disease: str,
     file: UploadFile = File(..., description="CSV file with header row matching the disease schema"),
+    chest_pain_coding: Optional[str] = Query(
+        None,
+        description=(
+            "Heart only. Which coding the ChestPainType column uses: 'clinical' (the "
+            "default, and what the UI sends: TA = typical angina) or 'uci_raw' (the raw "
+            "UCI file's inverted coding, converted explicitly). See Gate 8.2."
+        ),
+    ),
     _user: User = Depends(require_role(*CLINICAL_ROLES)),
 ) -> BatchResponse:
     if not file.filename or not file.filename.lower().endswith(".csv"):
@@ -783,8 +906,15 @@ async def batch_predict(
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail={"error": "CSV must be UTF-8 encoded", "code": "ENCODING_ERROR"})
 
+    coding = _resolve_chest_pain_coding(disease, chest_pain_coding)
+
     reader = csv.DictReader(io.StringIO(text))
     rows: List[Dict[str, Any]] = list(reader)
+    _reject_raw_research_export(disease, list(reader.fieldnames or []), coding)
+
+    # The coding is auditable: a batch whose coding was not recorded cannot be
+    # rechecked later. AuditMiddleware reads this after the handler returns.
+    request.state.audit_details = {"chest_pain_coding": coding, "rows": len(rows)}
 
     if len(rows) == 0:
         raise HTTPException(status_code=400, detail={"error": "CSV is empty or has no data rows", "code": "EMPTY_CSV"})
@@ -797,6 +927,14 @@ async def batch_predict(
 
     # Validation is always per-row: a malformed row must never affect any
     # other row's result, whichever prediction path runs below.
+    # A declared raw-coded upload is rewritten into the clinical codes that mean
+    # the same thing, using a map DERIVED from the model's two maps. From here
+    # the rows are ordinary API input, so encode_for_inference() stays the only
+    # thing that ever scores -- there is no second path to keep in step.
+    if coding == "uci_raw":
+        from backend.heart_glm.stack import translate_raw_codes
+        rows = translate_raw_codes(rows)
+
     validated_rows: List[tuple] = []  # (original CSV row number, validated patient dict)
     for i, raw_row in enumerate(rows, start=1):
         # Convert numeric strings to appropriate types
@@ -850,6 +988,7 @@ async def batch_predict(
         succeeded=succeeded,
         failed=failed,
         results=results,
+        chest_pain_coding=coding,
     )
 
 
@@ -872,6 +1011,14 @@ class ReportRequest(BaseModel):
     """
 
     disease: str
+    # From the /predict response for this patient (Gate 8.4). This endpoint does
+    # not re-score, so a conformal module's decision has to travel with the
+    # request; without it the report says so rather than inferring one from the
+    # label text. output_type and probability_scale are NOT accepted from the
+    # client -- they are read from the disease config, server-side.
+    decision: str | None = None
+    probability_lower: float | None = None
+    probability_upper: float | None = None
     probability_corrected: float | None = None
     probability: float | None = Field(
         None,
@@ -925,11 +1072,13 @@ async def generate_clinical_report(
     # probability (router.get_disease_info corrects them for diabetes). The
     # client's own band, if any, is advisory and discarded downstream.
     risk_bands = (disease_info or {}).get("risk_bands")
-    decision_threshold = (
-        router.disease_configs.get(body.disease, {})
-        .get("model", {})
-        .get("inference_threshold")
-    )
+    model_config = router.disease_configs.get(body.disease, {}).get("model", {}) or {}
+    decision_threshold = model_config.get("inference_threshold")
+    # How this module decides, from its own config -- never from its name. A
+    # conformal module has no threshold and no bands, and the report must say
+    # that instead of substituting 0.5 and 0.7/0.4 (Gate 8.4).
+    output_type = model_config.get("output_type")
+    probability_scale = model_config.get("probability_scale")
 
     if _generate_report is None:
         # Fallback when the LLM client package is not installed
@@ -942,6 +1091,11 @@ async def generate_clinical_report(
             body.features,
             risk_bands,
             decision_threshold,
+            output_type,
+            probability_scale,
+            body.decision,
+            body.probability_lower,
+            body.probability_upper,
         )
         return {"disease": body.disease, "report": report_text, "source": "rule_based"}
 
@@ -954,6 +1108,11 @@ async def generate_clinical_report(
         features=body.features,
         risk_bands=risk_bands,
         decision_threshold=decision_threshold,
+        output_type=output_type,
+        probability_scale=probability_scale,
+        decision=body.decision,
+        probability_lower=body.probability_lower,
+        probability_upper=body.probability_upper,
     )
     return {"disease": body.disease, **result}
 

@@ -25,7 +25,7 @@ from backend.auth.rbac import require_role, ADMIN_ROLES
 from backend.database import get_db
 from backend.monitoring.drift import get_monitor, drift_unavailable_reason
 from backend.monitoring.metrics import get_metrics_response
-from backend.monitoring.mlflow_tracker import list_recent_runs, log_model_info
+from backend.monitoring.mlflow_tracker import log_model_info, tracking_state
 
 router = APIRouter()
 
@@ -68,7 +68,7 @@ async def drift_status(
         # installed but exposes an incompatible API (see docs/EVIDENTLY_COST.md),
         # and "no report yet" hid that behind a message about a missing run.
         message=(
-            drift_unavailable_reason()
+            drift_unavailable_reason(disease)
             or ("No drift report run yet. POST /admin/drift/{disease}/run to trigger."
                 if monitor.last_report is None else "Drift report available.")
         ),
@@ -162,10 +162,16 @@ async def run_drift(
     loop = asyncio.get_event_loop()
     report = await loop.run_in_executor(None, monitor.run, current_df)
 
-    # Update Prometheus gauge
+    # Update the Prometheus gauge.
+    #
+    # `or 0.0` used to stand here, which published a drift share of ZERO whenever
+    # the run could not judge -- too few rows, an unencodable window, a missing
+    # reference. Zero means "measured, nothing drifted". NaN is the honest export
+    # for "not measured": Prometheus carries it and a dashboard shows a gap
+    # instead of a reassuring flat line at zero.
     from backend.monitoring.metrics import record_drift
-    drift_share = report.get("metrics", {}).get("dataset_drift", {}).get("drift_share") or 0.0
-    record_drift(disease, drift_share)
+    share = report.get("metrics", {}).get("dataset_drift", {}).get("drift_share")
+    record_drift(disease, float("nan") if share is None else float(share))
 
     return DriftStatusResponse(
         disease=disease,
@@ -192,11 +198,54 @@ async def drift_html_report(
     monitor = get_monitor(disease)
     if monitor.last_report is None:
         return HTMLResponse(
-            content="<html><body><h2>No report yet. POST /admin/drift/{disease}/run first.</h2></body></html>",
+            content=("<html><body><h2>No report yet. "
+                     f"POST /admin/drift/{disease}/run first.</h2></body></html>"),
             status_code=200,
         )
-    html = monitor._last_html or "<p>Report HTML not available.</p>"
-    return HTMLResponse(content=html)
+    # Rendered from the live report. This is NOT Evidently's report -- that path
+    # never ran (see backend/monitoring/drift.py) and asking the new monitor for
+    # `_last_html` raised AttributeError.
+    return HTMLResponse(content=_render_drift_html(monitor.last_report))
+
+
+def _render_drift_html(report: Dict[str, Any]) -> str:
+    """A plain table of the drift numbers. No new dependency, no template engine."""
+    from html import escape
+
+    def cell(value, digits=4):
+        if value is None:
+            return "<td class='na'>not measured</td>"
+        if isinstance(value, float):
+            return f"<td>{value:.{digits}g}</td>"
+        return f"<td>{escape(str(value))}</td>"
+
+    status = escape(str(report.get("status", "")))
+    head = (f"<h2>Input drift — {escape(str(report.get('disease', '')))}</h2>"
+            f"<p><b>status:</b> {status}"
+            + (f" — {escape(str(report.get('detail')))}" if report.get("detail") else "")
+            + f"<br><b>reference:</b> {report.get('reference_rows')} rows, sha256 "
+              f"{escape(str(report.get('reference_sha256', ''))[:12])}…"
+              f"<br><b>current:</b> {report.get('current_rows')} rows"
+              f"<br><b>measures:</b> {escape(str(report.get('measures', '')))}</p>")
+    rows = ""
+    for f in report.get("features", []):
+        rows += ("<tr>"
+                 f"<td>{escape(str(f['feature']))}</td>"
+                 f"<td>{escape(str(f['kind']))}</td>"
+                 + cell(f.get("psi")) + f"<td>{escape(str(f.get('psi_band')))}</td>"
+                 + cell(f.get("p_value"), 3) + cell(f.get("p_adjusted"), 3)
+                 + f"<td>{'<b>yes</b>' if f.get('drifted') else 'no'}</td>"
+                 + f"<td>{escape(str(f.get('detail') or ''))}</td>"
+                 "</tr>")
+    table = ("<table border=1 cellpadding=4 cellspacing=0><thead><tr>"
+             "<th>feature</th><th>kind</th><th>PSI</th><th>band</th><th>p</th>"
+             "<th>p (Holm)</th><th>drifted</th><th>note</th></tr></thead>"
+             f"<tbody>{rows}</tbody></table>")
+    rule = escape(str((report.get("rule") or {}).get("flag", "")))
+    return ("<html><head><meta charset='utf-8'><title>Drift report</title>"
+            "<style>body{font-family:system-ui,sans-serif;margin:2rem}"
+            "td,th{font-size:14px}.na{color:#888;font-style:italic}</style></head>"
+            f"<body>{head}{table}<p><b>flagged when:</b> {rule}</p></body></html>")
 
 
 # ── GET /admin/mlflow/runs ────────────────────────────────────────────────────
@@ -209,8 +258,18 @@ async def mlflow_runs(
     n: int = Query(20, ge=1, le=100),
     _: object = Depends(require_role(*ADMIN_ROLES)),
 ) -> Dict[str, Any]:
-    runs = list_recent_runs(n=n)
-    return {"experiment": "OmniDiag", "count": len(runs), "runs": runs}
+    # `status` distinguishes "not installed" / "store unreachable" / "working but
+    # empty" / "working", which `count: 0` alone never did -- and that ambiguity
+    # is why an empty experiment went unexplained (Gate 8.6).
+    state = tracking_state(n=n)
+    return {
+        "experiment": "OmniDiag",
+        "status": state["status"],
+        "tracking_uri": state["tracking_uri"],
+        "detail": state["detail"],
+        "count": len(state["runs"]),
+        "runs": state["runs"],
+    }
 
 
 # ── POST /admin/mlflow/register-model ─────────────────────────────────────────

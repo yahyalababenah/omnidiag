@@ -201,3 +201,24 @@ class TestAuditLogNullUser:
         assert found is not None
         assert found.duration_ms == 42.0
         assert found.method == "POST"
+
+    async def test_audit_log_details_is_optional_and_holds_json(self, db_session):
+        """
+        Gate 8.2: `details` carries what the request line cannot. A heart batch
+        records the chest-pain coding it was read under, because a batch whose
+        coding was never recorded cannot be rechecked afterwards. Every other
+        request leaves it NULL, so rows written before this column stay valid.
+        """
+        with_details = AuditLog(
+            endpoint="/api/v4/heart_disease/batch", method="POST", status_code=200,
+            details={"chest_pain_coding": "uci_raw", "rows": 920},
+        )
+        without = AuditLog(endpoint="/api/v4/diseases", method="GET", status_code=200)
+        db_session.add_all([with_details, without])
+        await db_session.commit()
+        await db_session.refresh(with_details)
+        await db_session.refresh(without)
+
+        assert with_details.details["chest_pain_coding"] == "uci_raw"
+        assert with_details.details["rows"] == 920
+        assert without.details is None

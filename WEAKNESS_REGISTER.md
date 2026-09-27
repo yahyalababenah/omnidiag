@@ -553,3 +553,40 @@ Heart files were not touched.
 | **WI-6** | **Model output labelled "Diagnosis" / "Positive" / "<disease> Detected".** | **Changed** (`utils/screening.js`): Engineering Mode, EMR panel headline/title/errors/loading text, Comparison Mode badge and the PDF ("AI Screening Summary" and badge) now read "Screening result", "Elevated risk — confirmatory testing recommended" or "Below threshold". **Left as-is and reported:** `BatchUpload.jsx` column "Diagnosis" and its CSV export (batch is out of scope for this task); `PatientTimeline.jsx` badge (separate work); `AdminDashboard.jsx` review-queue value; `App.jsx` subtitle "Multi-Disease Diagnostic Platform"; "diagnostic engine" cold-start messages; the "Prediction: Positive/Negative" rows; the API field `diagnosis` (contract, pinned by the golden master). | Out of scope for this task (batch / separate work), or not labelling the result. | Same substitution in BatchUpload/PatientTimeline/AdminDashboard when those are in scope. | S2 | **PARTLY FIXED** |
 | **WI-7** | **Patient Data Summary coloured healthy values red** (value == 1 → red: Fruits, Veggies, PhysActivity, AnyHealthcare = Yes). The same bug class affected Income/Education/MaxHR (higher is better), `ExerciseAngina = N` and `Sex = F` (enum position). | **Fixed:** `constants/clinicalDirection.js` holds a per-feature favourable value / direction, reusing the WI-1 policy directions where they exist. Sex is neutral. | — | — | S3 | **FIXED** (render UNVERIFIED in a browser) |
 | **WI-8** | **Diabetes SHAP shows PhysActivity = Yes as risk-increasing for some patients. Investigated, not fixed.** | **Conclusion: genuine model behaviour, not an aggregation artefact.** All meta-learner coefficients are positive (xgb +0.436, lgb +3.857, rf +0.902), so the \|coef\|-weighted average is a convex combination and cannot flip a sign that all three models agree on. Global SHAP, n = 2000 BRFSS rows, P(SHAP > 0 \| PhysActivity = 1): xgb 0.03, lgb 0.07, rf 0.01, aggregated 0.06. Mean SHAP when =1: −0.0124 / −0.0115 / −0.0022, aggregated −0.0100. Through the full stack, setting PhysActivity 0 → 1 raised raw risk in 36% of 300 rows (mean Δp −0.0047). Fruits is essentially ignored (P(SHAP > 0 \| =1) 0.51 aggregated; Δp +0.0008). Veggies: 0.30 aggregated. Part of each habit's effect is also carried by `Lifestyle_Score` (SHAP vs value corr −0.40 to −0.53), shown as a separate row. The demo patients with PhysActivity = 1 (D-001, D-002, D-004) all show it as *protective*, so the smoke-test patients were not reproduced (**UNVERIFIED**, possibly environment or input specific). RF per-feature SHAP is about 5–10× smaller than the boosted models, consistent with P-2's unverified "probability units" suspicion. | Investigate-only by instruction. P-1/P-2 affect magnitudes and additivity, not this sign. | Monotonic constraints on lifestyle features at the next retrain, and/or explain the stack end to end (P-1/P-2). | S2 | **OPEN — investigated** |
+
+---
+
+## Addendum — 2026-09-26 (Phase 8, Gates 8.1–8.8)
+
+This register records what was found and when. Nothing above is edited: a
+corrected history is not a history. What follows is what changed afterwards, so
+an entry above that no longer describes the shipped system can be read against
+it.
+
+**The heart model that ships is no longer the one most entries above describe.**
+Since Gate 8.1 the deployed artifact is `heart_l3_glm_stack.pkl` — a Spline-GLM
+on 7 inputs (L3, D-25) with Venn-Abers calibration and a Mondrian conformal
+decision — not `heart_full_tuned.pkl`. Consequences for entries above:
+
+* **HM-5's warning list.** The five features named there
+  (`ChestPainType, Oldpeak, ExerciseAngina, Sex, Cholesterol`) were read off
+  `evaluation_evidence/heart/shap_importance.json`, which describes a model that
+  was never deployed (F0-1). The shipped model does not read `Oldpeak`,
+  `ExerciseAngina`, `MaxHR` or `ST_Slope` at all — blanking any of them changes
+  exactly nothing, measured. The live warning list is now derived from
+  `blank_impact` measured into the bundle at build time, with the rule declared
+  in `configs/heart_disease.yaml`; it resolves to `RestingBP, Cholesterol,
+  FastingBS`. See Gate 8.3.
+* **The importance ranking quoted in HM-5** belongs to that same undeployed
+  model. The measured ranking for the shipped artifact is in
+  `evaluation_evidence/heart/heart_l3_glm_importance.json`, regenerated from the
+  artifact by `scripts/regen_heart_importance.py` and checked against it by a
+  test. `shap_importance.json` is kept for the archived model and carries a
+  `_SUPERSEDED` note in its own contents.
+* **Any threshold quoted for heart** (0.5 argmax, or 0.3695) no longer applies:
+  the shipped model has no decision threshold. It answers
+  `referral` / `no_referral` / `uncertain`, and `uncertain` counts as a referral
+  everywhere in the system. See Gate 8.4.
+
+Full detail, with the measurements, is in the research repository's gate reports
+(`gate_8_1.md` … `gate_8_8.md`) and decision log (D-30 … D-50).

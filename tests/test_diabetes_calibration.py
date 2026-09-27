@@ -18,6 +18,10 @@ and the mock restored cleanly). No network, no external data.
 """
 
 import os
+import sys
+from pathlib import Path
+
+from backend.heart_glm import stack as stack_module
 
 import numpy as np
 import pytest
@@ -186,36 +190,54 @@ DIABETES_MIN = {**{k: 0 for k in _BINARY}, "BMI": 10.0, "MentHlth": 0, "PhysHlth
 DIABETES_MAX = {**{k: 1 for k in _BINARY}, "BMI": 100.0, "MentHlth": 30, "PhysHlth": 30,
                 "GenHlth": 5, "Age": 13, "Education": 6, "Income": 8}
 
+# Case names state the CLINICAL meaning of the chest pain and the API code that
+# carries it, because the previous names did not and one of them was wrong in
+# exactly the way HF-1 was: "typical_up_slope" sends ChestPainType "ATA", which
+# is ATYPICAL angina. A case name that misdescribes its own input is how an
+# inverted encoding survives a test suite.
+#
+#   API code -> clinical meaning (the meaning the API has always documented)
+#   TA  -> typical angina        ATA -> atypical angina
+#   NAP -> non-anginal pain      ASY -> asymptomatic (no anginal features)
 HEART_CASES = {
-    "typical_up_slope": {
+    # ChestPainType "ATA" = atypical angina.
+    "clinical_atypical_angina_up_slope": {
         "Age": 55, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 130,
         "Cholesterol": 250, "FastingBS": 0, "RestingECG": "Normal", "MaxHR": 150,
         "ExerciseAngina": "N", "Oldpeak": 1.5, "ST_Slope": "Up",
     },
-    "asymptomatic_flat": {
+    # ChestPainType "ASY" = asymptomatic, i.e. no anginal features.
+    "clinical_no_anginal_features_flat": {
         "Age": 63, "Sex": "M", "ChestPainType": "ASY", "RestingBP": 145,
         "Cholesterol": 233, "FastingBS": 1, "RestingECG": "LVH", "MaxHR": 108,
         "ExerciseAngina": "Y", "Oldpeak": 2.6, "ST_Slope": "Flat",
     },
-    "young_female": {
+    # ChestPainType "NAP" = non-anginal pain.
+    "clinical_non_anginal_pain_young_female": {
         "Age": 34, "Sex": "F", "ChestPainType": "NAP", "RestingBP": 118,
         "Cholesterol": 210, "FastingBS": 0, "RestingECG": "Normal", "MaxHR": 175,
         "ExerciseAngina": "N", "Oldpeak": 0.0, "ST_Slope": "Up",
     },
 }
-# Golden heart outputs, RECAPTURED 2026-09-20 from OmniDiagRouter.predict on
-# deploy/v2-platform after the heart_full_tuned.pkl Pipeline replacement
-# (see backend/model_loader.py commit "feat(heart): load heart_full_tuned.pkl
-# as a self-contained sklearn Pipeline"). This is a DELIBERATE break of the
-# previous safety net, not drift: the heart model itself changed (new
-# Pipeline, new training data, new threshold 0.3695 instead of argmax 0.5),
-# so its outputs on these exact patients are expected to differ from every
-# prior capture. From this commit on, any further drift here again means
-# something leaked into heart that shouldn't have.
+# Golden heart outputs, RECAPTURED 2026-09-26 on phase8/heart-fixes-and-monitoring
+# after the Spline-GLM + Venn-Abers + Mondrian conformal replacement (Gate 8.1).
+# This is a DELIBERATE break of the previous net, not drift: the model, its
+# feature set, its calibration and its decision rule all changed.
+#
+# The atypical-angina case (formerly `typical_up_slope`) is GONE rather than
+# updated. Its old expectation
+# (Negative, 0.3386) WAS the HF-1 defect being asserted as correct behaviour:
+# UCI's chest-pain codes are inverted, so a patient the clinician records as
+# typical angina scored LOW. That property now has a test of its own, stated
+# as a property rather than a captured number, in
+# tests/test_heart_glm_backend.py::test_typical_angina_outranks_no_anginal_features_*.
+#
+# `confidence` here is the Venn-Abers probability, and a patient whose
+# conformal set is not a singleton is reported as a referral for further
+# evaluation (prediction 1) — see backend/heart_glm/stack.py.
 HEART_GOLDEN = {
-    "asymptomatic_flat": {"prediction": 1, "confidence": 0.9833390712738037, "diagnosis": "Positive"},
-    "typical_up_slope": {"prediction": 0, "confidence": 0.33861273527145386, "diagnosis": "Negative"},
-    "young_female": {"prediction": 0, "confidence": 0.039755821228027344, "diagnosis": "Negative"},
+    "clinical_no_anginal_features_flat": {"prediction": 1, "confidence": 0.6875, "diagnosis": "Uncertain — refer for further evaluation"},
+    "clinical_non_anginal_pain_young_female": {"prediction": 0, "confidence": 0.023809523809523808, "diagnosis": "Negative"},
 }
 
 CORRECTION_KEYS = {
@@ -368,17 +390,38 @@ class TestDiabetesPredictApi:
 
     @pytest.mark.parametrize("case", sorted(HEART_CASES))
     async def test_heart_response_has_no_correction_fields(self, live_client, case):
-        # Heart still applies no prevalence correction (unaffected by the
-        # Pipeline replacement), but now states its own decision threshold
-        # like diabetes does — CORRECTION_KEYS (prevalence/risk-band fields)
-        # must still be absent; inference_threshold is the one field heart
-        # gained.
+        # Heart applies no prevalence correction, so CORRECTION_KEYS must be
+        # absent. It also publishes NO inference_threshold: its decision is a
+        # conformal set, and a single cut-point is exactly what produced the sex
+        # gap in sensitivity this model was built to close (HF-13). A threshold
+        # reappearing here is a regression.
+        #
+        # The response was pinned to exactly three keys until Gate 8.4. It now
+        # carries its decision as data -- the decision itself, the referral flag,
+        # the Venn-Abers interval, and what it is calibrated to -- because every
+        # consumer that lacked them was inferring from the disease name instead:
+        # the frontend showed a 0.5 threshold this model does not have, and the
+        # review queue judged uncertainty by entropy around that same 0.5. The
+        # key set is still pinned, so a field cannot be added without a decision.
         resp = await _post_predict(live_client, "heart_disease", HEART_CASES[case])
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert CORRECTION_KEYS.isdisjoint(data), CORRECTION_KEYS & set(data)
-        assert set(data) == {"prediction", "confidence", "diagnosis", "inference_threshold"}
-        assert data["inference_threshold"] == pytest.approx(0.3695)
+        assert set(data) == {
+            "prediction", "confidence", "diagnosis",
+            "decision", "conformal_set", "decision_is_referral",
+            "probability_lower", "probability_upper",
+            "output_type", "probability_scale",
+        }, sorted(data)
+        assert "inference_threshold" not in data
+        # The absences are declared, not merely missing: `output_type` is what
+        # tells a consumer there is no threshold and no band to look for, so it
+        # never has to guess from the disease name. Bands themselves belong to
+        # GET /api/v4/diseases, which reports null for this module.
+        assert data["output_type"] == "conformal_decision"
+        assert data["probability_scale"] == "ivap_calibrated_training_mix"
+        # And the interval brackets the probability it belongs to.
+        assert data["probability_lower"] <= data["confidence"] <= data["probability_upper"]
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -386,7 +429,7 @@ class TestDiabetesPredictApi:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestHeartNonRegression:
-    @pytest.mark.parametrize("case", sorted(HEART_CASES))
+    @pytest.mark.parametrize("case", sorted(HEART_GOLDEN))
     def test_router_output_unchanged(self, real_router, case):
         out = real_router.predict("heart_disease", dict(HEART_CASES[case]))
         golden = HEART_GOLDEN[case]
@@ -412,7 +455,7 @@ class TestHeartNonRegression:
         bad one, so a regression that lets inf/nan back in would show up as
         the two good rows failing too, not just the bad one.
         """
-        good = dict(HEART_CASES["typical_up_slope"])
+        good = dict(HEART_CASES["clinical_no_anginal_features_flat"])
         bad = dict(good)
         bad["Oldpeak"] = bad_oldpeak
 
@@ -440,7 +483,7 @@ class TestHeartNonRegression:
         assert by_row[3]["status"] == "ok"
         # The two good rows are identical patients -- same result, and it
         # matches the non-regression golden value for this exact patient.
-        golden = HEART_GOLDEN["typical_up_slope"]
+        golden = HEART_GOLDEN["clinical_no_anginal_features_flat"]
         for row in (1, 3):
             assert by_row[row]["prediction"] == golden["prediction"]
             assert by_row[row]["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
@@ -449,17 +492,18 @@ class TestHeartNonRegression:
     def _csv_row(patient, blank_key=None):
         return ",".join("" if k == blank_key else str(v) for k, v in patient.items())
 
-    @pytest.mark.parametrize("missing_field", ["ST_Slope", "RestingBP"], ids=["ST_Slope", "RestingBP"])
+    @pytest.mark.parametrize("missing_field", ["ST_Slope", "MaxHR"], ids=["ST_Slope", "MaxHR"])
     async def test_batch_low_impact_missing_field_succeeds_without_warning(self, live_client, doctor_token, missing_field):
         """
-        Regression guard for HM-5 (WEAKNESS_REGISTER.md). ST_Slope and
-        RestingBP are Optional on HeartDiseaseInput (the model's Pipeline
-        imputes them) but rank 10th/9th of 11 in
-        evaluation_evidence/heart/shap_importance.json -- low enough that a
-        missing value must not trigger data_completeness_warning, or the
-        warning stops meaning anything.
+        Regression guard for HM-5 (WEAKNESS_REGISTER.md). A blank field must
+        not warn unless it changes the prediction, or the warning stops meaning
+        anything. Since Gate 8.1 the model reads seven inputs (L3, D-25), so
+        ST_Slope and MaxHR are not read at all and blanking them cannot
+        possibly matter. The list now comes from the config, checked against
+        the shipped artifact, instead of from a SHAP file belonging to a model
+        that was never deployed (F0-1).
         """
-        patient = dict(HEART_CASES["typical_up_slope"])
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
         header = ",".join(patient.keys())
         row = self._csv_row(patient, blank_key=missing_field)
         csv_bytes = "\n".join([header, row]).encode("utf-8")
@@ -475,17 +519,20 @@ class TestHeartNonRegression:
         assert data["results"][0]["status"] == "ok"
         assert data["results"][0].get("data_completeness_warning") is None
 
-    @pytest.mark.parametrize("missing_field", ["Oldpeak", "Cholesterol"], ids=["Oldpeak", "Cholesterol"])
+    @pytest.mark.parametrize(
+        "missing_field", ["Cholesterol", "FastingBS", "RestingBP"],
+        ids=["Cholesterol", "FastingBS", "RestingBP"],
+    )
     async def test_batch_high_impact_missing_field_succeeds_with_warning(self, live_client, doctor_token, missing_field):
         """
-        Regression guard for HM-5. Oldpeak (SHAP rank 2/11) and Cholesterol
-        (rank 5/11) are the two Optional fields that also sit in
-        ModelLoader._HIGH_IMPACT_FEATURES -- a missing value there must
-        still succeed (the whole point of HM-5), but with
-        data_completeness_warning naming the missing feature, visible in
-        the row the same as it would be to a clinician in the UI.
+        Regression guard for HM-5, and for HF-11. These three are Optional on
+        the schema AND read by the model, so a blank one is imputed: the row
+        must still succeed (the point of HM-5) but carry
+        data_completeness_warning naming the field. FastingBS is on the list
+        because in the previous model a blank one raised risk by 7.6 points and
+        flipped 8.1% of decisions with NO warning at all (HF-11).
         """
-        patient = dict(HEART_CASES["typical_up_slope"])
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
         header = ",".join(patient.keys())
         row = self._csv_row(patient, blank_key=missing_field)
         csv_bytes = "\n".join([header, row]).encode("utf-8")
@@ -506,7 +553,7 @@ class TestHeartNonRegression:
     async def test_batch_complete_row_has_no_warning(self, live_client, doctor_token):
         """HM-5: a fully complete row is unaffected -- no warning key at all,
         exactly like every /batch response before this change."""
-        patient = dict(HEART_CASES["typical_up_slope"])
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
         header = ",".join(patient.keys())
         row = self._csv_row(patient)
         csv_bytes = "\n".join([header, row]).encode("utf-8")
@@ -521,31 +568,38 @@ class TestHeartNonRegression:
         assert data["succeeded"] == 1, data
         assert "data_completeness_warning" not in data["results"][0] or data["results"][0]["data_completeness_warning"] is None
 
-    def test_threshold_is_read_from_the_model_file_not_a_constant(self, real_router):
-        # bundle["threshold"] must be the number the .pkl actually carries,
-        # and predict() must consult it at call time -- not a 0.5 argmax or
-        # any other literal baked into model_loader.py. Proven by mutating
-        # the loaded bundle's threshold in place and watching the decision
-        # for the same patient/probability flip both ways.
+    def test_decision_comes_from_the_conformal_cells_not_a_constant(self, real_router):
+        # The heart decision must be read from the bundle's Mondrian cells at
+        # call time, not from any literal in the backend. Proven the same way
+        # the old threshold test worked: mutate the loaded artifact in place
+        # and watch the same patient's decision move both ways.
         loader = real_router._get_loader("heart_disease")
-        bundle = loader.model  # forces load
-        assert bundle["threshold"] == pytest.approx(0.3695)
+        cells = loader.bundle["conformal_cells"]
+        assert set(cells) == {"F0", "F1", "M0", "M1"}
 
-        patient = HEART_CASES["typical_up_slope"]
-        proba = HEART_GOLDEN["typical_up_slope"]["confidence"]  # 0.3386...
-        original_threshold = bundle["threshold"]
+        patient = HEART_CASES["clinical_no_anginal_features_flat"]
+        original = dict(cells)
         try:
-            bundle["threshold"] = proba + 0.05
-            result_above = loader.predict(dict(patient))
-            assert result_above["prediction"] == 0
-            assert result_above["inference_threshold"] == pytest.approx(proba + 0.05)
+            # Nothing is typical of class 0 -> class 0 leaves the set, leaving
+            # {1} alone: a confident referral.
+            cells["M0"] = -1.0
+            cells["M1"] = 1.0
+            assert loader.predict(dict(patient))["diagnosis"] == "Positive"
 
-            bundle["threshold"] = proba - 0.05
-            result_below = loader.predict(dict(patient))
-            assert result_below["prediction"] == 1
-            assert result_below["inference_threshold"] == pytest.approx(proba - 0.05)
+            # Mirror image: only class 0 survives -> no referral.
+            cells["M0"] = 1.0
+            cells["M1"] = -1.0
+            assert loader.predict(dict(patient))["diagnosis"] == "Negative"
+
+            # Both survive -> uncertain, and uncertain is still a referral.
+            cells["M0"] = 1.0
+            cells["M1"] = 1.0
+            uncertain = loader.predict(dict(patient))
+            assert uncertain["prediction"] == 1
+            assert uncertain["diagnosis"].startswith("Uncertain")
         finally:
-            bundle["threshold"] = original_threshold  # real_router is module-scoped
+            cells.clear()
+            cells.update(original)  # real_router is module-scoped
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -579,3 +633,373 @@ class TestDiabetesEdgeInputs:
         cfg = {"model": {k: v for k, v in _DIABETES_MODEL_CFG.items() if k != "prevalence_deploy"}}
         with pytest.raises(KeyError, match="prevalence_deploy"):
             EnsembleModelLoader(cfg)
+
+
+class TestBatchChestPainCodingGuard:
+    """
+    Gate 8.2 — the two guards on the batch upload path.
+
+    The raw UCI file codes ChestPainType by anginal-feature COUNT, the inverse
+    of the clinical meaning this API takes (HF-1). Uploaded as-is and read as
+    clinical input, 609 of its 920 rows change decision and 130 diseased
+    patients lose their referral (measured, results/p8_2_guard_size.json). One
+    guard refuses the file as distributed; the other lets a caller declare the
+    coding and converts explicitly.
+    """
+
+    HEART_HEADER = ",".join(HEART_CASES["clinical_atypical_angina_up_slope"].keys())
+
+    def _rows(self, *patients):
+        body = [self.HEART_HEADER]
+        body += [",".join(str(v) for v in p.values()) for p in patients]
+        return "\n".join(body).encode("utf-8")
+
+    async def _post(self, live_client, doctor_token, csv_bytes, **params):
+        return await live_client.post(
+            "/api/v4/heart_disease/batch",
+            files={"file": ("test.csv", csv_bytes, "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+            params=params,
+        )
+
+    # ── Layer 1: the raw research export is refused ──────────────────────────
+
+    @pytest.mark.parametrize("marker", ["site", "HeartDisease", "num"])
+    async def test_csv_with_a_raw_uci_marker_column_is_refused(self, live_client, doctor_token, marker):
+        """
+        A column that exists in the UCI export and in no API schema means this
+        is a research file, not a clinician's upload. Refused with the reason
+        and the fix, not a bare 400.
+        """
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        csv_bytes = "\n".join([
+            self.HEART_HEADER + f",{marker}",
+            ",".join(str(v) for v in patient.values()) + ",cleveland",
+        ]).encode("utf-8")
+
+        resp = await self._post(live_client, doctor_token, csv_bytes)
+        assert resp.status_code == 422, resp.text
+        # The app flattens a dict detail into its standard error envelope.
+        body = resp.json()
+        assert body["code"] == "RAW_UCI_EXPORT_REJECTED"
+        assert body["marker_columns_found"] == [marker]
+        # The message must name the fix, or the user has no way forward.
+        assert "chest_pain_coding=uci_raw" in body["error"]
+
+    async def test_an_ordinary_clinical_upload_is_untouched(self, live_client, doctor_token):
+        """The guard must not fire on the file a clinician actually uploads."""
+        patient = dict(HEART_CASES["clinical_no_anginal_features_flat"])
+        resp = await self._post(live_client, doctor_token, self._rows(patient))
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["succeeded"] == 1, data
+        assert data["chest_pain_coding"] == "clinical"
+        # Unchanged against the golden value: the default path did not move.
+        golden = HEART_GOLDEN["clinical_no_anginal_features_flat"]
+        assert data["results"][0]["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
+
+    async def test_marker_column_is_allowed_once_the_coding_is_declared(self, live_client, doctor_token):
+        """
+        Declaring uci_raw is the documented way to upload the research file, so
+        the marker column stops being a reason to refuse. It is not a model
+        input either way.
+        """
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        csv_bytes = "\n".join([
+            self.HEART_HEADER + ",site",
+            ",".join(str(v) for v in patient.values()) + ",cleveland",
+        ]).encode("utf-8")
+
+        resp = await self._post(live_client, doctor_token, csv_bytes, chest_pain_coding="uci_raw")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["chest_pain_coding"] == "uci_raw"
+
+    # ── Layer 2: the declared coding actually converts ───────────────────────
+
+    async def test_declared_raw_coding_scores_as_the_clinical_opposite(self, live_client, doctor_token):
+        """
+        The point of the whole gate. A row whose ChestPainType is the raw code
+        'TA' means NO anginal features; read as clinical input it would mean
+        typical angina. Declaring uci_raw must produce the same answer as
+        uploading 'ASY' -- the clinical code for the same thing -- and a
+        different one from uploading 'TA' as clinical.
+        """
+        raw = dict(HEART_CASES["clinical_atypical_angina_up_slope"], ChestPainType="TA")
+        equivalent = dict(raw, ChestPainType="ASY")   # CP_RAW_TO_CLINICAL["TA"]
+
+        as_raw = await self._post(live_client, doctor_token, self._rows(raw), chest_pain_coding="uci_raw")
+        as_clinical_equivalent = await self._post(live_client, doctor_token, self._rows(equivalent))
+        as_clinical_literal = await self._post(live_client, doctor_token, self._rows(raw))
+        for resp in (as_raw, as_clinical_equivalent, as_clinical_literal):
+            assert resp.status_code == 200, resp.text
+
+        raw_conf = as_raw.json()["results"][0]["confidence"]
+        equivalent_conf = as_clinical_equivalent.json()["results"][0]["confidence"]
+        literal_conf = as_clinical_literal.json()["results"][0]["confidence"]
+
+        assert raw_conf == pytest.approx(equivalent_conf, abs=1e-9)
+        # And the inversion this gate is about is real, not cosmetic.
+        assert abs(raw_conf - literal_conf) > 0.05, (raw_conf, literal_conf)
+
+    async def test_unknown_coding_is_refused(self, live_client, doctor_token):
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        resp = await self._post(
+            live_client, doctor_token, self._rows(patient), chest_pain_coding="whatever"
+        )
+        assert resp.status_code == 400, resp.text
+        assert resp.json()["code"] == "INVALID_CHEST_PAIN_CODING"
+
+    async def test_diabetes_declares_no_coding_and_is_unaffected(self, live_client, doctor_token):
+        """
+        Both guards read the disease's own config, never the disease name. A
+        disease that declares no coding has none to pass, and its batch path is
+        unchanged.
+        """
+        resp = await live_client.post(
+            "/api/v4/diabetes/batch",
+            files={"file": ("d.csv", b"BMI\n25.0\n", "text/csv")},
+            headers={"Authorization": f"Bearer {doctor_token}"},
+            params={"chest_pain_coding": "uci_raw"},
+        )
+        assert resp.status_code == 400, resp.text
+        assert resp.json()["code"] == "CODING_NOT_APPLICABLE"
+
+    async def test_the_coding_reaches_the_audit_row(self, live_client, doctor_token, db_session):
+        """
+        Gate 8.2: the coding is recorded, not just returned. A batch result can
+        be re-read later; the coding it was scored under cannot, unless it was
+        written down. Asserted end to end through AuditMiddleware rather than by
+        setting the column directly, because what could break is the handoff.
+        """
+        from sqlalchemy import select
+
+        from backend.db_models.audit_log import AuditLog
+
+        patient = dict(HEART_CASES["clinical_atypical_angina_up_slope"])
+        resp = await self._post(
+            live_client, doctor_token, self._rows(patient), chest_pain_coding="uci_raw"
+        )
+        assert resp.status_code == 200, resp.text
+
+        rows = (await db_session.execute(
+            select(AuditLog).where(AuditLog.endpoint == "/api/v4/heart_disease/batch")
+        )).scalars().all()
+        assert rows, "the batch upload wrote no audit row at all"
+        assert any((r.details or {}).get("chest_pain_coding") == "uci_raw" for r in rows), \
+            [r.details for r in rows]
+
+    # ── The translation map is derived, not hand-written ─────────────────────
+
+    def test_raw_to_clinical_map_is_derived_from_the_two_maps(self):
+        """
+        A hand-written third map would be a third place for HF-1 to come back.
+        This asserts the map is exactly the count-preserving one and that it is
+        its own inverse.
+        """
+        from backend.heart_glm import stack
+
+        for raw_code, clinical_code in stack.CP_RAW_TO_CLINICAL.items():
+            assert stack.CP_MAP_UCI_RAW[raw_code] == stack.CP_MAP_CLINICAL[clinical_code]
+            assert stack.CP_RAW_TO_CLINICAL[clinical_code] == raw_code
+        assert set(stack.CP_RAW_TO_CLINICAL) == set(stack.CP_MAP_UCI_RAW)
+        # No code maps to itself: the two codings disagree on all four values.
+        assert not any(k == v for k, v in stack.CP_RAW_TO_CLINICAL.items())
+
+    def test_derived_map_is_pinned_literally(self):
+        """
+        The derivation is sound only while the anginal-feature count is a unique
+        key in both maps; a repeated count would silently drop a code and leave
+        a three-entry map that still passes "count-preserving" and "own
+        inverse" for the codes it kept. stack.py refuses to import in that case
+        (asserted below), and this pins the result so a change has to be
+        deliberate.
+        """
+        from backend.heart_glm import stack
+
+        assert stack.CP_RAW_TO_CLINICAL == {
+            "ASY": "TA", "NAP": "ATA", "ATA": "NAP", "TA": "ASY",
+        }
+
+    def test_a_repeated_anginal_count_refuses_to_import(self):
+        """
+        The check lives in the module, not only here: a build that cannot derive
+        the map correctly must fail to start rather than serve mistranslated
+        chest pain. Exercised by re-executing the module source with one map
+        mutated, which is the only way to test an import-time guard.
+        """
+        source = Path(stack_module.__file__).read_text()
+        mutated = source.replace(
+            '{"ASY": 3.0, "NAP": 2.0, "ATA": 1.0, "TA": 0.0}',
+            '{"ASY": 3.0, "NAP": 2.0, "ATA": 2.0, "TA": 0.0}',
+        )
+        assert mutated != source, "the map literal moved -- update this test"
+        with pytest.raises(ImportError, match="repeated anginal-feature count"):
+            exec(compile(mutated, stack_module.__file__, "exec"), {"__name__": "mutated_stack"})
+
+    def test_translation_passes_through_rows_it_cannot_map(self):
+        """
+        A bad cell must stay a one-row validation error, not break the batch.
+        """
+        from backend.heart_glm import stack
+
+        out = stack.translate_raw_codes([{"ChestPainType": "TA"}, {"ChestPainType": None}, {}])
+        assert out == [{"ChestPainType": "ASY"}, {"ChestPainType": None}, {}]
+
+
+class TestHeartImportanceFile:
+    """
+    Gate 8.2 — the importance file must describe the model that ships.
+    """
+
+    def test_importance_matches_the_shipped_bundle(self):
+        """
+        Same method as F0-1 used to catch the old file: recompute and compare.
+        Fails if the shipped file drifts from the bundle, in value or in rank.
+        """
+        import subprocess
+
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        result = subprocess.run(
+            [sys.executable, os.path.join(repo, "scripts/regen_heart_importance.py"), "--verify"],
+            capture_output=True, text=True, cwd=repo,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_importance_covers_exactly_the_features_the_model_reads(self):
+        """
+        The old file listed Oldpeak, ExerciseAngina, MaxHR and ST_Slope -- four
+        features the shipped model does not read. That is what made it wrong
+        rather than merely stale.
+        """
+        import json
+
+        from backend.heart_glm import stack
+
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(repo, "evaluation_evidence/heart/heart_l3_glm_importance.json")) as fh:
+            data = json.load(fh)
+        assert set(data["importance"]) == set(stack.MODEL_FEATURES)
+        assert data["rank"][0] == "cp_anginal", "chest pain is the model's strongest feature"
+        # The scale limit must travel with the numbers.
+        assert "not an attribution" in data["scale_limit"].lower()
+
+
+class TestReviewQueueUsesTheModelsDecision:
+    """
+    Gate 8.4, end to end against the database.
+
+    Auto-queue for human review used to score entropy around a decision
+    threshold for every module. Heart has none, so it got the 0.5 default, and
+    the outcome was wrong both ways: a patient the model called UNCERTAIN far
+    from 0.5 was not queued, and a confidently decided patient near 0.5 was. The
+    endpoint now queues on the module's own decision when it publishes one.
+    """
+
+    BASE = {
+        "Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 140,
+        "Cholesterol": 289, "FastingBS": 0, "RestingECG": "Normal",
+        "MaxHR": 122, "ExerciseAngina": "N", "Oldpeak": 0.0, "ST_Slope": "Flat",
+    }
+
+    async def _predict(self, live_client, doctor_token, patient):
+        return await live_client.post(
+            "/api/v4/heart_disease/predict",
+            json=patient,
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+
+    @staticmethod
+    async def _stored_record(db_session, patient):
+        """
+        The prediction row for THIS patient, matched on its stored inputs.
+
+        Not "the most recent heart row": created_at has one-second resolution on
+        SQLite, so rows written by sibling tests in the same module tie and the
+        lookup silently returned another case's record.
+        """
+        from sqlalchemy import select
+
+        from backend.db_models.prediction import Prediction
+
+        rows = (await db_session.execute(
+            select(Prediction).where(Prediction.disease == "heart_disease")
+        )).scalars().all()
+        matched = [
+            r for r in rows
+            if r.input_features.get("Age") == patient["Age"]
+            and r.input_features.get("ChestPainType") == patient["ChestPainType"]
+            and r.input_features.get("Sex") == patient["Sex"]
+            and r.input_features.get("RestingBP") == patient["RestingBP"]
+        ]
+        assert matched, f"no stored prediction for Age={patient['Age']} {patient['ChestPainType']}"
+        return matched[-1]
+
+    # Every case here is one where the OLD rule and the new one DISAGREE, which
+    # is the only kind that tests anything: the first three fixtures tried were
+    # patients both rules happened to treat alike, so the test passed even with
+    # the fix reverted. Each row notes what the old entropy-around-0.5 rule did.
+    @pytest.mark.parametrize(
+        "patient, decision, should_queue",
+        [
+            # UNCERTAIN at p=0.72 -- far enough from 0.5 that the old rule left
+            # it unqueued, though the model had said it could not place them.
+            (dict(Age=25, Sex="M", ChestPainType="TA", RestingBP=100,
+                  Cholesterol=150, RestingECG="Normal"), "uncertain", True),
+            # A CONFIDENT referral at p=0.576 -- close enough to 0.5 that the old
+            # rule sent a decided patient for review.
+            (dict(Age=31, Sex="F", ChestPainType="TA", RestingBP=180,
+                  Cholesterol=350, RestingECG="ST"), "referral", False),
+            # And a confident non-referral, which neither rule queues.
+            (dict(Age=54, Sex="M", ChestPainType="NAP", RestingBP=140,
+                  Cholesterol=289, RestingECG="Normal"), "no_referral", False),
+        ],
+        ids=["uncertain_far_from_half", "confident_near_half", "no_referral"],
+    )
+    async def test_only_an_uncertain_decision_is_queued(
+        self, live_client, doctor_token, db_session, patient, decision, should_queue
+    ):
+        from sqlalchemy import select
+
+        from backend.db_models.review_queue import ReviewQueue
+
+        patient = dict(self.BASE, **patient)
+        resp = await self._predict(live_client, doctor_token, patient)
+        assert resp.status_code == 200, resp.text
+        # The fixture drives the rule, so a changed model must change the fixture
+        # rather than silently weaken the test.
+        assert resp.json()["decision"] == decision, resp.json()
+
+        record = await self._stored_record(db_session, patient)
+        # The decision and its interval are stored, not just returned.
+        assert record.decision == decision
+        assert record.probability_lower <= record.confidence <= record.probability_upper
+
+        queued = (await db_session.execute(
+            select(ReviewQueue).where(ReviewQueue.prediction_id == record.id)
+        )).scalars().first()
+        assert (queued is not None) is should_queue, (
+            f"decision={decision}: queued={queued is not None}, expected {should_queue}"
+        )
+
+    async def test_the_stored_threshold_is_null_not_a_default(
+        self, live_client, doctor_token, db_session
+    ):
+        """
+        A queued heart row must not record a decision_threshold: writing 0.5
+        there would make the audit trail claim the model used a cut-point.
+        """
+        from sqlalchemy import select
+
+        from backend.db_models.prediction import Prediction
+        from backend.db_models.review_queue import ReviewQueue
+
+        resp = await self._predict(live_client, doctor_token, dict(self.BASE))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["decision"] == "uncertain"
+
+        record = await self._stored_record(db_session, dict(self.BASE))
+        queued = (await db_session.execute(
+            select(ReviewQueue).where(ReviewQueue.prediction_id == record.id)
+        )).scalars().first()
+        assert queued is not None
+        assert queued.decision_threshold is None, queued.decision_threshold

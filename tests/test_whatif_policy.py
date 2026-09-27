@@ -145,12 +145,32 @@ class TestPolicyOnDemoPatients:
         assert {d for d, _ in with_fallback} == {"heart_disease", "diabetes"}
 
     def test_crossing_scenarios_really_cross(self, real_router, cf_results):
+        """A "crossing" scenario must actually reach a negative decision.
+
+        Read the disease's decision rule from its config rather than assuming
+        one: a module that publishes an `inference_threshold` is checked
+        against it, and one whose decision is a conformal set (heart, since
+        Gate 8.1) publishes no threshold and is checked by re-predicting. Both
+        are the same assertion — the scenario really crosses — stated in the
+        terms the module actually decides in.
+        """
         for (disease, name), result in cf_results.items():
+            threshold = real_router.get_disease_info(disease)["inference_threshold"]
             for scenario in result["counterfactuals"]:
                 assert scenario["crosses_threshold"] is True
                 prob = scenario.get("new_probability_corrected", scenario.get("probability"))
-                threshold = real_router.get_disease_info(disease)["inference_threshold"]
-                assert prob < threshold + 1e-4, (disease, name, prob)
+                if threshold is not None:
+                    assert prob < threshold + 1e-4, (disease, name, prob)
+                else:
+                    patient = _validated(
+                        disease, {**DEMO[disease], **EDGE.get(disease, {})}[name]
+                    )
+                    moved = {**patient, **{
+                        c["feature"]: c["counterfactual_value"] for c in scenario["changes"]
+                    }}
+                    assert real_router.predict(disease, moved)["prediction"] == 0, (
+                        disease, name, prob,
+                    )
 
 
     def test_reported_changes_fully_explain_the_probability(self, real_router, cf_results):

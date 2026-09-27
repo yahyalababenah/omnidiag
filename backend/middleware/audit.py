@@ -12,6 +12,9 @@ What is logged:
     - status_code — response status
     - ip_address — client IP (supports IPv6, String(45))
     - duration_ms — wall-clock time from first byte to last byte
+    - details    — optional JSON a handler attaches via request.state.audit_details,
+                   for a request the path alone does not describe (e.g. the
+                   chest-pain coding a batch upload was read under, Gate 8.2)
 
 What is NOT logged (to reduce noise):
     - GET /         (health check — polled every few seconds by HF Spaces)
@@ -98,6 +101,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     status_code=response.status_code,
                     ip_address=request.client.host if request.client else None,
                     duration_ms=round(duration_ms, 2),
+                    # Set by a handler that has more to record than its path --
+                    # e.g. which chest-pain coding a batch upload was read under
+                    # (Gate 8.2). This middleware runs after the handler, so the
+                    # value is already there. Absent for every other request.
+                    details=getattr(request.state, "audit_details", None),
                 )
                 db.add(entry)
                 await db.commit()

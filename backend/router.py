@@ -90,8 +90,8 @@ class OmniDiagRouter:
         has_model = os.path.isfile(weights_path)
         # Display bands for the risk badge, on the same scale as the
         # probabilities this disease returns. A disease that configures none
-        # (heart) reports None and the UI keeps its own default — nothing
-        # about that path changes.
+        # (heart, deliberately -- D-32) reports None, and since Gate 8.4 the UI
+        # shows NO badge for it rather than substituting its own 0.7/0.4.
         model_cfg = config.get("model", {})
         risk_bands = model_cfg.get("risk_bands") or None
         if risk_bands and {"prevalence_train", "prevalence_deploy"} <= set(model_cfg):
@@ -108,6 +108,10 @@ class OmniDiagRouter:
             "name": config.get("disease", {}).get("name"),
             "display_name": config.get("disease", {}).get("display_name"),
             "description": config.get("disease", {}).get("description"),
+            # One line to show beside every result for this module. Absent for a
+            # module that declares none, and the UI then shows nothing rather
+            # than inventing a scope (Gate 8.9).
+            "scope_note": config.get("disease", {}).get("scope_note"),
             "version": config.get("disease", {}).get("version"),
             "model_type": config.get("model", {}).get("type"),
             "explainer_type": config.get("model", {}).get("explainer_type"),
@@ -116,9 +120,20 @@ class OmniDiagRouter:
             # Decision threshold on the same scale as the probabilities this
             # disease returns (already the deployment scale for diabetes;
             # configs/diabetes.yaml states it there). None for a disease that
-            # configures none — heart takes sklearn's argmax — and the UI
-            # falls back to its own documented constant in that case.
+            # configures none, which since Gate 8.1 is heart: its decision is a
+            # conformal set, not a probability against a cut-point. The UI shows
+            # no threshold in that case and invents none (Gate 8.4).
             "inference_threshold": model_cfg.get("inference_threshold"),
+            # How this module decides, and what its probability is calibrated
+            # to. Sent so consumers branch on the declaration instead of on the
+            # disease name.
+            "output_type": model_cfg.get("output_type"),
+            "probability_scale": model_cfg.get("probability_scale"),
+            # Largest batch this module accepts, and why, for the message the UI
+            # shows before it uploads. Declared per disease because the reason is
+            # per disease: diabetes generates row by row, heart is vectorised.
+            "max_batch_rows": model_cfg.get("max_batch_rows"),
+            "max_batch_rows_reason": model_cfg.get("max_batch_rows_reason"),
             # Whether this module's probabilities are prevalence-corrected.
             # The UI needs it to label a column or an export honestly: a
             # batch CSV headed `risk_probability_corrected` is a false claim
@@ -192,8 +207,8 @@ class OmniDiagRouter:
                 detail={
                     "error": f"Counterfactual generation is not implemented for disease '{disease}'.",
                     "code": "COUNTERFACTUALS_NOT_SUPPORTED",
-                    "hint": "This feature is only available for ensemble models (e.g. diabetes). "
-                            "Heart disease uses a single XGBoost model without a counterfactual generator.",
+                    "hint": "The disease's model family provides no counterfactual generator. "
+                            "See docs/ADDING_A_MODEL_FAMILY.md.",
                 }
             )
         

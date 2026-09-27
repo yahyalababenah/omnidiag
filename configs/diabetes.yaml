@@ -91,6 +91,11 @@ model:
   # (was 0.275, selected on y_test). Test set: 91.3% sensitivity, 55.4% specificity
   # -- both threshold-invariant to prevalence_deploy (see below).
   # Evidence: evaluation_evidence/diabetes/threshold_decision_log.md
+  # Largest batch this module accepts, and why, in the words the UI shows
+  # before uploading. Declared here rather than branched on the disease name
+  # in the frontend (Gate 8.4).
+  max_batch_rows: 20
+  max_batch_rows_reason: "diabetes scoring takes about 0.1 s per patient"
   inference_threshold: 0.108184
   weights_path: "models/diabetes/omni_diag_xgb_optimized.pkl"
   # Prior-shift (Bayes) correction — see backend/prevalence_correction.py.

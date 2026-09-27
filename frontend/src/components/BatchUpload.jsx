@@ -28,18 +28,25 @@ import { API_BASE } from '../api'
 // even though the Authorization header below is attached correctly.
 const BASE = `${API_BASE}/api/v4`
 
-// Diabetes generation is ~0.1 s per row and the whole batch is one request.
-// Above this the judge is watching a spinner rather than the product, so the
-// upload is refused up front with the row count rather than accepted and
-// left to run. Heart is vectorised and stays on the server's 500-row limit.
-const DIABETES_MAX_ROWS = 20
+// Used only when the API told us nothing. The per-disease cap and its reason
+// are declared in each disease's config and arrive on GET /api/v4/diseases
+// (`max_batch_rows`, `max_batch_rows_reason`); this file no longer decides them
+// by disease name (Gate 8.4). Diabetes generates row by row at ~0.1 s each and
+// heart is vectorised, so the numbers differ for a reason that belongs with the
+// module, not with the upload widget.
 const SERVER_MAX_ROWS = 500
 
-/** Row cap for a disease, and why, for the message shown to the user. */
-export function rowLimitFor(disease) {
-  return disease === 'diabetes'
-    ? { max: DIABETES_MAX_ROWS, reason: 'diabetes scoring takes about 0.1 s per patient' }
-    : { max: SERVER_MAX_ROWS, reason: 'server limit' }
+/**
+ * Row cap for a disease, and why, for the message shown to the user.
+ *
+ * @param {object|null} diseaseInfo - the disease's entry from GET /api/v4/diseases
+ */
+export function rowLimitFor(diseaseInfo) {
+  const max = diseaseInfo?.max_batch_rows
+  if (typeof max === 'number') {
+    return { max, reason: diseaseInfo.max_batch_rows_reason || 'module limit' }
+  }
+  return { max: SERVER_MAX_ROWS, reason: 'server limit' }
 }
 
 /** Data rows in a CSV text body, ignoring the header and blank lines. */
@@ -281,7 +288,7 @@ export default function BatchUpload() {
   const diseaseInfo = availableDiseases?.find(d => d.name === selectedDisease)
   const threshold = diseaseInfo?.inference_threshold ?? null
   const prevalenceCorrected = diseaseInfo?.prevalence_corrected === true
-  const limit = rowLimitFor(selectedDisease)
+  const limit = rowLimitFor(diseaseInfo)
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
@@ -303,7 +310,7 @@ export default function BatchUpload() {
 
     // Count the rows before uploading, so an oversized diabetes batch is
     // refused in a second instead of running for a minute and timing out.
-    const { max, reason } = rowLimitFor(selectedDisease)
+    const { max, reason } = rowLimitFor(diseaseInfo)
     try {
       const rows = countCsvDataRows(await f.text())
       if (rows > max) {
@@ -320,7 +327,7 @@ export default function BatchUpload() {
     }
 
     setFile(f)
-  }, [selectedDisease])
+  }, [selectedDisease, diseaseInfo])
 
   async function runBatch() {
     if (!file || !selectedDisease) return

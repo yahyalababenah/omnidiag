@@ -25,7 +25,69 @@ pinned: false
 
 ---
 
-**OmniDiag** is a config-driven, multi-disease clinical decision support system built for healthcare professionals. It serves per-disease XGBoost and stacking ensemble models behind a unified FastAPI surface, with SHAP-based explainability, a DiCE-inspired counterfactual engine, a human-in-the-loop active learning pipeline, DeepSeek LLM clinical report generation, Prometheus metrics, and Kubernetes deployment with horizontal pod autoscaling.
+**OmniDiag** is a config-driven, multi-disease clinical decision support system built for healthcare professionals. It serves per-disease models behind a unified FastAPI surface, with SHAP-based explainability, a DiCE-inspired counterfactual engine, a human-in-the-loop active learning pipeline, DeepSeek LLM clinical report generation, Prometheus metrics, and Kubernetes deployment with horizontal pod autoscaling.
+
+## Who this is for, and what each module covers
+
+**The system** is a clinical decision support system (CDSS) for **resident and general physicians**, in **outpatient clinics, teaching hospitals and government hospitals**. It supports a clinician's decision. It does not make one, and it does not diagnose.
+
+**The heart module is part of that system with a narrower scope of its own.** It ranks **patients a clinician has already decided to refer for catheterisation** by the probability of a >50 % stenosis. It is **not a general-population screen**: every patient it learned from had already been selected for catheterisation by a clinician (UCI, 1982–1987), so it has never seen the people a screening test would be pointed at. The sentence is carried in the module's own config (`disease.scope_note`) and shown beside every result on screen and in the printed report, because a number without its scope is the failure this project is most exposed to.
+
+**The diabetes module** (CDC BRFSS 2015) is a population-survey risk model and carries its own declared limits in `WEAKNESS_REGISTER.md`. **It was not touched in Phase 8:** its model, its prevalence correction and its decision threshold (0.108184, on the deployment-prevalence scale) are unchanged, and its open items — including WI-8 — stand as recorded.
+
+### What changed in Phase 8 (heart module only)
+
+The heart module now ships a **Spline-GLM on seven pre-stress-test inputs, calibrated with exact inductive Venn-Abers, with a Mondrian conformal decision by sex × class** (`models/heart_disease/heart_l3_glm_stack.pkl`, built at image build time and verified against a recorded fingerprint). It answers **refer / do not refer / uncertain** rather than thresholding a probability, and **uncertain counts as a referral everywhere in the system**. It publishes **no decision threshold and no risk bands**, deliberately: Gate 6 measured that the probability's meaning does not transport between hospitals, so a HIGH/MODERATE/LOW badge on it would claim a precision the model does not have. The declared cost is that **around 40 % of patients land in `uncertain`**.
+
+The full research record — every decision, its alternatives, and the measurement behind it — is in the experiments repository, not here.
+
+> **What the screenshots in the research repo do and do not show.** They show that the system behaves as designed — that the interface reports the model's decision faithfully. **They do not show that it is clinically understood.** No clinician has read these screens. Around 40 % of patients land in `uncertain`, and what a physician does with that has not been tested with any physician. **Clinical review is a declared next step before any real use.**
+
+### The three answers, on screen
+
+The heart module returns **one of three answers**, and the interface reports
+whichever one the model gave. These are real screens, captured from this branch
+against a local backend (Gate 8.6-b, 2026-09-27).
+
+| Referral | No referral | Uncertain |
+|---|---|---|
+| <img src="docs/assets/screenshots/10_referral_result.png" alt="Referral: the result panel reads Refer — confirmatory testing recommended, with the calibrated interval 85.9%–87.1%" width="280"> | <img src="docs/assets/screenshots/10_no_referral_result.png" alt="No referral: the result panel reads No referral indicated, with the calibrated interval 11.8%–25.0%" width="280"> | <img src="docs/assets/screenshots/10_uncertain_result.png" alt="Uncertain: the result panel reads Uncertain — refer for further evaluation, in amber, with the calibrated interval 71.4%–73.3%" width="280"> |
+| `Refer — confirmatory testing recommended` | `No referral indicated` | `Uncertain — refer for further evaluation` |
+
+**"Uncertain" is a third decision, not a middle band of risk.** The conformal set
+contains *both* labels, which means the model is declining to rank this patient
+at the guaranteed error rate — it is not saying "moderate risk". It is amber
+rather than red or green for that reason, it **counts as a referral everywhere in
+the system**, and it is where about 40 % of patients land. The module publishes
+no threshold and no risk bands, so there is no middle band for it to be.
+
+The generated report says the same thing in prose, including for the uncertain
+patient — [`20_uncertain_report.png`](docs/assets/screenshots/20_uncertain_report.png).
+
+**These screens show that the interface reports the model faithfully. They do not
+show that it is clinically understood** — the limit stated above applies to these
+four images too.
+
+### The measurements behind the model
+
+Every figure below is copied from the experiments repository, where it was
+produced; none is a live plot. Each caption names the gate that produced it, the
+script that drew it, and the date of the commit it was taken from.
+
+| | |
+|---|---|
+| <img src="docs/assets/research/fig_ladder_auc.png" alt="Forest plot of pooled leave-one-hospital-out AUC for the seven feature-set layers, each with its HKSJ interval" width="330"> | <img src="docs/assets/research/fig_models_forest.png" alt="Forest plot of pooled AUC for the six model families on two feature sets" width="330"> |
+| **The seven-layer feature ladder**, pooled leave-one-hospital-out AUC with HKSJ intervals. Gate 3 · `scripts/p3_figures.py` · research repo `0e0047d`, 2026-09-25 | **The six model families**, on the shipped feature set and the wider one. Gate 4 · `scripts/p4_figures.py` · research repo `3c5d88a`, 2026-09-25 |
+| <img src="docs/assets/research/fig_ablation_forest.png" alt="Forest plot comparing nine training-objective ablation arms by pooled AUC" width="330"> | <img src="docs/assets/research/fig_hf13_options.png" alt="Sensitivity by sex under four decision-rule options, showing the single-threshold gap and the Mondrian option" width="330"> |
+| **Nine training objectives** compared on the same split. Gate 5 · `scripts/p5_figures.py` · research repo `0e0047d`, 2026-09-25 | **The sex-sensitivity gap (HF-13)** and the four decision rules considered; O3, the Mondrian rule, is what ships. Gate 7 · `scripts/p7_hf13_figure.py` · research repo `f2e17a3`, 2026-09-26 |
+| <img src="docs/assets/research/fig_tehran_layers.png" alt="External Tehran cohort AUC across feature-set layers" width="330"> | <img src="docs/assets/research/fig_tehran_cp_only.png" alt="Chest-pain coding comparison between the UCI and Tehran cohorts" width="330"> |
+| **External validation, Tehran cohort** — a different country, a different decade, a different recording convention. Gate 1 · `scripts/p3_figures.py` · research repo `0e0047d`, 2026-09-25 | **Why chest-pain coding matters** between the two cohorts. Gate 4 · `scripts/p4_figures.py` · research repo `3c5d88a`, 2026-09-25 |
+
+The pooled figure is never the whole story here: the widest single-hospital
+interval spans 0.40 AUC, and the 95 % prediction interval for a *new* hospital
+runs from 0.36 to 0.97. Both are in the research repo's `results.md`, with the
+per-hospital tables the plots summarise.
+
 
 > **What is actually running in the deployed Space** (verified 2026-09-23, see
 > [docs/FEATURE_VERIFICATION.md](docs/FEATURE_VERIFICATION.md)):
@@ -34,9 +96,33 @@ pinned: false
 >   tracking are implemented in this repository but are **not live**. Evidently
 >   is installed in the image yet unusable — the code targets its 0.4 API and
 >   the pin resolves to 0.7, which removed it; the cost of each way out is
->   costed in [docs/EVIDENTLY_COST.md](docs/EVIDENTLY_COST.md). MLflow creates
->   an empty database and logs no runs. Do not present either as a working
->   feature.
+>   costed in [docs/EVIDENTLY_COST.md](docs/EVIDENTLY_COST.md).
+>
+>   **MLflow, corrected 2026-09-26 (Gate 8.6).** It logged no runs because
+>   *nothing wrote to it*: the only automatic caller was the retrain path, which
+>   fails for heart and is a no-op for diabetes, and the script that builds the
+>   shipped heart artifact logged nothing at all. Worse, the admin endpoint
+>   reported `count: 0` whether the package was missing, the store was
+>   unreachable, or the store was working and empty — so "MLflow is empty" could
+>   not be told apart from "MLflow is not installed".
+>
+>   Both are fixed. `GET /admin/mlflow/runs` now returns a `status` of
+>   `unavailable` / `unreachable` / `empty` / `ok` with the `tracking_uri` and a
+>   reason, and [`scripts/train_heart_glm.py`](scripts/train_heart_glm.py) logs
+>   one run per image build recording the artifact's provenance — the training
+>   CSV's sha256, the bundle's sha256, the reproducibility fingerprint, the
+>   conformal alpha, and the blank-input impact — and **deliberately no accuracy
+>   figure**, because every performance number for this model is cross-fitted or
+>   leave-one-hospital-out and belongs with its confidence interval, not beside
+>   an artifact hash.
+>
+>   **What this still is not:** a tracking *server*. With no `MLFLOW_TRACKING_URI`
+>   set, the store is a SQLite file baked into the image at build time, so it
+>   holds exactly one run — the model in that image — and a new build replaces
+>   it. There is no experiment comparison, and the retrain cycle that would
+>   produce one is still broken (see the Known limitation below). `docker-compose`
+>   and the k8s manifest do point at a real MLflow server, and the same code logs
+>   there when one is reachable.
 > - **Clinical notes: regex, English only.** The BioBERT path exists in the
 >   code but is never called — the frontend always sends `use_bert: false` and
 >   `transformers` is not part of the deployed dependency set. Arabic is not
@@ -165,15 +251,17 @@ Rate limiting is applied via [`SlowAPI`](backend/rate_limit.py:49) with per-rout
 
 ### Human-in-the-Loop Active Learning
 
-The active learning pipeline consists of three components. [`sampler.py`](backend/active_learning/sampler.py:26) computes binary entropy **around the module's own decision threshold**, not around 0.5: the probability is first mapped by [`centre_on_threshold()`](backend/active_learning/sampler.py) — the prior-shift map with the threshold `t` sent to 0.5, strictly increasing and the identity when `t = 0.5` — and then `H(q) = -q·log₂(q) - (1-q)·log₂(1-q)` is taken. A prediction with `H ≥ 0.88` ([`_DEFAULT_ENTROPY_THRESHOLD`](backend/active_learning/sampler.py)) is queued via [`should_queue_for_review(probability_corrected, decision_threshold)`](backend/active_learning/sampler.py). For heart (`t = 0.3695`, read from the shipped model bundle, not argmax) that is ≈20–58 %; for diabetes (`t = 0.108184` on the prevalence-corrected scale) it is ≈5–22 %. The distinction matters: a 0.5-centred sampler on the corrected diabetes scale queued 4,789 of 14,139 test rows, every one a confident Positive at ≥ 5× the threshold, and **0 of the 849** rows within ±20 % of the threshold; the threshold-centred sampler queues 3,566 rows including **all 849**. Each queued row records `uncertainty_scale` and `decision_threshold` beside `uncertainty_score`, so scores from different releases are never compared blindly. [`uncertainty_band()`](backend/active_learning/sampler.py) maps the same centred value to `CERTAIN` / `CONFIDENT` / `BORDERLINE` / `UNCERTAIN`. The [`routes.py`](backend/active_learning/routes.py) module exposes `GET /api/v4/review/queue` (paginated, filterable by disease), `POST /api/v4/review/{id}/annotate` (writes `label` and transitions `status → reviewed`), `POST /api/v4/review/{id}/skip`, and `GET /api/v4/review/stats`.
+The active learning pipeline consists of three components. [`sampler.py`](backend/active_learning/sampler.py:26) computes binary entropy **around the module's own decision threshold**, not around 0.5: the probability is first mapped by [`centre_on_threshold()`](backend/active_learning/sampler.py) — the prior-shift map with the threshold `t` sent to 0.5, strictly increasing and the identity when `t = 0.5` — and then `H(q) = -q·log₂(q) - (1-q)·log₂(1-q)` is taken. A prediction with `H ≥ 0.88` ([`_DEFAULT_ENTROPY_THRESHOLD`](backend/active_learning/sampler.py)) is queued via [`should_queue_for_review(probability_corrected, decision_threshold)`](backend/active_learning/sampler.py). For diabetes (`t = 0.108184` on the prevalence-corrected scale) that is ≈5–22 %. **Heart no longer takes this path at all:** its module reports a decision rather than a probability against a cut-point, so a row is queued when the model itself answers `uncertain` — `decision == 'uncertain'`, not an entropy score. Routing it through the threshold rule was wrong in both directions and measurably so: with the 0.5 default it left a patient the model had called UNCERTAIN at p = 0.95 unqueued while queueing a confidently decided one at p = 0.52. A queued heart row records `decision_threshold = NULL`, because writing 0.5 there would make the audit trail claim a threshold the model does not have. The distinction matters: a 0.5-centred sampler on the corrected diabetes scale queued 4,789 of 14,139 test rows, every one a confident Positive at ≥ 5× the threshold, and **0 of the 849** rows within ±20 % of the threshold; the threshold-centred sampler queues 3,566 rows including **all 849**. Each queued row records `uncertainty_scale` and `decision_threshold` beside `uncertainty_score`, so scores from different releases are never compared blindly. [`uncertainty_band()`](backend/active_learning/sampler.py) maps the same centred value to `CERTAIN` / `CONFIDENT` / `BORDERLINE` / `UNCERTAIN`. The [`routes.py`](backend/active_learning/routes.py) module exposes `GET /api/v4/review/queue` (paginated, filterable by disease), `POST /api/v4/review/{id}/annotate` (writes `label` and transitions `status → reviewed`), `POST /api/v4/review/{id}/skip`, and `GET /api/v4/review/stats`.
 
-[`run_retrain_pipeline()`](backend/active_learning/retrain.py:149) is the full async pipeline. [`get_annotated_samples()`](backend/active_learning/retrain.py:38) issues a raw SQL JOIN of `review_queue` and `predictions` filtered to `status='reviewed'` and `label IS NOT NULL`. [`retrain_xgb()`](backend/active_learning/retrain.py:84) loads the current `.pkl`, constructs an `xgb.DMatrix`, and calls `xgb.train()` with `xgb_model=model` for 20 incremental boost rounds at lr=0.05 — the existing tree structure is preserved and extended. The old model is renamed to a timestamped `.bak.pkl` before the new weights are written. On success, [`ModelLoader.invalidate()`](backend/model_loader.py) / [`EnsembleModelLoader.invalidate()`](backend/ensemble_loader.py) clears the live router's cached model object so the very next prediction lazy-reloads the new weights from disk — **no process restart required**. This hot-reload path was verified end-to-end (swap in a differently-shaped model file → confirm the next request immediately errors with a feature-mismatch specific to the *new* file, proving it was actually loaded). [`_log_to_mlflow()`](backend/active_learning/retrain.py:137) records the retrain run unconditionally, with a warning-only failure path if MLflow is unreachable.
+[`run_retrain_pipeline()`](backend/active_learning/retrain.py:149) is the full async pipeline. [`get_annotated_samples()`](backend/active_learning/retrain.py:38) issues a raw SQL JOIN of `review_queue` and `predictions` filtered to `status='reviewed'` and `label IS NOT NULL`. [`retrain_xgb()`](backend/active_learning/retrain.py:84) loads the current `.pkl`, constructs an `xgb.DMatrix`, and calls `xgb.train()` with `xgb_model=model` for 20 incremental boost rounds at lr=0.05 — the existing tree structure is preserved and extended. The old model is renamed to a timestamped `.bak.pkl` before the new weights are written. On success, [`ModelLoader.invalidate()`](backend/model_loader.py) / [`EnsembleModelLoader.invalidate()`](backend/ensemble_loader.py) clears the live router's cached model object so the very next prediction lazy-reloads the new weights from disk — **no process restart required**. This hot-reload path was verified end-to-end (swap in a differently-shaped model file → confirm the next request immediately errors with a feature-mismatch specific to the *new* file, proving it was actually loaded). [`_log_to_mlflow()`](backend/active_learning/retrain.py:137) records the retrain run unconditionally, with a warning-only failure path if MLflow is unreachable — **but it is never reached in practice, because `retrain_xgb()` fails before it for both diseases** (see the Known limitation below). Until Gate 8.6 that made it the only automatic writer to an experiment that consequently stayed empty.
 
-🚧 **Known limitation:** `retrain_xgb()` builds its training matrix directly from the raw predict-time `input_features` (`X = np.array([list(feat.values()) for feat in features_list])`) and always reads/writes the single hardcoded path `models/{disease}/omni_diag_xgb_optimized.pkl`. For **heart_disease**, that filename no longer exists at all — the shipped weights are `models/heart_disease/heart_full_tuned.pkl`, a `dict` bundle (`{pipeline, features, threshold, ...}`), not a bare `XGBClassifier` — so `retrain_xgb()` fails immediately at its own `if not model_path.exists()` check, before the un-encoded-categorical-strings issue it was originally written to describe is ever reached. No real annotated-sample retrain cycle for heart_disease currently completes, for a different reason than previously documented. For **diabetes**, that same hardcoded path is **not** one of the three files `EnsembleModelLoader` actually loads (`xgb_model.pkl`, `lgb_model.pkl`, `rf_model.pkl`) — so even a numerically successful run retrains a file the live ensemble never reads, a silent no-op. The hot-reload mechanism described above is implemented and tested; connecting it to a disease-aware, correctly-shaped retrain step is the next piece of work here.
+🚧 **Known limitation:** `retrain_xgb()` builds its training matrix directly from the raw predict-time `input_features` (`X = np.array([list(feat.values()) for feat in features_list])`) and always reads/writes the single hardcoded path `models/{disease}/omni_diag_xgb_optimized.pkl`. For **heart_disease**, that filename no longer exists at all — the shipped artifact is `models/heart_disease/heart_l3_glm_stack.pkl`, a `dict` bundle holding a Spline-GLM Pipeline with its calibration and conformal state, not a bare `XGBClassifier` — so `retrain_xgb()` fails immediately at its own `if not model_path.exists()` check, before the un-encoded-categorical-strings issue it was originally written to describe is ever reached. It is also built at image build time from the training CSV and verified against a recorded fingerprint, so retraining it from annotated rows is a larger question than swapping a file. No real annotated-sample retrain cycle for heart_disease currently completes, for a different reason than previously documented. For **diabetes**, that same hardcoded path is **not** one of the three files `EnsembleModelLoader` actually loads (`xgb_model.pkl`, `lgb_model.pkl`, `rf_model.pkl`) — so even a numerically successful run retrains a file the live ensemble never reads, a silent no-op. The hot-reload mechanism described above is implemented and tested; connecting it to a disease-aware, correctly-shaped retrain step is the next piece of work here.
 
 ### DeepSeek LLM Clinical Report Generation
 
-[`generate_report()`](backend/llm/report_generator.py:100) calls the DeepSeek API using an `AsyncOpenAI` client pointed at `_DEEPSEEK_BASE_URL = "https://api.deepseek.com"` with `model="deepseek-chat"` and `max_tokens=600`. The key is read lazily via [`_get_api_key()`](backend/llm/report_generator.py:18) on each call — not at import time — so Hugging Face Space secrets injected after startup are picked up correctly. [`_format_shap()`](backend/llm/report_generator.py:57) sorts SHAP values by absolute magnitude and formats the top 5 as directional bullets (`↑ increases risk` / `↓ decreases risk`) for inclusion in the user prompt alongside disease, probability, risk band, decision threshold and patient features. The risk band is computed **once, on the server**, by classifying `probability_corrected` against the disease's own `risk_bands` (corrected for diabetes, the historical 0.70 / 0.40 for heart) — never from literal cut-points and never from a band supplied by the client. The same band drives the narrative, the recommended actions and the LLM prompt, and is returned as `risk_band`. The prompt states that the probability is calibrated to the deployment prevalence so the model does not read 11 % as "low".
+[`generate_report()`](backend/llm/report_generator.py:100) calls the DeepSeek API using an `AsyncOpenAI` client pointed at `_DEEPSEEK_BASE_URL = "https://api.deepseek.com"` with `model="deepseek-chat"` and `max_tokens=600`. The key is read lazily via [`_get_api_key()`](backend/llm/report_generator.py:18) on each call — not at import time — so Hugging Face Space secrets injected after startup are picked up correctly. [`_format_shap()`](backend/llm/report_generator.py:57) sorts SHAP values by absolute magnitude and formats the top 5 as directional bullets (`↑ increases risk` / `↓ decreases risk`) for inclusion in the user prompt alongside disease, probability, risk band, decision threshold and patient features. The risk band is computed **once, on the server**, by classifying `probability_corrected` against the disease's own `risk_bands` — never from literal cut-points and never from a band supplied by the client. The same band drives the narrative, the recommended actions and the LLM prompt, and is returned as `risk_band`. The prompt states that the probability is calibrated to the deployment prevalence so the model does not read 11 % as "low".
+
+> **heart_disease takes a different prompt.** It configures `risk_bands: null` on purpose (D-32: Gate 6 measured that its probability's meaning does not transport between hospitals), so it gets **no band at all** — `risk_band` is `null` and the recommended actions are keyed on the decision instead. Its prompt states the decision, the Venn-Abers interval, that the probability is calibrated to the training hospitals' mix rather than to the reading institution's population, and that there is no threshold and no band to report. Until Phase 8 it was handed the threshold-module prompt unchanged, which told it the opposite on all three points and supplied a 0.70/0.40 band this module does not define.
 
 When `DEEPSEEK_API_KEY` is absent or the API call raises any exception, [`_rule_based_report()`](backend/llm/report_generator.py:71) generates the same four-section structure — Clinical Summary, Key Risk Drivers, Recommended Actions, Risk Stratification Note — using the SHAP rankings and a `HIGH` / `MODERATE` / `LOW` risk band derived from the probability. The response `source` field distinguishes `"llm"` (with `llm_model` and `latency_ms`) from `"rule_based"` (with `fallback_reason`) so callers can surface the provenance to clinicians.
 
@@ -185,14 +273,17 @@ When `DEEPSEEK_API_KEY` is absent or the API call raises any exception, [`_rule_
 
 The inference pipeline order is **disease-specific**, matching how each model was trained (verified live for both diseases):
 
-- **heart_disease (CAD)** — [`ModelLoader.predict()`](backend/model_loader.py:179) does **no manual preprocessing at all**: raw feature values go straight into `pipeline.predict_proba()`. The shipped weights file (`models/heart_disease/heart_full_tuned.pkl`) is a single self-contained `sklearn.Pipeline` — a `ColumnTransformer` (`IterativeImputer` + `StandardScaler` for the 6 numeric features, `SimpleImputer` + `OrdinalEncoder` for the 5 categorical ones) feeding an `XGBClassifier` — so imputation, scaling and encoding all happen inside the Pipeline itself. There is no separate feature-engineering step and no `label_encoders.pkl` / `standard_scaler.pkl` preprocessor files for this disease; six of the eleven input fields (`RestingBP, Cholesterol, FastingBS, MaxHR, Oldpeak, ST_Slope`) are `Optional` on the schema for exactly this reason — the Pipeline is built to impute them.
+- **heart_disease (CAD)** — [`HeartGlmConformalBackend`](backend/model_backends/heart_glm_conformal.py) does **no manual preprocessing at all**: raw feature values are encoded by [`stack.encode_for_inference()`](backend/heart_glm/stack.py) and go straight into the bundle's `sklearn.Pipeline`. The shipped artifact (`models/heart_disease/heart_l3_glm_stack.pkl`) is built at image build time by [`scripts/train_heart_glm.py`](scripts/train_heart_glm.py) and holds a `ColumnTransformer` (`IterativeImputer` + `StandardScaler` + `SplineTransformer`) feeding a `LogisticRegression`, plus the Venn-Abers calibration arrays and the Mondrian conformal cells. There is no separate feature-engineering step and no preprocessor files for this disease. **The schema accepts eleven inputs and the model reads seven** (L3, D-25): `MaxHR`, `Oldpeak`, `ExerciseAngina` and `ST_Slope` are accepted for the record and not read at all — blanking any of them changes the answer by exactly nothing, measured, and the UI labels them. Of the seven it does read, `RestingBP`, `Cholesterol` and `FastingBS` are `Optional` and imputed, and a blank one is reported to the clinician as `data_completeness_warning`.
+  > The previous model — a tuned `XGBClassifier` Pipeline in `models/heart_disease/heart_full_tuned.pkl` with a 0.3695 threshold — is **archived, not shipped**. Descriptions of it elsewhere in this file were corrected in Phase 8; `AUDIT_REPORT.md` and `WEAKNESS_REGISTER.md` keep their original text with dated addenda, because they are audit records.
 - **diabetes** — [`EnsembleModelLoader.predict()`](backend/ensemble_loader.py:245): engineer heuristic + medical features **first**, then encode + scale. Here `engineer_clinical()` is a documented no-op ([diabetes_features.py:101](features/diabetes_features.py:101)); its formula is computed inside `engineer_medical()` instead, by deliberate design (documented in-code) so it participates in live inference. It does — `Diabetes_Clinical_Risk` is typically the top-ranked SHAP feature for this disease (confirmed live).
 
 On explain requests, the pipeline appends a SHAP TreeExplainer step returning structured JSON: `shap_chart_data` sorted by absolute SHAP value descending, a text explanation of the top-3 features with direction labels, and the base expected log-odds value. The `shap_chart_data` column in `predictions` stores this JSON for offline audit retrieval via `GET /admin/audit-logs` or direct DB query.
 
 #### XGBoost 3.x Compatibility Patch
 
-XGBoost 3.x stores `base_score` as a bracket-wrapped string (e.g. `[5.85E-1]`) in its UBJSON serialisation. SHAP's `TreeExplainer` calls `save_raw()` and parses the output with `float()`, which fails on the bracketed format. [`ModelLoader`](backend/model_loader.py) applies a `save_raw()` monkey-patch at load time that strips the brackets from the UBJSON byte stream, enabling SHAP to read `base_score` correctly. For heart_disease the patch targets `pipeline.named_steps["clf"]` (the `XGBClassifier` step inside the shipped Pipeline), not a bare top-level estimator. The patch is applied only to XGBoost models and silently skipped for other types.
+XGBoost 3.x stores `base_score` as a bracket-wrapped string (e.g. `[5.85E-1]`) in its UBJSON serialisation. SHAP's `TreeExplainer` calls `save_raw()` and parses the output with `float()`, which fails on the bracketed format. [`ModelLoader`](backend/model_loader.py) applies a `save_raw()` monkey-patch at load time that strips the brackets from the UBJSON byte stream, enabling SHAP to read `base_score` correctly. The patch is applied only to XGBoost models and silently skipped for other types.
+
+> **No longer applies to heart_disease.** It did while that module shipped an `XGBClassifier` inside a Pipeline. The Spline-GLM that ships now is additive on the logit scale, so its SHAP values are computed exactly in closed form by [`stack.shap_log_odds()`](backend/heart_glm/stack.py) — no TreeExplainer, and no patch.
 
 ### DiCE-Inspired Counterfactual Engine
 
@@ -231,13 +322,35 @@ Disease-specific now, not uniform: **diabetes** implements a [`BaseFeatureEngine
 
 ### MLflow Experiment Tracking
 
-> **Deployment status:** not live. MLflow is installed in the Space image and
-> creates an empty tracking database on first call; `list_recent_runs()`
-> returns an empty list because nothing logs to it there.
+> **Deployment status, corrected 2026-09-27 (Gate 8.6-b).** The sentence that
+> stood here — that `list_recent_runs()` returns an empty list because nothing
+> logs to it — stopped being true in Gate 8.6 and is replaced, not appended,
+> because this section describes what the code does now.
+>
+> `scripts/train_heart_glm.py` logs **one run per image build** into the store
+> baked into the image, recording that artifact's provenance and no accuracy
+> figure; the admin endpoint reports a `status` of `unavailable` / `unreachable`
+> / `empty` / `ok` instead of `count: 0` for all three. What is still **not**
+> live is a tracking *server*: with no `MLFLOW_TRACKING_URI` the store is a
+> SQLite file inside the image, holding exactly that image's build, and a new
+> build replaces it.
+>
+> The **research** history — the seven-layer ladder, the six model families, the
+> nine ablation arms, the calibration candidates, HF-13 and the external Tehran
+> cohort, 45 runs in all — lives in a permanent store in the experiments
+> repository, not here and not in the image. Each of those runs is tagged
+> `post_hoc: true` with the commit of the results file it was read from: they are
+> **readings of saved results, not re-runs**, and none of them was tracked live.
 
 [`log_model_info()`](backend/monitoring/mlflow_tracker.py:63) and [`log_drift_metrics()`](backend/monitoring/mlflow_tracker.py:110) in [`mlflow_tracker.py`](backend/monitoring/mlflow_tracker.py) log all runs under the `"OmniDiag"` experiment. [`ensure_experiment()`](backend/monitoring/mlflow_tracker.py:46) is idempotent — it creates the experiment on first call and returns the existing `experiment_id` on subsequent calls. Model runs log `disease` and `model_version` as MLflow **tags**, evaluation metrics as MLflow **metrics** (via `mlflow.log_metrics()` — a separate mechanism from tags), and `.pkl` artifacts from `models/{disease}/`. Drift runs log `drift_share`, `drifted_columns`, `total_columns`, and `sample_size` as metrics with a `run_type=drift` tag. The retraining pipeline calls `_log_to_mlflow()` automatically after each incremental update. [`list_recent_runs(n=20)`](backend/monitoring/mlflow_tracker.py:143) backs the admin dashboard endpoint.
 
-### Federated Learning *(🚧 In Progress — server K8s manifest pending)*
+### Federated Learning *(🚧 prototype SUPERSEDED — replacement designed, not implemented)*
+
+> **Status, plainly.** The Flower prototype described below is **superseded and will not be developed further**: it transmits a pickled XGBoost model, and the heart module no longer ships an XGBoost model. Its `add_dp_noise()` is not wired into anything and offers no privacy guarantee.
+>
+> The replacement is **designed and not implemented**: federated learning, cross-silo, over horizontally partitioned data, using **GLORE** (distributed Newton with a per-site intercept, Wu et al. 2012, JAMIA) — chosen because naive FedAvg averages the intercept too, and prevalence across these four hospitals runs from 36 % to 94 % (calibrated intercept −0.67 to +2.37), so one averaged intercept fits none of them. GLORE keeps an intercept per site and shares only the slopes.
+>
+> **No federated result is claimed anywhere in this repository.** The design critique lives in the research repo (`gate_8_10a.md`); it is a critique, not a measurement, and nothing has been run. When it is run it will be a simulation across four historical cohorts in isolated processes on one machine — no patient rows leaving a site, aggregation mathematically identical to the centralised model — and **not** a trial between real institutions, and **not** differentially private. What is sent (gradients and Hessians) are statistical summaries that may leak information, as in any federated learning without differential privacy.
 
 [`OmniDiagFLClient`](backend/federated/client.py:27) implements the hospital-site node. [`get_parameters()`](backend/federated/client.py:67) serialises the current XGBoost model via `pickle.dumps`; [`set_parameters()`](backend/federated/client.py:77) deserialises and applies the aggregated global model. [`fit()`](backend/federated/client.py:77) runs 10 incremental XGBoost rounds on local EHR data — raw patient records never leave the site. [`evaluate()`](backend/federated/client.py:99) computes local binary accuracy and returns it as a Flower metric dict.
 
@@ -368,11 +481,11 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │
 ├── models/                               # Trained model artifacts
 │   ├── advanced_feature_engineering.py   # Standalone feature computation functions
-│   ├── heart_disease/                    # CAD self-contained Pipeline bundle (heart_full_tuned.pkl)
+│   ├── heart_disease/                    # CAD bundle (heart_l3_glm_stack.pkl), built at image build time
 │   └── diabetes/                         # DM ensemble weights + preprocessors
 │
 ├── configs/                              # Disease YAML configurations
-│   ├── heart_disease.yaml                # CAD v6.0.0 — self-contained sklearn Pipeline (500-estimator XGBoost)
+│   ├── heart_disease.yaml                # CAD v7.0.0 — Spline-GLM + Venn-Abers + Mondrian conformal
 │   ├── diabetes.yaml                     # DM v1.1.0 — stacking ensemble
 │   └── config_loader.py                  # Centralised YAML loader
 │
@@ -567,7 +680,7 @@ Mounted at `/auth` (**not** under `/api/v4`) — verified live against a running
 
 | Method | Path | Auth | Response |
 |---|---|---|---|
-| `POST` | `/api/v4/{disease}/predict` | Anonymous OK¹ | `PredictResponse` — heart: `{prediction, confidence, diagnosis, inference_threshold}`, plus `data_completeness_warning` when a high-SHAP-importance input was missing and imputed; diabetes adds the scale audit fields below. `Cache-Hit` is a response **header**, not a body field |
+| `POST` | `/api/v4/{disease}/predict` | Anonymous OK¹ | `PredictResponse` — heart: `{prediction, confidence, diagnosis, decision, conformal_set, decision_is_referral, probability_lower, probability_upper, output_type, probability_scale}` and **no `inference_threshold`**, plus `data_completeness_warning` when an input the model reads was missing and imputed; diabetes adds the scale audit fields below. `Cache-Hit` is a response **header**, not a body field |
 | `POST` | `/api/v4/{disease}/explain` | Anonymous OK¹ | `{prediction, confidence, diagnosis, chart_data[], text_explanation, base_value}`; diabetes adds `base_value_raw, shap_scale, shap_reconstructed_probability_corrected, shap_additivity_gap, per_model_shap, shap_weights, ensemble_variance, model_agreement` |
 | `POST` | `/api/v4/{disease}/counterfactuals` | Anonymous OK¹ | diabetes: `{status, baseline_probability, baseline_probability_corrected, probability_scale, counterfactuals[{scenario, changes{}, new_probability, new_probability_corrected, baseline_probability_corrected, risk_reduction, risk_reduction_relative_pct, risk_reduction_absolute_pp, probability_scale, feasibility}]}`; heart: `{status, baseline_probability, counterfactuals[{scenario_id, probability, changes[{feature, original_value, counterfactual_value, direction}]}]}` |
 | `POST` | `/api/v4/{disease}/batch` | `doctor`/`nurse`/`super_admin` | `{results[], summary{total, ok, errors}}` — CSV upload, max 500 rows |
@@ -591,7 +704,7 @@ The diabetes ensemble was trained on the 50/50-resampled BRFSS file, so its raw 
 | `prevalence_correction_applied`, `prevalence_train`, `prevalence_deploy` | — | `true`, 0.50, 0.237 |
 | `model_contributions`, `ensemble_variance` | raw | Per-base-model outputs, uncorrected |
 
-`GET /api/v4/diseases` returns `info.inference_threshold` and `info.risk_bands` on the same scale. Stored rows carry `predictions.probability_scale` (`'corrected'` | `'raw'` | `NULL` for rows written before the column existed); aggregates split by it (`GET /api/v4/admin/stats → avg_confidence_by_scale`, drift runs → `rows_by_probability_scale`) and treat `NULL` as its own `unknown` group. Heart applies no prevalence correction and has a single scale — it returns a bare `inference_threshold` (0.3695, read from the model bundle, not this table's corrected/raw pair) but none of the other fields above.
+`GET /api/v4/diseases` returns `info.inference_threshold` and `info.risk_bands` on the same scale. Stored rows carry `predictions.probability_scale` (`'corrected'` | `'raw'` | `NULL` for rows written before the column existed); aggregates split by it (`GET /api/v4/admin/stats → avg_confidence_by_scale`, drift runs → `rows_by_probability_scale`) and treat `NULL` as its own `unknown` group. Heart applies no prevalence correction and has a single scale. It returns **no `inference_threshold` and no `risk_bands`** — its decision is a conformal set, not a probability against a cut-point — and `GET /api/v4/diseases` reports both as `null` for it, alongside `output_type: "conformal_decision"` and `probability_scale: "ivap_calibrated_training_mix"`. Consumers branch on `output_type`; an absent threshold is information, not a gap to fill with 0.5.
 
 A legacy `POST /api/v3/predict` (tagged **Legacy** in Swagger) is still mounted and, unlike its v4 counterpart, requires `CLINICAL_ROLES`. It is retained for backward compatibility only — new integrations should use `/api/v4/{disease}/predict`.
 
@@ -643,7 +756,7 @@ Two different prefixes are actually in use — verified live against a running i
 | Metrics | [prometheus-client 0.20+](backend/monitoring/metrics.py) | `/metrics` scrape endpoint |
 | Drift | [Evidently 0.4+](backend/monitoring/drift.py:48) | Dataset drift detection — **code only, not live** |
 | MLOps | [MLflow 2.10+](backend/monitoring/mlflow_tracker.py:63) | Experiment tracking — **code only, not live** |
-| Federated | [Flower (flwr 1.0+)](backend/federated/aggregator.py:62) | Cross-hospital FL (🚧) |
+| Federated | [Flower (flwr 1.0+)](backend/federated/aggregator.py:62) | Prototype, **superseded** — see [Federated Learning](#federated-learning-🚧-prototype-superseded--replacement-designed-not-implemented) |
 | Validation | [Pydantic v2](backend/schemas.py) | Input/output model validation |
 | Config | [PyYAML 6.0+](configs/config_loader.py) | Disease configuration files |
 

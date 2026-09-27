@@ -4,6 +4,22 @@
 **Date:** 2026-09-16
 **Verdict:** ❌ **FAIL** — the submitted proposal contains **zero citations**. Every epidemiological claim in it is unreferenced.
 
+> **Addendum, 2026-09-26 (Phase 8).** The audit below is left exactly as written
+> on 2026-09-16. One of its findings has since been overtaken by a deliberate
+> change, and is recorded here rather than edited into the finding:
+>
+> **§4's sweep of `README.md`** reported zero hits for `primary care`, `outpatient`,
+> `general practitioner` and related terms. That is no longer true of the current
+> README, because Gate 8.9 **added** a scope statement naming the intended users
+> (resident and general physicians) and settings (outpatient clinics, teaching and
+> government hospitals), plus the narrower scope of the heart module — that it
+> ranks patients **already referred for catheterisation** and is not a
+> general-population screen.
+>
+> That statement is a **scope declaration, not an epidemiological claim**, so it
+> needs no citation and does not change this audit's verdict. The finding that
+> the *proposal's* epidemiological claims are uncited stands untouched.
+
 ---
 
 ## 0. Scope Resolution — What Was Actually Audited

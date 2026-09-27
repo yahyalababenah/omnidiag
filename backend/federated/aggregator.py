@@ -1,4 +1,19 @@
 """
+SUPERSEDED — not part of the shipped system, and not to be developed further.
+
+This prototype transmits a pickled XGBoost model between sites. The heart module
+has not shipped an XGBoost model since Phase 8; it ships a Spline-GLM whose
+federated form is a different algorithm entirely (GLORE: distributed Newton with
+a per-site intercept). `add_dp_noise()` here is called from nowhere and provides
+no privacy guarantee of any kind -- it computes no epsilon and accounts for no
+composition.
+
+Kept so the prototype's history is readable, not because it runs. No federated
+result is claimed anywhere in this repository. See the Federated Learning section
+of README.md.
+"""
+
+"""
 OmniDiag — Federated Learning Aggregator
 ==========================================
 Implements FedAvg (Federated Averaging) for privacy-preserving model updates

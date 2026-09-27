@@ -12,7 +12,7 @@ import {
   Sun,
   Menu,
 } from 'lucide-react';
-import { DiseaseProvider } from './context/DiseaseContext';
+import { DiseaseProvider, useDisease } from './context/DiseaseContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import DiseaseSelector from './components/DiseaseSelector';
@@ -39,6 +39,7 @@ function AppContent() {
   const [pendingView, setPendingView] = useState(null);
   const { user, isAdmin, logout }     = useAuth();
   const { dark, toggle: toggleTheme } = useTheme();
+  const { currentDiseaseInfo }        = useDisease();
 
   const isAdminView = activeView === 'admin';
 
@@ -166,8 +167,17 @@ function AppContent() {
             {dark ? 'Light Mode' : 'Dark Mode'}
           </button>
           <InstallPrompt />
+          {/* The version and the engine both belong to the MODULE on screen,
+              and both were wrong for heart: the footer said v4.0.0 beside the
+              selector's v7.0.0, and "Powered by XGBoost + SHAP" describes the
+              diabetes ensemble — heart is a Spline-GLM, and the two disagreed
+              in the same viewport a reviewer was looking at. Read from the
+              module's own info, never hardcoded. */}
           <p className="text-[10px] text-gray-400 text-center dark:text-slate-600">
-            OmniDiag v4.0.0 &middot; Powered by XGBoost + SHAP
+            {currentDiseaseInfo?.display_name ?? 'OmniDiag'}
+            {currentDiseaseInfo?.version ? ` v${currentDiseaseInfo.version}` : ''}
+            {currentDiseaseInfo?.model_type ? ` \u00b7 ${currentDiseaseInfo.model_type}` : ''}
+            {currentDiseaseInfo?.explainer_type ? ` + ${currentDiseaseInfo.explainer_type} SHAP` : ''}
           </p>
         </div>
       </aside>

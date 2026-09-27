@@ -10,8 +10,10 @@ mlruns.db
 # Kaggle backup files (too large for HF Spaces)
 *.kaggle_backup
 
-# Core dump files (Linux)
-core.*
+# Core dump files (Linux). Narrowed from `core.*`, which also matched source
+# files named core.py and silently dropped one from a commit.
+core
+core.[0-9]*
 
 # Hugging Face Spaces — binary files rejected by HF
 mlruns.db
@@ -33,6 +35,12 @@ experiment_files/
 
 # ============== CLEANUP: Data files ==============
 *.csv
+
+# Gate 8.7c: build_drift_reference.py reads this file unconditionally to build
+# the diabetes drift-reference profile, and that step runs at Docker build time
+# on HF (Dockerfile line 66). HF builds from the pushed git tree, so the file
+# must be tracked, not merely present on disk.
+!data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv
 
 # ولكن استبعاد النسخ الاحتياطية القديمة للمعالجات
 /models/heart_disease/preprocessors/*.bak.v4.pkl
