@@ -175,5 +175,91 @@
         "Income": 6
       }
     }
+  ],
+  "diabetes_nhanes": [
+    {
+      "id": "N-001",
+      "name": "Lina Haddad",
+      "age": 28,
+      "sex": "F",
+      "data": {
+        "RIDAGEYR": 28,
+        "RIAGENDR": 0,
+        "BMXBMI": 22,
+        "ADIPOSITY_BAND": "normal",
+        "SBP": 108,
+        "DBP": 68,
+        "BPXPLS": 70,
+        "MCQ300C": 0,
+        "CVD_ANY": 0,
+        "PAQ650": 1,
+        "PAQ665": 1,
+        "LBDHDD": 66,
+        "LBXSCH": 185,
+        "LBXSTR": 70,
+        "LBXSATSI": 16,
+        "LBXSGTSI": 14,
+        "LBXSCR": 0.85,
+        "LBXSBU": 13,
+        "LBXSAL": 4.3,
+        "LBXSUA": 5
+      }
+    },
+    {
+      "id": "N-002",
+      "name": "Rami Nasser",
+      "age": 45,
+      "sex": "M",
+      "data": {
+        "RIDAGEYR": 45,
+        "RIAGENDR": 1,
+        "BMXBMI": 30,
+        "ADIPOSITY_BAND": "high",
+        "SBP": 126,
+        "DBP": 80,
+        "BPXPLS": 72,
+        "MCQ300C": 0,
+        "CVD_ANY": 0,
+        "PAQ650": 0,
+        "PAQ665": 1,
+        "LBDHDD": 46,
+        "LBXSCH": 195,
+        "LBXSTR": 140,
+        "LBXSATSI": 26,
+        "LBXSGTSI": 30,
+        "LBXSCR": 0.9,
+        "LBXSBU": 14,
+        "LBXSAL": 4.3,
+        "LBXSUA": 5.8
+      }
+    },
+    {
+      "id": "N-003",
+      "name": "Waleed Khoury",
+      "age": 58,
+      "sex": "M",
+      "data": {
+        "RIDAGEYR": 58,
+        "RIAGENDR": 1,
+        "BMXBMI": 33,
+        "ADIPOSITY_BAND": "high",
+        "SBP": 138,
+        "DBP": 84,
+        "BPXPLS": 70,
+        "MCQ300C": 1,
+        "CVD_ANY": 0,
+        "PAQ650": 0,
+        "PAQ665": 0,
+        "LBDHDD": 38,
+        "LBXSCH": 185,
+        "LBXSTR": 240,
+        "LBXSATSI": 36,
+        "LBXSGTSI": 52,
+        "LBXSCR": 0.85,
+        "LBXSBU": 13,
+        "LBXSAL": 4.3,
+        "LBXSUA": 6.8
+      }
+    }
   ]
 }
