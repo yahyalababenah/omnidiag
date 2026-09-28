@@ -121,6 +121,58 @@ runs from 0.36 to 0.97. Both are in the research repo's `results.md`, with the
 per-hospital tables the plots summarise.
 
 
+### Dysglycaemia screening: the three answers, on screen
+
+The NHANES module answers with the same three-way decision and the interface reports
+whichever one the model gave. Real screens from the merged branch, captured against a local
+backend on 2026-09-28 (Clinical EMR mode, demo patients N-003, N-001, N-002).
+
+| Referral | No referral | Uncertain |
+|---|---|---|
+| <img src="docs/assets/screenshots/30_nhanes_referral_result.png" alt="Referral: Refer — confirmatory testing recommended, 64.6% with interval 60.9%–68.4%, High urgency, HbA1c or OGTT" width="280"> | <img src="docs/assets/screenshots/30_nhanes_no_referral_result.png" alt="No referral: No referral indicated, 3.6% with interval 2.6%–4.8%, Low urgency, with the note that NO_REFER is not a clearance" width="280"> | <img src="docs/assets/screenshots/30_nhanes_uncertain_result.png" alt="Uncertain: refer for further evaluation, 34.9% with interval 32.7%–37.4%, Medium urgency, fasting or random glucose" width="280"> |
+| `Refer — confirmatory testing recommended` · High urgency: HbA1c, or OGTT where HbA1c is unreliable | `No referral indicated` · Low urgency, and the screen states that **14.1 % of truly dysglycaemic patients receive it** | `Uncertain — refer for further evaluation` · Medium urgency: fasting or random glucose |
+
+Each panel carries a **next clinical step** (`clinical_action_plan`) built from the decision, not from
+a risk band. The no-referral panel says on screen that it is not a clearance; the uncertain panel says
+uncertain is not a middle amount of risk.
+
+**What-If uses this module's own lever policy.** For N-002 the scenario moves BMI 30 → 24.9,
+adiposity band high → normal, SBP 126 → 120, HDL 46 → 60 and vigorous activity 0 → 1, and the model's
+estimate falls to 18.2 %. It is the model's response to modifiable factors, not a predicted treatment
+effect, and HDL is a proxy for the behaviour that raises it (see
+[`diabetes_what_if_levers.py`](backend/diabetes_what_if_levers.py)).
+
+<img src="docs/assets/screenshots/31_nhanes_whatif.png" alt="What-If scenario for N-002: BMI, adiposity band, SBP, HDL and activity move to their targets, post-intervention probability 18.2%" width="420">
+
+**These screens show that the interface reports the model faithfully. They do not show that it is
+clinically understood** — no clinician has read them, as for the heart module. Two things visible in
+them are still wrong and are open, not hidden: the panels label the base value "SHAP Base Value"
+although this model has no SHAP step (its contributions are the model), and the uncertain panel's
+frame is green while its title and next-step box are amber.
+
+### The measurements behind the dysglycaemia model
+
+Every figure below is a static image copied from the Phase 9 research folder into
+[`docs/phase9/figures/`](docs/phase9/figures/) and committed on 2026-09-28 (`7300042`); none is a live
+plot, and the scripts that drew them are **not in this repository**. Each caption names the finding or
+decision it supports, in [`FINDINGS_REGISTER.md`](docs/phase9/FINDINGS_REGISTER.md) and
+[`DISCOVERY_RECORD.md`](docs/phase9/DISCOVERY_RECORD.md).
+
+| | |
+|---|---|
+| <img src="docs/phase9/figures/fig1_cbc_artefact_control.png" alt="AUC with and without a complete blood count, under an HbA1c label and a glucose label" width="330"> | <img src="docs/phase9/figures/fig3_label_noise_ceiling.png" alt="Validation AUC rising from 0.7796 to 0.8476 as patients near the HbA1c cut are excluded" width="330"> |
+| **The CBC gain is an assay artefact (F9-29).** Adding a blood count lifts AUC by +0.0218 against the HbA1c label and *lowers* it by 0.0039 against a glucose label on the same patients, so it is banned as an input | **About 0.07 AUC is locked in label noise (F9-30).** Dropping the 24.5 % of patients within ±0.20 of the 5.7 % cut takes validation AUC from 0.7796 to 0.8476 |
+| <img src="docs/phase9/figures/fig6_every_lever.png" alt="Change in validation AUC for every modelling lever tried in Phase 9" width="330"> | <img src="docs/phase9/figures/fig4_calibration_layers.png" alt="ECE, calibration slope and AUC for raw EBM, isotonic and Platt calibration" width="330"> |
+| **Every lever tried.** Against a pre-declared bar of +0.005, only the CBC crossed it, and it was the artefact; up-weighting the 60+ band made AUC worse | **Platt scaling is adopted (D9-04).** ECE 0.054 → 0.023 with AUC untouched at 0.7796; isotonic cost 0.0013 AUC |
+| <img src="docs/phase9/figures/fig5_pooled_vs_subgroup_auc.png" alt="AUC of age alone and of the full model, overall and by age band" width="330"> | <img src="docs/phase9/figures/fig2_blank_field_vulnerability.png" alt="Fraction of decisions flipped and median risk shift when each single field is left blank" width="330"> |
+| **Why 60+ AUC is low.** Age alone scores 0.716 overall and 0.517 inside the 60+ band, so the full model's validation AUC of 0.648 there is not a defect that re-weighting can fix | **Leaving one field blank (F9-28).** Up to 38 % of decisions flip when a single field is missing, which is why six fields are mandatory and never imputed (D9-06) |
+| <img src="docs/phase9/figures/fig7_per_band_coverage.png" alt="Conformal coverage by age band and class, class-conditional against group-conditional" width="330"> | <img src="docs/phase9/figures/fig8_alpha_dial.png" alt="Worst per-band coverage against share of patients marked uncertain, for class-conditional and group-conditional conformal" width="330"> |
+| **Pooled coverage hid two failing groups (F9-31).** Class-conditional coverage fell to 0.578 for dysglycaemic 20–39s and 0.574 for healthy 60+; group-conditional (D9-05) restores both | **The decisiveness dial.** Group-conditional keeps worst-band coverage far above class-conditional at every α. This plot marks α = 0.15, selected on validation; the shipped α was later moved to **0.20** (D9-07), for the reasons in the config |
+
+The pooled figure is not the whole story here either: AUC is 0.757 for ages 20–39, 0.691 for 40–59 and
+0.619 for 60+, and the twenty inputs recover NH Asian and NH Black membership at AUC 0.785 and 0.780
+although race is never an input (see the limits above).
+
 > **What is actually running in the deployed Space** (verified 2026-09-23, see
 > [docs/FEATURE_VERIFICATION.md](docs/FEATURE_VERIFICATION.md)):
 >
@@ -164,7 +216,7 @@ per-hospital tables the plots summarise.
 >   is not a before/after view of one patient under an intervention; no such
 >   view exists.
 
-Coronary Artery Disease (CAD) and Diabetes Mellitus (DM) are currently registered. Adding a disease within a registered model family requires a YAML config, a Pydantic schema, a feature engineer, and model weights — no routing, middleware, auth, or API changes. Adding a new model family requires one backend class implementing the ModelBackend interface, registered once. Tree-based families use TreeExplainer; other families use a slower generic SHAP explainer.
+Three modules are currently registered: Coronary Artery Disease (`heart_disease`), Diabetes Risk Assessment on BRFSS (`diabetes`, superseded but still served) and Dysglycaemia Screening on NHANES (`diabetes_nhanes`). Adding a disease within a registered model family requires a YAML config, a Pydantic schema, a feature engineer, and model weights — no routing, middleware, auth, or API changes. Adding a new model family requires one backend class implementing the ModelBackend interface, registered once. Tree-based families use TreeExplainer; other families use a slower generic SHAP explainer.
 
 ---
 
@@ -454,7 +506,17 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   ├── router.py                         # OmniDiagRouter — config-driven disease routing
 │   ├── schemas.py                        # Pydantic models + DISEASE_SCHEMA_REGISTRY
 │   ├── model_loader.py                   # Lazy XGBoost loader + SHAP TreeExplainer + XGB3 patch
-│   ├── ensemble_loader.py                # Stacking ensemble (XGB/LGB/RF + LR meta-learner)
+│   ├── ensemble_loader.py                # Stacking ensemble (XGB/LGB/RF + LR meta-learner) — BRFSS diabetes
+│   ├── model_backends/                   # One class per model family, registered once
+│   │   ├── base.py                       # ModelBackend interface + capabilities flags
+│   │   ├── heart_glm_conformal.py        # Heart: Spline-GLM + Venn-Abers + Mondrian conformal
+│   │   ├── diabetes_ebm_conformal.py     # NHANES: EBM + Platt + age-band conformal + What-If
+│   │   ├── stacking_ensemble.py          # BRFSS diabetes stacking ensemble
+│   │   └── sklearn_pipeline.py, sklearn_generic.py
+│   ├── heart_glm/                        # Heart bundle loader (stack.py) + reference scores
+│   ├── diabetes_what_if_levers.py        # NHANES What-If lever policy (own module; imports nothing from backend)
+│   ├── schemas_diabetes_nhanes.py        # NHANES input schema (20 fields, 6 mandatory)
+│   ├── schemas_clinical_action.py        # clinical_action_plan built from the decision
 │   ├── shap_service.py                   # SHAP value → JSON chart data transformation
 │   ├── counterfactual_generator.py       # DiCE-inspired generator + Clinical Firewall
 │   ├── database.py                       # Async SQLAlchemy engine + session factory
@@ -480,11 +542,13 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   ├── active_learning/                  # Human-in-the-loop pipeline
 │   │   ├── sampler.py                    # prediction_entropy(), should_queue_for_review()
 │   │   ├── routes.py                     # /review/queue, /review/{id}/annotate, /skip, /stats
-│   │   └── retrain.py                    # run_retrain_pipeline() — fetch → retrain → reload → log
+│   │   ├── retrain.py                    # run_retrain_pipeline() — fetch → retrain → reload → log
+│   │   └── diabetes_nhanes_candidate.py  # NHANES active learning: candidate only, never promoted
 │   │
 │   ├── monitoring/                       # MLOps observability
 │   │   ├── metrics.py                    # Prometheus: 8 counters/histograms/gauges
 │   │   ├── drift.py                      # DriftMonitor (Evidently) + get_monitor() singletons
+│   │   ├── drift_stats.py                # Input drift on scipy alone: KS, chi-square, PSI
 │   │   ├── mlflow_tracker.py             # log_model_info(), log_drift_metrics(), list_recent_runs()
 │   │   └── routes.py                     # /admin/drift/*, /admin/mlflow/*
 │   │
@@ -514,11 +578,13 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 ├── models/                               # Trained model artifacts
 │   ├── advanced_feature_engineering.py   # Standalone feature computation functions
 │   ├── heart_disease/                    # CAD bundle (heart_l3_glm_stack.pkl), built at image build time
-│   └── diabetes/                         # DM ensemble weights + preprocessors
+│   ├── diabetes/                         # BRFSS DM ensemble weights + preprocessors (superseded)
+│   └── diabetes_nhanes/                  # NHANES EBM bundle (.joblib), model_card.json, drift_reference.json
 │
 ├── configs/                              # Disease YAML configurations
 │   ├── heart_disease.yaml                # CAD v7.0.0 — Spline-GLM + Venn-Abers + Mondrian conformal
-│   ├── diabetes.yaml                     # DM v1.1.0 — stacking ensemble
+│   ├── diabetes.yaml                     # DM v1.1.0 — BRFSS stacking ensemble (superseded)
+│   ├── diabetes_nhanes.yaml              # NHANES v2.0.0 — EBM + Platt + age-band conformal, alpha 0.20
 │   └── config_loader.py                  # Centralised YAML loader
 │
 ├── alembic/                              # Database migrations
@@ -548,7 +614,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │       ├── datasources/prometheus.yml    # Grafana datasource provisioning
 │       └── dashboards/omnidiag.json      # Pre-built dashboard (predictions, latency, drift)
 │
-├── tests/                                # 13 test modules (SQLite in-memory, no Redis needed)
+├── tests/                                # 41 test modules (SQLite in-memory, no Redis needed)
 │   ├── conftest.py                       # Fixtures: DB, cache, mocked router, seeded roles
 │   ├── test_auth.py
 │   ├── test_rbac.py
@@ -562,7 +628,11 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   ├── test_database.py
 │   ├── test_unit_active_learning.py
 │   ├── test_unit_auth.py
-│   └── test_unit_counterfactuals.py
+│   ├── test_unit_counterfactuals.py
+│   ├── test_diabetes_ebm_backend.py      # NHANES backend: each test names the finding it protects
+│   ├── test_diabetes_gate93.py           # NHANES What-If levers (incl. named adiposity band)
+│   ├── test_diabetes_frontend_contract.py, test_diabetes_monitoring.py, test_diabetes_active_learning.py
+│   └── … heart GLM, What-If policy, drift and MLflow-state tests (full list: ls tests/)
 │
 ├── frontend/                             # React 18 + Vite + Tailwind CSS
 │   ├── src/
@@ -578,15 +648,20 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   │   │   ├── DynamicClinicalForm.jsx   # Schema-driven form engine
 │   │   │   ├── SchemaFieldFactory.jsx    # Component resolver (toggle/select/slider/number)
 │   │   │   ├── ShapBarChart.jsx          # Recharts horizontal SHAP bar chart
-│   │   │   ├── WhatIfScenarioCard.jsx    # Counterfactual viewer
+│   │   │   ├── WhatIfScenarioCard.jsx    # Counterfactual viewer (retries once on 502/503/504)
+│   │   │   ├── ClinicalActionPlan.jsx    # Next clinical step from the decision (NHANES)
 │   │   │   └── MedicalTooltip.jsx        # Dictionary-backed hover tooltip
 │   │   └── utils/
 │   │       ├── schemaFieldParser.js      # JSON Schema → FieldMetadata[]
 │   │       ├── schemaToZod.js            # FieldMetadata[] → Zod validation schema
 │   │       ├── featureCategorizer.js     # Field → category grouping
 │   │       └── medicalDictionary.js      # Feature name → clinical description
-│   └── mockPatients.js                   # Pre-defined patient records (3 CAD, 4 DM)
+│   └── mockPatients.js                   # Pre-defined patient records (CAD, BRFSS DM, NHANES)
 │
+├── docs/
+│   ├── assets/screenshots/               # Real UI captures: heart (10_, 20_) and NHANES (30_, 31_)
+│   ├── assets/research/                  # Heart research figures copied from the experiments repo
+│   └── phase9/                           # NHANES record: DISCOVERY_RECORD, FINDINGS_REGISTER, RESEARCH_FIDELITY_AUDIT, figures/
 ├── data/                                 # Raw and processed datasets per disease
 ├── experiment_files/                     # Training experiments and diagnostics
 ├── docker-compose.yml                    # 7 services: postgres, redis, backend, mlflow, prometheus, grafana, retrain
@@ -712,9 +787,9 @@ Mounted at `/auth` (**not** under `/api/v4`) — verified live against a running
 
 | Method | Path | Auth | Response |
 |---|---|---|---|
-| `POST` | `/api/v4/{disease}/predict` | Anonymous OK¹ | `PredictResponse` — heart: `{prediction, confidence, diagnosis, decision, conformal_set, decision_is_referral, probability_lower, probability_upper, output_type, probability_scale}` and **no `inference_threshold`**, plus `data_completeness_warning` when an input the model reads was missing and imputed; diabetes adds the scale audit fields below. `Cache-Hit` is a response **header**, not a body field |
+| `POST` | `/api/v4/{disease}/predict` | Anonymous OK¹ | `PredictResponse` — heart: `{prediction, confidence, diagnosis, decision, conformal_set, decision_is_referral, probability_lower, probability_upper, output_type, probability_scale}` and **no `inference_threshold`**, plus `data_completeness_warning` when an input the model reads was missing and imputed; diabetes adds the scale audit fields below; `diabetes_nhanes` returns the same decision envelope as heart plus `clinical_action_plan`. `Cache-Hit` is a response **header**, not a body field |
 | `POST` | `/api/v4/{disease}/explain` | Anonymous OK¹ | `{prediction, confidence, diagnosis, chart_data[], text_explanation, base_value}`; diabetes adds `base_value_raw, shap_scale, shap_reconstructed_probability_corrected, shap_additivity_gap, per_model_shap, shap_weights, ensemble_variance, model_agreement` |
-| `POST` | `/api/v4/{disease}/counterfactuals` | Anonymous OK¹ | diabetes: `{status, baseline_probability, baseline_probability_corrected, probability_scale, counterfactuals[{scenario, changes{}, new_probability, new_probability_corrected, baseline_probability_corrected, risk_reduction, risk_reduction_relative_pct, risk_reduction_absolute_pp, probability_scale, feasibility}]}`; heart: `{status, baseline_probability, counterfactuals[{scenario_id, probability, changes[{feature, original_value, counterfactual_value, direction}]}]}` |
+| `POST` | `/api/v4/{disease}/counterfactuals` | Anonymous OK¹ | diabetes: `{status, baseline_probability, baseline_probability_corrected, probability_scale, counterfactuals[{scenario, changes{}, new_probability, new_probability_corrected, baseline_probability_corrected, risk_reduction, risk_reduction_relative_pct, risk_reduction_absolute_pp, probability_scale, feasibility}]}`; heart and `diabetes_nhanes`: `{status, baseline_probability, counterfactuals[{scenario_id, probability, changes[{feature, original_value, counterfactual_value, direction}]}]}`, and NHANES adds `best_achievable` when no scenario crosses the decision. The NHANES call takes about 0.3 s; the BRFSS diabetes call takes about 15 s locally |
 | `POST` | `/api/v4/{disease}/batch` | `doctor`/`nurse`/`super_admin` | `{results[], summary{total, ok, errors}}` — CSV upload, max 500 rows |
 | `POST` | `/api/v4/generate-report` | Anonymous OK¹ | body `{disease, probability_corrected, label, shap_values[], features{}}` (`probability` is a **deprecated** alias; `confidence_band` is advisory and ignored) → `{report, source, risk_band, llm_model?, latency_ms?, fallback_reason?}` |
 | `POST` | `/api/v4/parse-notes` | Open (no auth dependency) | `{extracted_features{}, mapped_features{}, field_count}` — `mapped_features` holds the schema-ready dict when `disease` is supplied |
