@@ -45,6 +45,17 @@ RUN mkdir -p models/heart_disease models/diabetes/preprocessors && \
     curl -fsSL "${HF}/diabetes/preprocessors/standard_scaler.pkl" -o models/diabetes/preprocessors/standard_scaler.pkl && \
     echo "=== all models downloaded ==="
 
+# NHANES dysglycaemia bundle (Phase 9). HF rejects any binary in a git push, so the
+# .joblib cannot travel in the Space repository and is fetched here like the BRFSS
+# weights above. The sha256 is checked: the bundle carries the conformal quantiles
+# and the calibration, so a different file would silently change every decision.
+# A local or GitHub checkout has this file already; the download overwrites it with
+# the same bytes or fails the build.
+RUN mkdir -p models/diabetes_nhanes && \
+    curl -fsSL "https://huggingface.co/yahyoha/omnidiag-models/resolve/main/diabetes_nhanes/diabetes_nhanes_ebm.joblib" \
+        -o models/diabetes_nhanes/diabetes_nhanes_ebm.joblib && \
+    echo "fcceeb37b53295f115e5fe41b9a8618117263ef6ddb7898f9a90ad7b50b2c408  models/diabetes_nhanes/diabetes_nhanes_ebm.joblib" | sha256sum -c -
+
 # Build the live heart model from the committed training CSV. No model binary
 # is committed to the repository, so this step IS the shipping mechanism.
 #
