@@ -1,0 +1,233 @@
+# =============================================================================
+# OmniDiag Configuration — Diabetes (NHANES dysglycaemia screening, EBM)
+# =============================================================================
+# Replaces the BRFSS stacking ensemble described in configs/diabetes.yaml, which
+# is kept and marked superseded (D9-02 precedent: the federated path was kept and
+# marked rather than deleted).
+#
+# Every number in this file was reproduced from the shipped bundle by
+# train_diabetes_nhanes_ebm_v2.py and is recorded in models/diabetes_nhanes/
+# model_card.json. Nothing here is carried over from a research report.
+# The full method and the findings behind each limitation are in
+# docs/phase9/DISCOVERY_RECORD.md and docs/phase9/FINDINGS_REGISTER.md.
+# =============================================================================
+
+disease:
+  name: "diabetes_nhanes"
+  display_name: "Dysglycaemia Screening"
+  description: >-
+    NHANES 2007-2018. Estimates the probability of dysglycaemia (HbA1c >= 5.7%)
+    among adults who have NOT been diagnosed with diabetes and are NOT on
+    glucose-lowering treatment, from twenty measurements available at a first
+    visit. Explainable Boosting Machine: the per-feature contributions are the
+    model itself, not a post-hoc approximation. Decides with a conformal set, not
+    a threshold.
+  target_column: "y"
+  version: "2.0.0"
+
+# ---------------------------------------------------------------------------
+# Population and label — the two things most often stated wrongly elsewhere
+# ---------------------------------------------------------------------------
+population:
+  inclusion: "adults >= 20 years, not pregnant, with an HbA1c measurement"
+  exclusion: >-
+    anyone told by a doctor that they have diabetes (DIQ010), taking insulin
+    (DIQ050) or taking oral glucose-lowering medication (DIQ070). This is a
+    screening tool for the undiagnosed and untreated. It is NOT a diabetes
+    diagnostic and must never be described as one.
+  label: "HbA1c >= 5.7% (ADA prediabetes-or-diabetes)"
+  cohort_n: 26904
+  cohort_prevalence: 0.3288
+
+# ---------------------------------------------------------------------------
+# Measured performance — held-out TEMPORAL test set only
+# ---------------------------------------------------------------------------
+# train 2007-2014 (n=18508) | calibrate + select 2015-2016 (2148 + 2149)
+# | test 2017-2018 held out (n=4099, prevalence 0.3586)
+# The random-split result is not produced and must never be quoted anywhere.
+performance:
+  split: "temporal (train 2007-2014, calibrate 2015-2016, test 2017-2018)"
+  test_n: 4099
+  test_prevalence: 0.3586
+  auc: 0.7523
+  auc_ci_95: [0.7378, 0.7662]
+  auc_mec_weighted: 0.7655          # NHANES exam weights; US-representative
+  calibration_intercept: -0.090     # ideal 0
+  calibration_slope: 0.952          # ideal 1
+  ece: 0.0249
+  scaled_brier: 0.1755
+  sensitivity_flagged: 0.8986       # referral OR uncertain -> an HbA1c is ordered
+  specificity_no_referral: 0.2777
+  # What the model is NOT: 0.7523 is the honest ceiling for this label and these
+  # twenty fields (D9-03). Larger feature sets score ~0.80 but only by including a
+  # complete blood count, whose gain is an assay artefact -- see limitations.
+
+# ---------------------------------------------------------------------------
+# Model
+# ---------------------------------------------------------------------------
+model:
+  family: "ebm_platt_conformal"     # backend/model_backends/diabetes_ebm_conformal.py
+  type: "explainable_boosting_machine"
+  explainer_type: "additive"        # the model IS the explanation; no SHAP
+  weights_path: "models/diabetes_nhanes/diabetes_nhanes_ebm.joblib"
+  model_card_path: "models/diabetes_nhanes/model_card.json"
+
+  # This module decides with a conformal set. It has no threshold and no risk
+  # bands, and their absence is information, not a gap to fill (heart D-32).
+  # The old BRFSS bands 0.70 / 0.40 were defined on a 50/50-balanced raw scale
+  # and are meaningless here; they are retired, not recomputed.
+  output_type: "conformal_decision"
+  inference_threshold: null
+  risk_bands: null
+
+  probability_scale: "platt_calibrated_nhanes_2015_2016"
+  # D9-04. probability_lower/upper are a B=1000 bootstrap of the Platt fit over
+  # the calibration set. They describe uncertainty in the CALIBRATION MAP. They
+  # are NOT a distribution-free predictive interval and no consumer may present
+  # them as one.
+  interval_kind: "platt_bootstrap_percentile_95"
+
+  # D9-05. Conditioned on age band because the class-conditional layer hid two
+  # failing groups behind acceptable pooled numbers (F9-31). Race is never an
+  # input and never a conditioning variable.
+  conformal:
+    alpha: 0.15
+    layer: "group_conditional_age_band"
+    bands: "0: 20-39, 1: 40-59, 2: 60+"
+    coverage_pos: 0.8986
+    coverage_neg: 0.8140
+    decision_shares: {referral: 0.2574, no_referral: 0.2144, uncertain: 0.5282}
+    # Coverage per band, the number this layer exists for. Before D9-05 the
+    # 20-39 positive cell was 0.444 and the 60+ negative cell was 0.391.
+    per_band_coverage:
+      "20-39": {positive: 0.9422, negative: 0.8147}
+      "40-59": {positive: 0.8866, negative: 0.8044}
+      "60+":   {positive: 0.8939, negative: 0.8251}
+
+  max_batch_rows: 100
+  max_batch_rows_reason: "EBM scoring is about 0.01 s per patient; the bootstrap interval is vectorised"
+
+# ---------------------------------------------------------------------------
+# Deployment prevalence — deliberately absent
+# ---------------------------------------------------------------------------
+prevalence:
+  train: 0.3288                     # NHANES screening cohort, 2007-2018
+  deploy: null
+  # F9-12. The old BRFSS config corrected to 0.237 for Jordan (Abu-Raddad 2020).
+  # That figure does NOT transfer: it is TOTAL diabetes prevalence including
+  # already-diagnosed cases, and this model's target is dysglycaemia among the
+  # UNDIAGNOSED and UNTREATED. Different event, different population. A correctly
+  # matched figure would have to measure HbA1c >= 5.7% among Jordanian adults with
+  # no prior diagnosis and on no treatment; no sourced figure of that shape was
+  # found. NHANES prevalence also drifts upward across cycles (31.7% -> 35.9%)
+  # and the calibration offset varies by up to 13 points across ethnic groups, so
+  # a single scalar correction could not carry it anyway.
+  # Consequence (heart precedent): absolute probabilities require local
+  # recalibration before they are displayed as anything but a relative ordering.
+  requires_local_recalibration: true
+
+# ---------------------------------------------------------------------------
+# Input schema
+# ---------------------------------------------------------------------------
+schema:
+  module: "backend.schemas_diabetes_nhanes"
+  class: "DiabetesNhanesInput"
+
+features:
+  count: 20
+  # D9-06. Leaving any of these blank moves the predicted risk materially or
+  # flips a large share of decisions (F9-28), so the model must never receive
+  # them as missing. PAQ650 alone shifts median risk by +0.108 and flips 31% of
+  # decisions. The schema rejects a null, the form blocks submission, and the
+  # batch path names the row rather than scoring it.
+  mandatory:
+    - RIDAGEYR
+    - BMXBMI
+    - ADIPOSITY_BAND
+    - LBDHDD
+    - PAQ650
+    - PAQ665
+  # F9-29 / D9-03. These may never become inputs. Enforced by an assert in the
+  # training script and again when the backend loads the bundle.
+  banned_inputs_reason: >-
+    A complete blood count raises AUC by +0.0218 against this HbA1c label and by
+    -0.0040 against a glucose label. HbA1c responds to mean corpuscular
+    haemoglobin at -0.0448 (p~4e-235) independently of glucose, so the gain is
+    the model learning an assay artefact, not additional risk information. Any
+    future CBC gain must not be reported as accuracy.
+  banned_inputs:
+    [LBXRDW, LBXMC, LBXMCHSI, LBXMCVSI, LBXWBCSI, LBXPLTSI, LBXHGB, LBXHCT,
+     LBXRBCSI, LBDLYMNO, LBDNENO, LBDMONO, LBDEONO, LBDBANO, LBXLYPCT,
+     LBXNEPCT, LBXMOPCT, LBXEOPCT, LBXBAPCT, LBXMPSI, LBXSCK]
+
+# ---------------------------------------------------------------------------
+# Explainability
+# ---------------------------------------------------------------------------
+explainer:
+  enabled: true
+  type: "ebm_terms"
+  shap_scale: "log_odds_raw_score"
+  note: >-
+    f(x) = intercept + sum of per-feature shape functions + sum of pairwise
+    terms. The contributions ARE the model. The identity is asserted to < 1e-8
+    on every explanation; it measured 2.67e-15 across the whole test cycle.
+    Contributions explain the RAW score, not the calibrated probability. A
+    pairwise term is split evenly between its two features for the per-feature
+    chart; the exact per-term breakdown is returned as `term_contributions`.
+
+# ---------------------------------------------------------------------------
+# Limitations — every one of these is measured, and each has a finding ID
+# ---------------------------------------------------------------------------
+limitations:
+  - id: F9-08
+    text: >-
+      HbA1c is not a neutral measure of glycaemia. It responds to mean
+      corpuscular haemoglobin (-0.0448, p~4e-235) and to red cell distribution
+      width, independently of glucose; iron deficiency raises the reading
+      without raising blood sugar. No blood-count feature is in this model, so
+      that bias is unmodelled noise here rather than a misleading explanation --
+      but it is not removed from the label.
+  - id: F9-09
+    text: >-
+      Race is not a model input and never will be. The model is NOT race-blind:
+      the twenty shipped features recover NH Asian membership at AUC 0.785 and
+      NH Black at 0.780 -- higher than creatine kinase, the variable that was
+      removed to reduce exactly this. Documentation must not claim blindness.
+  - id: F9-10
+    text: >-
+      Discrimination varies strongly by group. AUC 0.757 (20-39), 0.691 (40-59),
+      0.619 (60+); 0.785 female, 0.713 male. Within a single age band the
+      model's dominant feature carries almost nothing, which is arithmetic
+      rather than neglect -- and it is why the conformal layer is conditioned on
+      age band.
+  - id: F9-11
+    text: >-
+      Calibration differs by ethnic group behind an acceptable pooled number:
+      NH White +0.106, NH Asian -0.097, NH Black -0.076 mean predicted minus
+      observed. D9-05 restores per-group DECISION validity; it does NOT fix this
+      probability spread, which would require the group variable at inference.
+  - id: F9-06
+    text: >-
+      Conformal coverage is measured under a temporal split, which violates
+      exchangeability by design. The module must NOT claim a 90% coverage
+      guarantee. Measured coverage is 0.899 positive / 0.814 negative.
+  - id: F9-30
+    text: >-
+      About 0.07 AUC is unattainable in principle. HbA1c >= 5.7 is a hard cut on
+      an assay with 0.1-0.2 point within-person variability, and 24.5% of the
+      cohort sits inside that band. Excluding them the same model scores 0.85. A
+      large part of the 53% "uncertain" rate is the decision layer correctly
+      declining a label that is itself ambiguous.
+  - id: F9-32
+    text: >-
+      Raising HDL is a genuine lever and is absent from the What-If policy,
+      because the shared counterfactual generator understands only "decrease"
+      and "to". Deferred to Gate 9.3 with its own regression test. The exercise
+      levers carry most of the same advice.
+
+# ---------------------------------------------------------------------------
+# API
+# ---------------------------------------------------------------------------
+api:
+  endpoint_prefix: "/api/v4"
+  version: "2.0.0"
