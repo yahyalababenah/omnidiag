@@ -28,6 +28,26 @@ the model reads them.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+# Mirrors backend.schemas_diabetes_nhanes.ADIPOSITY_BAND_LEVELS. Copied, not imported:
+# this module imports nothing from backend (enforced by a test); a test also pins the copy.
+ADIPOSITY_BAND_LEVELS = {"normal": 0, "increased": 1, "high": 2}
+
+_LEVEL_NAMES = {level: name for name, level in ADIPOSITY_BAND_LEVELS.items()}
+
+
+def _num(value: Any) -> float:
+    """A lever value as a number; named adiposity bands map to their ordinal."""
+    if isinstance(value, str) and value in ADIPOSITY_BAND_LEVELS:
+        return float(ADIPOSITY_BAND_LEVELS[value])
+    return float(value)
+
+
+def _like(original: Any, number: float) -> Any:
+    """`number` in the form the patient supplied it (band name for a band)."""
+    if isinstance(original, str) and original in ADIPOSITY_BAND_LEVELS:
+        return _LEVEL_NAMES[int(number)]
+    return number
+
 #: kind -> meaning
 #:   "decrease": may only move DOWN, and never below `bound`
 #:   "increase": may only move UP, and never above `bound`
@@ -72,7 +92,7 @@ def is_engaged(value: Optional[float], kind: LeverKind, bound: float) -> bool:
     """True when this lever has somewhere to move for this patient."""
     if value is None:
         return False
-    value = float(value)
+    value = _num(value)
     if kind == "decrease":
         return value > float(bound)
     if kind == "increase":
@@ -89,12 +109,15 @@ def apply_lever(value: Optional[float], kind: LeverKind, bound: float) -> Option
     """
     if value is None:
         return None
-    value = float(value)
+    original = value
+    value = _num(value)
     if kind == "decrease":
-        return float(bound) if value > float(bound) else value
-    if kind == "increase":
-        return float(bound) if value < float(bound) else value
-    return float(bound)
+        moved = float(bound) if value > float(bound) else value
+    elif kind == "increase":
+        moved = float(bound) if value < float(bound) else value
+    else:
+        moved = float(bound)
+    return _like(original, moved)
 
 
 def all_improvements(
@@ -128,7 +151,7 @@ def policy_violations(
             problems.append(f"{feature}: missing value cannot be a lever")
             continue
         kind, bound = levers[feature]
-        old_v, new_v = float(old), float(new)
+        old_v, new_v = _num(old), _num(new)
         if new_v == old_v:
             continue
         if kind == "decrease" and not (new_v < old_v and new_v >= float(bound)):

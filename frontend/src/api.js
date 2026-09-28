@@ -56,7 +56,9 @@ class OmniDiagApi {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(errorMessage(body, res));
+        const failure = new Error(errorMessage(body, res));
+        failure.status = res.status;
+        throw failure;
       }
       return res.json();
     } catch (err) {
@@ -129,11 +131,20 @@ class OmniDiagApi {
   }
 
   /** POST /api/v4/{disease}/counterfactuals */
-  counterfactuals(disease, patientData) {
-    return this._fetch(`/api/v4/${disease}/counterfactuals`, {
+  async counterfactuals(disease, patientData) {
+    const call = () => this._fetch(`/api/v4/${disease}/counterfactuals`, {
       method: 'POST',
       body: JSON.stringify(patientData),
     });
+    try {
+      return await call();
+    } catch (err) {
+      // A 502/503/504 comes from the host's proxy while the container restarts
+      // or wakes, not from the model. The request is idempotent, so retry once.
+      if (![502, 503, 504].includes(err.status)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      return call();
+    }
   }
 
   /** POST /api/v4/generate-report */

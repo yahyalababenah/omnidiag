@@ -330,3 +330,20 @@ def test_predicting_records_a_decision(backend):
     """Monitoring must never break serving, so this asserts the call path runs,
     not that prometheus is installed."""
     backend.predict(PATIENT)
+
+
+def test_what_if_accepts_named_adiposity_band():
+    """The schema example carries ADIPOSITY_BAND="high"; What-If must not 500 on it."""
+    from backend.diabetes_what_if_levers import DIABETES_LEVERS, all_improvements, is_engaged
+    from backend.schemas_diabetes_nhanes import DiabetesNhanesInput
+
+    patient = dict(DiabetesNhanesInput.model_config["json_schema_extra"]["example"])
+    kind, bound = DIABETES_LEVERS["ADIPOSITY_BAND"]
+    assert is_engaged(patient["ADIPOSITY_BAND"], kind, bound)
+    assert all_improvements(patient)["ADIPOSITY_BAND"] == "normal"
+
+
+def test_band_levels_copy_matches_schema():
+    from backend.schemas_diabetes_nhanes import ADIPOSITY_BAND_LEVELS as schema_levels
+
+    assert levers.ADIPOSITY_BAND_LEVELS == schema_levels
