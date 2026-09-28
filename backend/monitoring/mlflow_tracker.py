@@ -196,6 +196,41 @@ def log_build_artifact(
         return None
 
 
+def start_candidate_run(disease: str, model_version: str):
+    """
+    Open a run for a retraining CANDIDATE and return (run, run_id).
+
+    The run is opened BEFORE the candidate is built, because the run id names the
+    directory the candidate is written to: the artifact and the record of it
+    share one identifier, and neither can exist without the other.
+
+    Unlike `log_build_artifact`, this RAISES when MLflow is unavailable. The two
+    are different jobs: a build must ship even with no tracking store, while a
+    candidate whose comparison against the shipped model was never recorded is
+    a bundle on disk with no evidence attached, and a bundle with no evidence is
+    worse than no bundle. The caller is expected to abort.
+
+    The caller closes the run (`with` on the returned run object).
+    """
+    if not _mlflow_available:
+        raise RuntimeError(
+            "mlflow is not installed in this environment — a retraining "
+            "candidate is not built without a run to record it in"
+        )
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    run = mlflow.start_run(run_name=f"{disease}-candidate-{model_version}")
+    mlflow.set_tags({
+        "disease": disease,
+        "model_version": model_version,
+        "run_type": "retrain_candidate",
+        # Read by whoever finds this run later: it records a candidate that was
+        # measured, not a model that was deployed.
+        "promoted": "no",
+    })
+    return run, run.info.run_id
+
+
 def tracking_state(n: int = 20) -> Dict[str, Any]:
     """
     What MLflow is actually doing, as four distinguishable states.

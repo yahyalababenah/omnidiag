@@ -496,10 +496,19 @@ def build_bundle(csv_path: str | Path, experiments_git_ref: str = "") -> Dict[st
             "family": "glm_ivap_conformal",
             "model": f"Spline-GLM (SplineTransformer n_knots={N_KNOTS}) + LogisticRegression C={GLM_C}",
             "feature_set": "L3 (7 pre-stress-test inputs), D-25",
-            "training_data": f"{csv_path} — 920 patients, 4 UCI sites (catheterisation 1982-1987)",
+            # Counted, not typed. The shipped build passes the 920-row UCI file
+            # and these read "920 patients / 4 sites" as they always have; the
+            # retrain path (Gate 8.10) passes a merged file, and a hardcoded 920
+            # would have made its candidate card state a row count the candidate
+            # was not trained on.
+            "training_data": (
+                f"{csv_path} — {len(frame)} patients, "
+                f"{frame['site'].nunique()} sites "
+                f"({', '.join(sorted(frame['site'].astype(str).unique()))})"
+            ),
             "training_csv_sha256": sha256_of(csv_path),
             "split": (
-                f"fit on all 920; IVAP and Mondrian cells cross-fitted on "
+                f"fit on all {len(frame)}; IVAP and Mondrian cells cross-fitted on "
                 f"{N_FOLDS}-fold OOF stratified by site x sex x label, seed {CV_SEED}"
             ),
             "calibration": "exact inductive Venn-Abers (IVAP) on the training-hospital mix",

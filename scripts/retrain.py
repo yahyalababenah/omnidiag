@@ -7,7 +7,13 @@ Scheduled retraining script. Triggered by:
   2. Cron / Docker (see docker-compose.yml retrain service)
   3. Drift threshold breach via POST /admin/drift/{disease}/run
 
-Pipeline:
+Pipeline (models whose family is NOT in CANDIDATE_FAMILIES — diabetes and the
+legacy XGBoost path). A `glm_ivap_conformal` module, i.e. heart since Gate 8.1,
+is delegated to the candidate builder by run_candidate_path() and never reaches
+step 1: it has no single threshold to judge an AUC against, its headline metric
+is leave-one-hospital-out rather than a random split, and nothing on that path
+is promoted at all (Gate 8.10).
+
   1. Load reference CSV + recent predictions from DB
   2. Merge new labelled samples (prediction > threshold treated as label)
   3. Retrain XGBoost / LGB model (or stacking ensemble for diabetes)
@@ -137,12 +143,57 @@ def flush_cache() -> None:
         log.warning("Could not flush cache: %s", e)
 
 
+def run_candidate_path(disease: str) -> None:
+    """
+    Delegate to the candidate builder for a family this script cannot train.
+
+    Everything below this function assumes one XGBoost on a random split, judged
+    by pooled AUC, promoted over the production path when it clears a tolerance.
+    None of that applies to the heart module: its decision is a conformal SET
+    rather than a probability against a cut-point, so it has no AUC-versus-
+    threshold to promote on; its headline figure is leave-one-hospital-out, so a
+    random split would produce a flattering number that selects nothing; and a
+    promotion at all is the thing Gate 8.10 removed from this path.
+
+    So this script does not train it. It hands the whole job to
+    backend.active_learning.retrain.retrain_candidate, which builds an isolated
+    candidate and records the comparison, and exits.
+    """
+    from backend.active_learning.retrain import load_disease_config, retrain_candidate
+    from backend.heart_glm import candidate as candidate_mod
+
+    log.info("%s is a %s model — building a CANDIDATE, promoting nothing",
+             disease, load_disease_config(disease).get("model", {}).get("family"))
+    log.info("%s", candidate_mod.CANDIDATE_LIMIT)
+
+    # No reviewed rows are read here: this script's own entry point has no
+    # database session, and inventing labels from `prediction > threshold`
+    # (which is what step 2 of this file's original docstring described) would
+    # train the model on its own output. A candidate from reviewed rows is built
+    # through the admin endpoint or the module CLI, both of which have a session.
+    result = retrain_candidate(disease, [], [])
+    log.info("Result: %s", result)
+    if result.get("status") != "success":
+        sys.exit(1)
+
+
 def main() -> None:
     args = parse_args()
     disease = args.disease
     log.info("=" * 60)
     log.info("OmniDiag Retrain Pipeline — disease=%s", disease)
     log.info("dry_run=%s, min_samples=%d, auc_tolerance=%.3f", args.dry_run, args.min_samples, args.auc_tolerance)
+
+    # 0. Families that are not retrained by this script at all.
+    try:
+        from backend.active_learning.retrain import CANDIDATE_FAMILIES, _model_family
+        family = _model_family(disease)
+    except Exception as exc:  # noqa: BLE001
+        log.error("Cannot determine the model family for %s: %r", disease, exc)
+        sys.exit(1)
+    if family in CANDIDATE_FAMILIES:
+        run_candidate_path(disease)
+        return
 
     # 1. Load reference data
     try:
