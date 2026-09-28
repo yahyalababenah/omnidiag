@@ -745,7 +745,7 @@ export default function ClinicalEmrMode() {
                     <div className="grid grid-cols-3 gap-4">
                       <MetricBox label="Prediction" value={result.prediction === 1 ? 'Positive' : 'Negative'} color={isPositive ? 'red' : 'green'} />
                       <MetricBox label="Risk Probability" value={`${confidencePct}%`} color="blue" />
-                      <MetricBox label="SHAP Base Value" value={shapData?.base_value?.toFixed(4) || '\u2014'} color="gray" />
+                      <MetricBox label={currentDiseaseInfo?.explainer_type === 'additive' ? 'Base value (model intercept)' : 'SHAP Base Value'} value={shapData?.base_value?.toFixed(4) || '\u2014'} color="gray" />
                     </div>
                   </div>
                 )}

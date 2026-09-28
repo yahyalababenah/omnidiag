@@ -121,34 +121,68 @@ runs from 0.36 to 0.97. Both are in the research repo's `results.md`, with the
 per-hospital tables the plots summarise.
 
 
-### Dysglycaemia screening: the three answers, on screen
+### What changed in Phase 9 (dysglycaemia module only)
 
-The NHANES module answers with the same three-way decision and the interface reports
-whichever one the model gave. Real screens from the merged branch, captured against a local
-backend on 2026-09-28 (Clinical EMR mode, demo patients N-003, N-001, N-002).
+The diabetes slot now ships an **Explainable Boosting Machine on twenty first-visit inputs, calibrated with Platt scaling, with a group-conditional conformal decision by age band** (`models/diabetes_nhanes/diabetes_nhanes_ebm.joblib`, fetched at image build time and checked against a recorded sha256). Like the heart module, it answers **referral / no referral / uncertain** rather than thresholding a probability, and **uncertain counts as a referral everywhere in the system**. It publishes **no decision threshold and no risk bands**, deliberately. The declared cost is that **38.3 % of patients land in `uncertain`**, and that **14.1 % of the patients who do have dysglycaemia receive `no_referral`**. Every decision the model made on the way there, and the measurement behind it, is in [`docs/phase9/`](docs/phase9/).
+
+> **What the screenshots below do and do not show.** They show that the interface reports the model's decision faithfully. **They do not show that it is clinically understood.** No clinician has read these screens or their action plans; that is a declared next step before any real use, as for the heart module.
+
+### The three answers, on screen (dysglycaemia)
+
+The module returns **one of three answers**, and the interface reports whichever one the model gave.
+These are real screens, captured from the merged branch against a local backend (2026-09-28, Clinical
+EMR mode, demo patients N-003, N-001 and N-002).
 
 | Referral | No referral | Uncertain |
 |---|---|---|
-| <img src="docs/assets/screenshots/30_nhanes_referral_result.png" alt="Referral: Refer — confirmatory testing recommended, 64.6% with interval 60.9%–68.4%, High urgency, HbA1c or OGTT" width="280"> | <img src="docs/assets/screenshots/30_nhanes_no_referral_result.png" alt="No referral: No referral indicated, 3.6% with interval 2.6%–4.8%, Low urgency, with the note that NO_REFER is not a clearance" width="280"> | <img src="docs/assets/screenshots/30_nhanes_uncertain_result.png" alt="Uncertain: refer for further evaluation, 34.9% with interval 32.7%–37.4%, Medium urgency, fasting or random glucose" width="280"> |
-| `Refer — confirmatory testing recommended` · High urgency: HbA1c, or OGTT where HbA1c is unreliable | `No referral indicated` · Low urgency, and the screen states that **14.1 % of truly dysglycaemic patients receive it** | `Uncertain — refer for further evaluation` · Medium urgency: fasting or random glucose |
+| <img src="docs/assets/screenshots/30_nhanes_referral_result.png" alt="Referral: the result panel reads Refer — confirmatory testing recommended, with the calibrated interval 60.9%–68.4%" width="280"> | <img src="docs/assets/screenshots/30_nhanes_no_referral_result.png" alt="No referral: the result panel reads No referral indicated, with the calibrated interval 2.6%–4.8%, and states that it is not a clearance" width="280"> | <img src="docs/assets/screenshots/30_nhanes_uncertain_result.png" alt="Uncertain: the result panel reads Uncertain — refer for further evaluation, with the calibrated interval 32.7%–37.4%" width="280"> |
+| `Refer — confirmatory testing recommended` · High urgency: HbA1c, or OGTT where HbA1c is unreliable | `No referral indicated` · Low urgency; the panel says **14.1 % of truly dysglycaemic patients receive this answer** | `Uncertain — refer for further evaluation` · Medium urgency: fasting or random glucose |
 
-Each panel carries a **next clinical step** (`clinical_action_plan`) built from the decision, not from
-a risk band. The no-referral panel says on screen that it is not a clearance; the uncertain panel says
-uncertain is not a middle amount of risk.
+**"Uncertain" is a third decision, not a middle band of risk.** The conformal set contains *both*
+labels: the model is declining to rank this patient at the guaranteed error rate. It counts as a
+referral everywhere in the system, and it is where 38.3 % of patients land. Each panel carries a **next
+clinical step** (`clinical_action_plan`) built from the decision, never from a risk band.
 
-**What-If uses this module's own lever policy.** For N-002 the scenario moves BMI 30 → 24.9,
-adiposity band high → normal, SBP 126 → 120, HDL 46 → 60 and vigorous activity 0 → 1, and the model's
-estimate falls to 18.2 %. It is the model's response to modifiable factors, not a predicted treatment
-effect, and HDL is a proxy for the behaviour that raises it (see
-[`diabetes_what_if_levers.py`](backend/diabetes_what_if_levers.py)).
-
-<img src="docs/assets/screenshots/31_nhanes_whatif.png" alt="What-If scenario for N-002: BMI, adiposity band, SBP, HDL and activity move to their targets, post-intervention probability 18.2%" width="420">
+The generated report says the same thing in prose, including for the uncertain patient —
+[`40_nhanes_uncertain_report.png`](docs/assets/screenshots/40_nhanes_uncertain_report.png). It is the
+rule-based report, not the LLM one.
 
 **These screens show that the interface reports the model faithfully. They do not show that it is
-clinically understood** — no clinician has read them, as for the heart module. Two things visible in
-them are still wrong and are open, not hidden: the panels label the base value "SHAP Base Value"
-although this model has no SHAP step (its contributions are the model), and the uncertain panel's
-frame is green while its title and next-step box are amber.
+clinically understood** — the limit stated above applies to these images too. Three defects visible in
+them are open, not hidden: the report quotes contributions as "SHAP +0.169" although this model has no
+SHAP step; the report tells the clinician to "order an HbA1c test" for an uncertain patient while the
+panel above it recommends a fasting or random glucose; and the uncertain panel's frame is green while its
+title and next-step box are amber.
+
+### How the dysglycaemia model explains itself
+
+There is **no SHAP step in this module, and none is wanted**: the explanation is the model. An EBM is
+additive by construction,
+
+    logit(raw score) = intercept + Σ f_j(x_j) + Σ f_jk(x_j, x_k)
+
+so each feature's contribution is read straight out of the fitted model, not estimated after the fact.
+The identity is **asserted on every request** to within 1e-8 (measured at 2.7e-15 over the whole test
+cycle) — an explanation that does not sum to the score is refused, not served. A pairwise term is split
+evenly between its two features for the bar chart, the sum stays exact, and the unsplit terms are in
+`term_contributions` for Engineering mode.
+
+<img src="docs/assets/screenshots/32_nhanes_contributions.png" alt="Clinical Insights for N-002: horizontal contribution bars per feature, base value −1.1499, and the What-If scenario below" width="420">
+
+*Clinical Insights for N-002. Red bars raise the estimate, green bars lower it; the base value is the
+model intercept.* Two things to read it correctly:
+
+- **The bars are on the raw log-odds scale; the probability shown is after Platt calibration.** They do
+  not add up to the displayed percentage by eye.
+- **Monotone priors hold on main effects only.** Pairwise terms can reverse direction for some patients,
+  so a single bar is a statement about this patient, not a rule about the feature.
+
+**What-If uses this module's own lever policy.** For N-002 it moves BMI 30 → 24.9, adiposity band
+high → normal, SBP 126 → 120, HDL 46 → 60 and vigorous activity 0 → 1, and the estimate falls to 18.2 %.
+It is the model's response to modifiable factors, not a predicted treatment effect, and HDL is a proxy
+for the behaviour that raises it ([`diabetes_what_if_levers.py`](backend/diabetes_what_if_levers.py)).
+
+<img src="docs/assets/screenshots/31_nhanes_whatif.png" alt="What-If scenario for N-002: BMI, adiposity band, SBP, HDL and activity move to their targets, post-intervention probability 18.2%" width="420">
 
 ### The measurements behind the dysglycaemia model
 
@@ -659,7 +693,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   └── mockPatients.js                   # Pre-defined patient records (CAD, BRFSS DM, NHANES)
 │
 ├── docs/
-│   ├── assets/screenshots/               # Real UI captures: heart (10_, 20_) and NHANES (30_, 31_)
+│   ├── assets/screenshots/               # Real UI captures: heart (10_, 20_) and NHANES (30_ to 40_)
 │   ├── assets/research/                  # Heart research figures copied from the experiments repo
 │   └── phase9/                           # NHANES record: DISCOVERY_RECORD, FINDINGS_REGISTER, RESEARCH_FIDELITY_AUDIT, figures/
 ├── data/                                 # Raw and processed datasets per disease

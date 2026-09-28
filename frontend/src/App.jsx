@@ -177,7 +177,7 @@ function AppContent() {
             {currentDiseaseInfo?.display_name ?? 'OmniDiag'}
             {currentDiseaseInfo?.version ? ` v${currentDiseaseInfo.version}` : ''}
             {currentDiseaseInfo?.model_type ? ` \u00b7 ${currentDiseaseInfo.model_type}` : ''}
-            {currentDiseaseInfo?.explainer_type ? ` + ${currentDiseaseInfo.explainer_type} SHAP` : ''}
+            {currentDiseaseInfo?.explainer_type ? (currentDiseaseInfo.explainer_type === 'additive' ? ' \u00b7 exact additive terms' : ` + ${currentDiseaseInfo.explainer_type} SHAP`) : ''}
           </p>
         </div>
       </aside>
