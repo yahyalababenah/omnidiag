@@ -135,3 +135,64 @@ deliberate exclusion of glucose on the strength of a single under-specified test
 reverted as D9-09. The rule learned — *a documented exclusion is overturned by showing
 the reasoning behind it was wrong, not by showing the excluded variable is weak* — is now
 written into the method.
+
+---
+
+# Appendix — the osmolality finding, verified independently
+
+Yahya's research archived an entire pipeline generation (`04_research_pipeline_v1/`) on one
+discovery: NHANES serum osmolality is a **calculated** value containing glucose, so admitting
+it lets the feature set reconstruct an excluded glycaemic variable. Leak guard 2 — the
+multivariate reconstruction check — was added because of it.
+
+Re-measured here from the raw files, independently of the research scripts, n=26512:
+
+### 1. The variable is the formula, not merely correlated with it
+
+    corr( 2*Na + glucose/18 + BUN/2.8 , LBXSOSSI ) = 0.9945
+
+Sodium and blood urea nitrogen are themselves already in the feature set, so the model can
+solve the identity directly:
+
+    glucose = 18 * ( osmolality - 2*Na - BUN/2.8 )
+
+### 2. One column flips the guard from a comfortable pass to a hard failure
+
+| feature set | R2(glucose \| features) | guard 2 (< 0.60) |
+|---|---|---|
+| without osmolality (60 features) | **0.134** | passes |
+| with osmolality (61 features) | **0.865** | **fails** |
+
+### 3. Guard 1 would have missed it completely — and this is the methodological point
+
+    univariate AUC( osmolality -> HbA1c >= 5.7 ) = 0.5844
+    guard 1 threshold 0.85  ->  NOT CAUGHT
+
+A univariate screen **structurally cannot** detect a variable that leaks only in combination
+with others. Guard 2 catches a class of leak guard 1 is blind to. That is a genuine
+methodological contribution, not an incidental observation, and it is why the guard exists.
+
+### 4. It pre-refutes the argument behind D9-08
+
+The reasoning that produced D9-08 was: *glucose reaches only AUC 0.7029 on its own, therefore
+it is not label-defining.* The osmolality finding, already in the research folder, is the
+counterexample:
+
+| variable | univariate AUC | leak? |
+|---|---|---|
+| osmolality | **0.5844** | yes — caught by the research |
+| glucose | 0.7029 | yes — added anyway in D9-08, reverted as D9-09 |
+
+**Osmolality is weaker than glucose and it is still a leak.** Weakness was never a defence
+under the research's own criterion, which was written months before D9-08 and sits in the same
+folder. The disagreement was never about principle: the principle was Yahya's, it was correct,
+and it was applied consistently in the research and inconsistently by me.
+
+### The principle, stated from the research's own evidence
+
+> A variable that encodes the target — or that encodes a variable excluded *because of* the
+> target — is a leak, regardless of how weakly it predicts on its own. Univariate strength
+> measures **usefulness**; leakage is a question of **provenance**. Provenance is the test.
+
+`LBXSOSSI` is one of the ten names in `GLYCEMIC_BANNED`, checked on every bundle load, with
+the derivation recorded inline so the next reader does not have to rediscover it.
