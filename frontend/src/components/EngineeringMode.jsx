@@ -16,6 +16,7 @@ import WhatIfScenarioCard from './WhatIfScenarioCard';
 import { SCREENING_LABEL, isElevated, screeningText } from '../utils/screening';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
+import ClinicalActionPlan from './ClinicalActionPlan';
 import { getDisplayThreshold } from '../constants/thresholds';
 
 export default function EngineeringMode() {
@@ -242,6 +243,9 @@ export default function EngineeringMode() {
                         : null
                     }
                   />
+                  {/* Next clinical step; renders nothing for a module whose
+                      response carries no plan (heart). */}
+                  <ClinicalActionPlan plan={result.clinical_action_plan} />
                   {/* "Prediction: Positive" underneath "Uncertain" reads as a
                       contradiction, even though it is the correct Q4 answer:
                       `prediction` is 1 for uncertain because an uncertain
