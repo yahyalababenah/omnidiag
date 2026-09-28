@@ -1063,3 +1063,87 @@ not have.
 
 Raising it honestly needs **non-glycaemic** information the cohort does not contain — and that is a
 data-collection question, not a modelling one.
+
+---
+
+# Gate 9.6 — Active Learning: a candidate path that mostly refuses
+
+Answers open question 3 from the Phase 9 brief. The recommendation then was "document
+it as broken and defer"; that was before the two hazards below were measured, and both
+are specific to this module rather than to active learning in general.
+
+New file `backend/active_learning/diabetes_nhanes_candidate.py`. Nothing shared is
+edited: `retrain.py` hard-codes `models/{disease}/omni_diag_xgb_optimized.pkl` and an
+XGBoost refit, neither of which exists here, and its own docstring already records that
+the heart cycle fails on that same line.
+
+## F9-35 — HIGH — The review queue stores an opinion; this model's target is an assay
+
+`ReviewQueue.label` is documented as "expert annotation (0 or 1)". For the heart module
+a clinician can meaningfully annotate *should this patient have been referred*. Here the
+target is **HbA1c >= 5.7%** — a laboratory value nobody can judge from waist, lipids or
+family history.
+
+An annotation that is a clinician's guess teaches the model to imitate clinicians. An
+annotation that is a transcribed HbA1c teaches it the target. Retraining on the first
+while believing it is the second is a silent change of what the model predicts.
+
+**Guard:** a row is admitted only when the reviewer's note carries a lab value in the
+HbA1c range. "confirmed", "agree with the model" and "looks high" are refused. A number
+outside 3–20 is refused rather than coerced, because it is a glucose value, a date or a
+typo and guessing which is the failure this module exists to prevent.
+
+## F9-36 — HIGH — Partial verification bias, measured on this cohort
+
+Only referred and uncertain patients plausibly get an HbA1c ordered. Cleared patients are
+never verified, so they never enter the annotated set. On the training cycle:
+
+| stage-1 decision | n | share | true prevalence |
+|---|---|---|---|
+| referral | 5181 | 0.280 | 0.523 |
+| uncertain | 6908 | 0.373 | 0.324 |
+| **no_referral** | **6419** | **0.347** | **0.154** — never verified |
+
+The annotated set an uncorrected loop would see has prevalence **0.409** against a true
+cohort prevalence of **0.321** — an enrichment of **+8.8 points** — and it discards
+**990 genuinely dysglycaemic patients, 16.7% of all positives**, who are precisely the
+cases the model already gets wrong and most needs to learn from.
+
+The enrichment is also **not uniform by age band** (+6.0 / +10.9 / +5.5 points), so it
+would distort the group-conditional conformal layer as well as the prevalence.
+
+**Guard:** `verification_bias()` measures the decision mix and the prevalence enrichment
+on the actual annotations; `build_candidate()` refuses past **5 percentage points**. The
+tolerance sits deliberately below the 8.8 it exists to catch — a tolerance at or above
+the failure would be decoration, and a test asserts that relationship.
+A second guard requires at least 10% of annotations to be patients the model **cleared**:
+a loop that never sees its own clearances cannot learn from the decision it is most
+likely getting wrong.
+
+## Sampling needs no threshold
+
+`backend/active_learning/sampler.py` centres entropy on a decision threshold. This module
+configures none (`inference_threshold: null`, D-32), and inventing one to compute entropy
+would reintroduce exactly the number the module exists without. The conformal layer
+already states which patients it could not separate — that is the uncertainty signal, it
+carries the per-group coverage property, and it needs no cut-point. So
+`should_queue_for_review(decision)` queues on `decision == "uncertain"` and nothing else.
+
+## The promise, asserted rather than stated
+
+Never writes `model.weights_path`. Never calls `invalidate()`. Never hot-reloads a loader.
+Produces a candidate card recording the parent bundle's sha256, how many annotations were
+supplied, how many were used, how many were dropped for lacking a lab value, and the full
+verification-bias report. Promotion is a human act performed elsewhere. A test reads the
+module's own source to confirm the live path is absent.
+
+A nine-cell transition matrix is provided so that a reviewer can see a referral flipping
+straight to no_referral as its own number rather than averaged into a summary.
+
+## Status
+
+35 tests, all passing; suite now **770 passed, zero failures**. The honest summary is
+that this path will refuse far more often than it fires, and that is the correct
+behaviour: on the data as it is collected today, every candidate would be refused for
+F9-36. Making it fire requires collecting outcomes for cleared patients — a
+data-collection change, not a modelling one.
