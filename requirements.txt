@@ -25,6 +25,11 @@ xgboost==3.3.0
 lightgbm==4.6.0
 joblib==1.5.3
 threadpoolctl==3.6.0
+# Explainable Boosting Machine for the NHANES dysglycaemia module. Pinned exactly
+# like the rest of this block: joblib.load() unpickles interpret classes, so an
+# unpinned or missing version fails at MODEL LOAD (the import of the backend
+# still succeeds, which is why this would not show at startup).
+interpret-core==0.7.8
 
 # ── SHAP explainability ────────────────────────────────────────────────────
 shap==0.52.0
