@@ -261,3 +261,7 @@ __marimo__/
 backups/
 archive/stale_2026-06/
 evaluation_evidence/**/*.png
+
+# Local copies of the heart candidate artifacts, brought into this worktree only
+# so the heart tests can run. They belong to the heart candidate branch, not here.
+models/heart_disease/candidates/

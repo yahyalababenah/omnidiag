@@ -33,7 +33,39 @@ pinned: false
 
 **The heart module is part of that system with a narrower scope of its own.** It ranks **patients a clinician has already decided to refer for catheterisation** by the probability of a >50 % stenosis. It is **not a general-population screen**: every patient it learned from had already been selected for catheterisation by a clinician (UCI, 1982–1987), so it has never seen the people a screening test would be pointed at. The sentence is carried in the module's own config (`disease.scope_note`) and shown beside every result on screen and in the printed report, because a number without its scope is the failure this project is most exposed to.
 
-**The diabetes module** (CDC BRFSS 2015) is a population-survey risk model and carries its own declared limits in `WEAKNESS_REGISTER.md`. **It was not touched in Phase 8:** its model, its prevalence correction and its decision threshold (0.108184, on the deployment-prevalence scale) are unchanged, and its open items — including WI-8 — stand as recorded.
+**The diabetes module is now a second, separately scoped module: dysglycaemia screening on NHANES (Phase 9).** It replaces the BRFSS 2015 stacking ensemble (`configs/diabetes.yaml`, kept and marked superseded). Sections further down that describe the BRFSS ensemble — the 0.108184 threshold, the 0.237 prevalence correction, the `risk_bands` — describe the superseded module, not this one.
+
+### The two modules, side by side
+
+| | **Heart** (Phase 8) | **Dysglycaemia screening** (Phase 9, NHANES) |
+|---|---|---|
+| **Question answered** | Among patients already chosen for catheterisation, who has a >50 % stenosis? | Among adults with **no diabetes diagnosis and on no glucose-lowering drug**, who has HbA1c ≥ 5.7 %? |
+| **Not** | A general-population screen | A diabetes diagnostic. Dysglycaemia is established by the laboratory result, never by this model |
+| **Data** | UCI cohorts, 1982–1987 | NHANES 2007–2018, n = 26,904, prevalence 32.9 % |
+| **Model** | Spline-GLM, Venn-Abers calibration | Explainable Boosting Machine, Platt calibration (contributions *are* the model, no SHAP) |
+| **Inputs** | 11 accepted, 7 read | 20 measurements at a first visit; 6 mandatory, never imputed |
+| **Decision** | refer / uncertain / no referral; Mondrian conformal by sex × class | referral / uncertain / no referral; conformal by **age band** (20–39, 40–59, 60+), α = 0.20 |
+| **Threshold, risk bands** | None, deliberately | None, deliberately (the BRFSS bands are retired, not recomputed) |
+| **Uncertain share** | about 40 % | 38.3 % (referral 33.9 %, no referral 27.8 %) |
+| **Next step on screen** | Result panel per decision | `clinical_action_plan` on every prediction: HbA1c/OGTT (High), fasting or random glucose (Medium), none (Low) |
+
+**Measured on the held-out 2017–2018 cycle** (train 2007–2014, calibrate 2015–2016; n = 4,099, prevalence 35.9 %; every figure is from the shipped bundle's `model_card.json`):
+
+- **AUC 0.752** (95 % CI 0.738–0.766); 0.766 with NHANES exam weights. Calibration slope 0.952, intercept −0.090, ECE 0.025.
+- **86 % of dysglycaemic patients are flagged** (referral or uncertain) — and therefore **14.1 % receive `no_referral`**: 9.8 % aged 20–39, 15.8 % aged 40–59, 14.3 % aged 60+. **Roughly one in seven patients who do have dysglycaemia is told there is no indication to test.** A `no_referral` here is not a clearance; the action plan says so on screen. At α = 0.15 the figure was 10.1 %, and the move to 0.20 was made knowingly: about 6 points fewer healthy patients sent for a test, about 4 points more missed positives.
+- Specificity of `no_referral` is 35.5 %, and **60–77 % of healthy patients are still told to test.** This is a "test most people" screen, not a narrow one.
+
+**Limits, each measured and each carried in `configs/diabetes_nhanes.yaml`:**
+
+- **Discrimination is uneven.** AUC 0.757 (20–39), 0.691 (40–59), 0.619 (60+); 0.785 female, 0.713 male.
+- **Not race-blind.** Race is never an input, but the twenty features recover NH Asian membership at AUC 0.785 and NH Black at 0.780. Calibration differs by group behind the pooled figure (mean predicted minus observed: NH White +0.106, NH Asian −0.097, NH Black −0.076).
+- **The label is ambiguous by construction.** HbA1c ≥ 5.7 % is a hard cut on an assay with 0.1–0.2 point within-person variability; 24.5 % of the cohort sits inside that band. About 0.07 AUC is unattainable in principle. HbA1c is also shifted by red-cell indices independently of glucose, so the label is not a pure measure of glycaemia.
+- **Glycaemic measurements are banned as inputs, permanently** (glucose, insulin, OGTT): they measure the same quantity as the label. A complete blood count is banned too — its AUC gain (+0.022) is an assay artefact, not risk information.
+- **Monotone priors hold on main effects only.** Pairwise terms can reverse direction for some patients (for example GGT +5 U/L lowers predicted risk for 16.3 %). "The model can never say older implies lower risk" is **false** for the shipped model and is not claimed anywhere.
+- **Conformal coverage is measured under a temporal split**, which breaks exchangeability, so no coverage guarantee is claimed.
+- **No deployment prevalence.** The 0.237 Jordan figure is total diabetes prevalence and does not transfer to this target. Absolute probabilities need local recalibration before they are shown as anything but a relative ordering.
+- **Not clinically reviewed.** No clinician has read these screens or the action plans; that is a declared next step, as for the heart module.
+- **What-If** for this module uses its own lever policy (`backend/diabetes_what_if_levers.py`), including raising HDL to a ceiling of 60 mg/dL; the heart module's counterfactual generator is untouched.
 
 ### What changed in Phase 8 (heart module only)
 

@@ -34,6 +34,7 @@ import PatientTimeline from './PatientTimeline';
 import ClinicalNotesInput from './ClinicalNotesInput';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
+import ClinicalActionPlan from './ClinicalActionPlan';
 import { getDisplayThreshold } from '../constants/thresholds';
 import { SCREENING_LABEL, screeningText } from '../utils/screening';
 import {
@@ -691,7 +692,13 @@ export default function ClinicalEmrMode() {
                             {screeningText(result)}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {result.decision === 'uncertain'
+                            {/* A module that returns an action plan supplies its own
+                                wording: the generic "low risk" sentence below would
+                                contradict a no_referral plan that says a negative is
+                                not a clearance. */}
+                            {result.clinical_action_plan?.rationale
+                              ? result.clinical_action_plan.rationale
+                              : result.decision === 'uncertain'
                               ? 'The model could not place this patient confidently in either group. Refer for further evaluation.'
                               : isPositive
                                 ? 'AI analysis indicates elevated risk. Clinical correlation recommended.'
@@ -729,6 +736,10 @@ export default function ClinicalEmrMode() {
                           : null
                       }
                     />
+
+                    {/* Next clinical step; renders nothing for a module whose
+                        response carries no plan (heart). */}
+                    <ClinicalActionPlan plan={result.clinical_action_plan} />
 
                     {/* Key metrics row */}
                     <div className="grid grid-cols-3 gap-4">

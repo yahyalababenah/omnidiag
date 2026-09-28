@@ -1,0 +1,423 @@
+{
+ "model_card": {
+  "module": "diabetes (NHANES dysglycaemia screening)",
+  "family": "ebm_ivap_conformal",
+  "population": "adults >= 20, not pregnant, NOT diagnosed with diabetes (DIQ010) and NOT on glucose-lowering treatment (DIQ050/DIQ070). A screening tool for the undiagnosed and untreated.",
+  "label": "dysglycaemia: HbA1c >= 5.7% (ADA prediabetes-or-diabetes)",
+  "data": "NHANES 2007-2018, 6 cycles",
+  "cohort_n": 26904,
+  "cohort_prevalence": 0.328835860838537,
+  "split": "TEMPORAL. train 2007-2014 (n=18508); val+cal 2015-2016 (2148/2149); test 2017-2018 held out (4099). The random-split result is not produced by this script and must never be quoted.",
+  "decisions": [
+   "D9-01 EBM on the curated-20 first-visit feature set",
+   "D9-02 measured waist replaced by a clinician-assessed 3-level adiposity band (published WHtR boundaries 0.50/0.60); required field, no blank level",
+   "D9-03 the AUC chase is closed at this feature set; a complete blood count is BANNED as an input and the ban is enforced by an assert in the training script",
+   "D9-04 Platt scaling replaces isotonic; p_lower/p_upper are a B=1000 bootstrap of the Platt fit over the calibration set",
+   "D9-05 the conformal layer is group-conditional over age band x class",
+   "D9-06 six fields are mandatory and may never be scored as missing"
+  ],
+  "limitations": [
+   "F9-29 / D9-03 a complete blood count raises AUC by +0.0218 against this HbA1c label and by -0.0040 against a glucose label: the gain is an assay artefact (HbA1c responds to MCH at -0.0448, p~4e-235, independently of glucose), not risk information. CBC columns are banned as inputs and the ban is asserted in the training script. Any future CBC gain must not be reported as accuracy.",
+   "F9-30 about 0.07 AUC is unattainable in principle: HbA1c >= 5.7 is a hard cut on an assay with 0.1-0.2 point within-person variability, and 24.5% of the cohort sits inside that band. Excluding them the same model scores 0.85. A large part of the 'uncertain' rate is the decision layer correctly declining a label that is itself ambiguous.",
+   "D9-04 the probability layer is Platt scaling fitted on the calibration set. p_lower/p_upper are a bootstrap percentile interval over that fit and describe uncertainty in the CALIBRATION MAP only. They are not a distribution-free predictive interval and must not be described as one.",
+   "D9-05 the conformal layer is conditioned on age band. Per-group DECISION validity is restored; the per-group PROBABILITY calibration spread (F9-11) is NOT fixed, because correcting it would require the group variable at inference time.",
+   "F9-06 conformal coverage is measured under a temporal split, which violates exchangeability by design. Do not claim a 90% per-class coverage guarantee.",
+   "F9-08 HbA1c is not a neutral measure of glycaemia: it responds to MCH (-0.0448, p~4e-235) and RDW independently of glucose. No CBC feature is in this model, so that bias is unmodelled noise rather than a misleading explanation -- but it is not removed.",
+   "F9-09 excluding race as an input does NOT make the model race-blind; the 20 shipped features recover NH Black / NH Asian membership at the AUCs reported in metrics.race_recoverability.",
+   "F9-10 sensitivity and AUC vary strongly by age band; see metrics.fairness.",
+   "F9-11 calibration differs by ethnic group behind an acceptable pooled number; see metrics.fairness.",
+   "F9-12 NHANES cohort prevalence is 32.9%. This is a US screening cohort. No matched Jordanian figure for HbA1c >= 5.7 among the undiagnosed and untreated has been sourced. Absolute probabilities require local recalibration before they are displayed.",
+   "F9-25 in training data, an absent adiposity measurement is itself a risk signal (prevalence 0.389 vs 0.279 in the 'increased' band). The deployed field is REQUIRED for this reason."
+  ],
+  "shap_scale": "log_odds_raw_score",
+  "calibration": "platt_logistic fitted on the 2015-2016 calibration half; interval = B=1000 bootstrap of that fit. Selected on validation in Gate 9.0c against isotonic and against no layer (ECE 0.023 / 0.031 / 0.054).",
+  "mandatory_fields_reason": "F9-28: blanking any of these moves median risk materially or flips a large share of decisions. PAQ650 alone shifts median risk by +0.108 and flips 31% of decisions. They must be rejected as null by the schema, blocked by the form, and named as a reason by the batch path -- never passed to the model as NaN.",
+  "shap_note": "EBM is additive by construction: intercept + sum of term contributions == the raw score (decision_function), verified to < 1e-8. The contributions ARE the model. They explain the RAW score, not the recalibrated probability. No post-hoc explainer is used.",
+  "output_type": "conformal_decision",
+  "risk_bands": null,
+  "inference_threshold": null,
+  "prevalence_deploy": null,
+  "environment": {
+   "numpy": "2.4.6",
+   "pandas": "3.0.3",
+   "scikit-learn": "1.9.0",
+   "scipy": "1.18.0",
+   "joblib": "1.5.3",
+   "interpret-core": "0.7.8",
+   "python": "3.13.5"
+  },
+  "seed": 42,
+  "source_script_sha256": "f6e98d74dbdd3f9eeee3294342148cc350e8f3fa28452d255835fc8d1694cbbe",
+  "generated": "2026-09-28T09:48:53"
+ },
+ "metrics": {
+  "test_auc_raw": 0.7522699456351578,
+  "test_auc_raw_ci": [
+   0.7378,
+   0.7662
+  ],
+  "test_auc_recalibrated": 0.7522699456351578,
+  "test_auc_mec_weighted": 0.7654612943879258,
+  "test_prevalence": 0.358624054647475,
+  "calibration_raw": {
+   "cal_intercept": 0.1824423319134595,
+   "cal_slope": 0.964885473800566,
+   "ece": 0.03455700027392598,
+   "brier": 0.19063428637004518,
+   "scaled_brier": 0.17120155270581872
+  },
+  "calibration_recalibrated": {
+   "cal_intercept": -0.09048358117044439,
+   "cal_slope": 0.9516008606818098,
+   "ece": 0.024934359675135624,
+   "brier": 0.18964452629867132,
+   "scaled_brier": 0.17550461710188492
+  },
+  "calibration_platt": {
+   "a": 1.0138650795812614,
+   "b": 0.28108812865268007,
+   "interval_median_width": 0.04747955037930918,
+   "bootstrap_B": 1000
+  },
+  "conformal": {
+   "alpha": 0.2,
+   "layer": "group_conditional_age_band",
+   "min_cell": 100,
+   "fell_back_to_pooled": [],
+   "q_class": {
+    "0": 0.39099436796198345,
+    "1": 0.7464528312181095
+   },
+   "q_group": {
+    "0|0": 0.1649786328821438,
+    "0|1": 0.9270669771819628,
+    "1|0": 0.40180039082300106,
+    "1|1": 0.7440069644919565,
+    "2|0": 0.5387244336074072,
+    "2|1": 0.6263091049146366
+   },
+   "class_conditional": {
+    "cov1": 0.8435374149659864,
+    "cov0": 0.7287942183339673,
+    "ref": 0.39180287875091485,
+    "nor": 0.4025372041961454,
+    "amb": 0.20565991705293973,
+    "sens": 0.8435374149659864,
+    "spec": 0.5401293267402054
+   },
+   "group_conditional": {
+    "cov1": 0.8585034013605443,
+    "cov0": 0.7466717383035375,
+    "ref": 0.33861917540863623,
+    "nor": 0.27836057575018297,
+    "amb": 0.3830202488411808,
+    "sens": 0.8585034013605443,
+    "spec": 0.35488779003423354
+   },
+   "per_band": {
+    "20-39": {
+     "n": 1412,
+     "class_pos": 0.36,
+     "class_neg": 0.9772535804549284,
+     "group_pos": 0.9022222222222223,
+     "group_neg": 0.7657961246840775
+    },
+    "40-59": {
+     "n": 1351,
+     "class_pos": 0.8494423791821561,
+     "class_neg": 0.7158671586715867,
+     "group_pos": 0.8420074349442379,
+     "group_neg": 0.7416974169741697
+    },
+    "60+": {
+     "n": 1336,
+     "class_pos": 0.9929278642149929,
+     "class_neg": 0.2766295707472178,
+     "group_pos": 0.8571428571428571,
+     "group_neg": 0.7170111287758346
+    }
+   },
+   "coverage_pos": 0.8585034013605443,
+   "coverage_neg": 0.7466717383035375,
+   "referral": 0.33861917540863623,
+   "no_referral": 0.27836057575018297,
+   "uncertain": 0.3830202488411808,
+   "sensitivity_flagged": 0.8585034013605443,
+   "specificity_no_referral": 0.35488779003423354
+  },
+  "d9_02_band_vs_measured_waist": {
+   "v1_band_auc": 0.7522699456351578,
+   "v0_waist_auc": 0.7507443144621864,
+   "delta_ci": [
+    -0.0008,
+    0.004
+   ]
+  },
+  "additivity_max_deviation": 2.6645352591003757e-15,
+  "fairness": {
+   "sex=female": {
+    "n": 2155,
+    "prevalence": 0.3443155452436195,
+    "auc": 0.7852488349423814,
+    "cal_bias": 0.02133257587233528,
+    "sensitivity": 0.862533692722372
+   },
+   "sex=male": {
+    "n": 1944,
+    "prevalence": 0.37448559670781895,
+    "auc": 0.7130634579236553,
+    "cal_bias": 0.011920977974646363,
+    "sensitivity": 0.8543956043956044
+   },
+   "age=20-39": {
+    "n": 1412,
+    "prevalence": 0.15934844192634562,
+    "auc": 0.7569109800617804,
+    "cal_bias": 0.006855541044274771,
+    "sensitivity": 0.9022222222222223
+   },
+   "age=40-59": {
+    "n": 1351,
+    "prevalence": 0.3982235381199112,
+    "auc": 0.6910885837482911,
+    "cal_bias": 0.012022898047318153,
+    "sensitivity": 0.8420074349442379
+   },
+   "age=60+": {
+    "n": 1336,
+    "prevalence": 0.5291916167664671,
+    "auc": 0.6189816574207954,
+    "cal_bias": 0.03235263695445534,
+    "sensitivity": 0.8571428571428571
+   },
+   "race=Mexican American": {
+    "n": 537,
+    "prevalence": 0.31843575418994413,
+    "auc": 0.7502476592209121,
+    "cal_bias": 0.046434609001828664,
+    "sensitivity": 0.9239766081871345
+   },
+   "race=Other Hispanic": {
+    "n": 396,
+    "prevalence": 0.3434343434343434,
+    "auc": 0.7919117647058823,
+    "cal_bias": 0.04049489514169885,
+    "sensitivity": 0.9338235294117647
+   },
+   "race=NH White": {
+    "n": 1438,
+    "prevalence": 0.29276773296244785,
+    "auc": 0.7596909544863216,
+    "cal_bias": 0.10459909794195865,
+    "sensitivity": 0.8551068883610451
+   },
+   "race=NH Black": {
+    "n": 946,
+    "prevalence": 0.4682875264270613,
+    "auc": 0.7456031306517553,
+    "cal_bias": -0.07583378936400326,
+    "sensitivity": 0.8555304740406321
+   },
+   "race=NH Asian": {
+    "n": 579,
+    "prevalence": 0.4058721934369603,
+    "auc": 0.7875680356259278,
+    "cal_bias": -0.09752626568754702,
+    "sensitivity": 0.7787234042553192
+   },
+   "race=Other/multi": {
+    "n": 203,
+    "prevalence": 0.31527093596059114,
+    "auc": 0.8032823741007195,
+    "cal_bias": 0.029397479844338714,
+    "sensitivity": 0.859375
+   },
+   "adiposity_band=0.0": {
+    "n": 676,
+    "prevalence": 0.16568047337278108,
+    "auc": 0.8056927558257346,
+    "cal_bias": -0.006791526730737185,
+    "sensitivity": 0.38392857142857145
+   },
+   "adiposity_band=1.0": {
+    "n": 1452,
+    "prevalence": 0.30647382920110194,
+    "auc": 0.7150642134273568,
+    "cal_bias": 0.016237172377865206,
+    "sensitivity": 0.7617977528089888
+   },
+   "adiposity_band=2.0": {
+    "n": 1775,
+    "prevalence": 0.4676056338028169,
+    "auc": 0.7004781028877414,
+    "cal_bias": 0.028289269721308075,
+    "sensitivity": 0.9746987951807229
+   },
+   "adiposity_band=MISSING": {
+    "n": 196,
+    "prevalence": 0.42346938775510207,
+    "auc": 0.7183068557415503,
+    "cal_bias": -0.0002687438286148591,
+    "sensitivity": 0.8554216867469879
+   }
+  },
+  "race_recoverability": {
+   "Mexican American": 0.7322869765403968,
+   "Other Hispanic": 0.6302467083503653,
+   "NH White": 0.6150343520796234,
+   "NH Black": 0.780099885963132,
+   "NH Asian": 0.7854998736824416,
+   "Other/multi": 0.629084042946513
+  },
+  "eyeball_robustness": {
+   "0.1": {
+    "auc": 0.7519965688824026,
+    "auc_sd": 0.0003935766058646595,
+    "decision_flip": 0.010905098804586484
+   },
+   "0.2": {
+    "auc": 0.7517343963070203,
+    "auc_sd": 0.00038481350008839205,
+    "decision_flip": 0.02239570626982191
+   },
+   "0.35": {
+    "auc": 0.7515803841506172,
+    "auc_sd": 0.000392340636506906,
+    "decision_flip": 0.038741156379604784
+   }
+  },
+  "blank_field": {
+   "RIDAGEYR": {
+    "median_delta": -0.0543728018259122,
+    "mean_delta": -0.04134105097128774,
+    "decision_flip": 0.5745303732617711
+   },
+   "RIAGENDR": {
+    "median_delta": -0.0009730529075001881,
+    "mean_delta": -0.001098380517867648,
+    "decision_flip": 0.03025128080019517
+   },
+   "BMXBMI": {
+    "median_delta": -0.01694701585045516,
+    "mean_delta": -0.03770175309507588,
+    "decision_flip": 0.1949255916077092
+   },
+   "ADIPOSITY_BAND": {
+    "median_delta": -0.01687317234287261,
+    "mean_delta": -0.02735873324522558,
+    "decision_flip": 0.1485728226396682
+   },
+   "SBP": {
+    "median_delta": -0.00379819205417975,
+    "mean_delta": -0.007583621889609091,
+    "decision_flip": 0.08855818492315198
+   },
+   "DBP": {
+    "median_delta": 0.02225632110827358,
+    "mean_delta": 0.021397177309034114,
+    "decision_flip": 0.1232007806782142
+   },
+   "BPXPLS": {
+    "median_delta": 0.01700022554523828,
+    "mean_delta": 0.016798793048757078,
+    "decision_flip": 0.09270553793608197
+   },
+   "MCQ300C": {
+    "median_delta": 0.003379674411714821,
+    "mean_delta": -0.007383262873262081,
+    "decision_flip": 0.09880458648450842
+   },
+   "CVD_ANY": {
+    "median_delta": 0.003400605733585027,
+    "mean_delta": -0.0010675639162784543,
+    "decision_flip": 0.035130519638936326
+   },
+   "PAQ650": {
+    "median_delta": 0.10788723370887998,
+    "mean_delta": 0.0983282285633903,
+    "decision_flip": 0.46425957550622104
+   },
+   "PAQ665": {
+    "median_delta": -0.06141193806170503,
+    "mean_delta": -0.05641646210413519,
+    "decision_flip": 0.30470846547938524
+   },
+   "LBDHDD": {
+    "median_delta": -0.04105990886131489,
+    "mean_delta": -0.041924988284435756,
+    "decision_flip": 0.26982190778238596
+   },
+   "LBXSCH": {
+    "median_delta": 0.00456014481611236,
+    "mean_delta": 0.002115270665002153,
+    "decision_flip": 0.05830690412295682
+   },
+   "LBXSTR": {
+    "median_delta": -0.0014899984605626568,
+    "mean_delta": -0.005333503411063227,
+    "decision_flip": 0.039521834593803366
+   },
+   "LBXSATSI": {
+    "median_delta": 0.007401048826597145,
+    "mean_delta": 0.00855414634523178,
+    "decision_flip": 0.05318370334227861
+   },
+   "LBXSGTSI": {
+    "median_delta": 0.004560921625460811,
+    "mean_delta": 0.007468564627093737,
+    "decision_flip": 0.12588436203952183
+   },
+   "LBXSCR": {
+    "median_delta": 0.01201578424459307,
+    "mean_delta": 0.010582320453428757,
+    "decision_flip": 0.06464991461332033
+   },
+   "LBXSBU": {
+    "median_delta": 0.0010606436985568096,
+    "mean_delta": 0.0031477646941427515,
+    "decision_flip": 0.04122956818736277
+   },
+   "LBXSAL": {
+    "median_delta": 0.011283449104457166,
+    "mean_delta": 0.020523034787227966,
+    "decision_flip": 0.12856794340082947
+   },
+   "LBXSUA": {
+    "median_delta": -0.0031504010162668322,
+    "mean_delta": -0.006302819841127114,
+    "decision_flip": 0.05879482800683093
+   }
+  },
+  "net_benefit": [
+   {
+    "t": 0.1,
+    "model": 0.29551923233308935,
+    "screen_all": 0.28736006071941667
+   },
+   {
+    "t": 0.2,
+    "model": 0.23481336911441814,
+    "screen_all": 0.19828006830934375
+   },
+   {
+    "t": 0.3,
+    "model": 0.17565259819468163,
+    "screen_all": 0.08374864949639288
+   }
+  ],
+  "selected_on_validation": "V1_soft_0.12",
+  "monotonised": [
+   "RIDAGEYR",
+   "BMXBMI",
+   "ADIPOSITY_BAND",
+   "SBP",
+   "MCQ300C",
+   "PAQ650",
+   "PAQ665",
+   "LBDHDD",
+   "LBXSTR",
+   "LBXSATSI",
+   "LBXSGTSI"
+  ]
+ }
+}

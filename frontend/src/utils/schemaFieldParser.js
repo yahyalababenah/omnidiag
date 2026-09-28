@@ -19,6 +19,7 @@
  * @property {string}  name        - The field key (e.g., "Age", "HighBP")
  * @property {string}  title       - Human-readable label derived from description
  * @property {string}  type        - JSON Schema type: "string" | "integer" | "number"
+ * @property {boolean} requiresDeliberateEntry - never pre-filled; the clinician must answer it (F9-38)
  * @property {string}  component   - React component type: "toggle" | "select" | "number" | "slider" | "text"
  * @property {{ required: boolean, minimum?: number, maximum?: number, enum?: (string|number)[], step?: number }} validation
  * @property {string}  description - Full field description
@@ -152,6 +153,14 @@ export function parseSchema(schema) {
   // without this a clinician typing a maximum heart rate has no way to know it
   // changes nothing — and Gate 8.3 measured that it changes exactly nothing.
   const unusedByModel = new Set(schema.x_unused_by_model || []);
+  // Fields a clinician must answer for themselves, never pre-filled (F9-38).
+  // The form seeds its initial values from the schema `example`, so a field with
+  // an example value arrives already answered. For a module whose backend rejects
+  // a blank on exactly these fields, that defeats the check: it refuses a null,
+  // and the form never sends one. A skipped question would be submitted as the
+  // example patient's value instead. Modules that do not declare this key are
+  // unaffected.
+  const deliberateEntry = new Set(schema.x_requires_deliberate_entry || []);
 
   return Object.entries(schema.properties).map(([name, rawProp]) => {
     const prop = unwrapNullable(rawProp);
@@ -173,7 +182,8 @@ export function parseSchema(schema) {
       validation,
       description: prop.description || '',
       unusedByModel: unusedByModel.has(name),
-      default: extractDefault(name, schema),
+      requiresDeliberateEntry: deliberateEntry.has(name),
+      default: deliberateEntry.has(name) ? '' : extractDefault(name, schema),
       category: null, // assigned later by featureCategorizer
     };
   });
@@ -192,8 +202,16 @@ export function extractDefaultValues(fields, schema) {
     schema?.example ||
     {};
 
+  const deliberateEntry = new Set(schema?.x_requires_deliberate_entry || []);
+
   const defaults = {};
   for (const field of fields) {
+    // F9-38: never seed these. An unanswered question must LOOK unanswered, or
+    // the backend's rejection of a blank protects the API and not the clinician.
+    if (deliberateEntry.has(field.name)) {
+      defaults[field.name] = '';
+      continue;
+    }
     if (field.name in example) {
       defaults[field.name] = example[field.name];
     } else {
