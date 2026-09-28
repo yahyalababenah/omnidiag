@@ -77,6 +77,48 @@ DECISION_NO_REFERRAL = "no_referral"
 DECISION_UNCERTAIN = "uncertain"
 UNCERTAIN_DIAGNOSIS = "Uncertain — order an HbA1c test"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# D9-09. Every glycaemic measurement is banned as an input, permanently.
+#
+# This is a TARGET LEAK OF THE SECOND KIND, and it is the one that is easy to
+# miss. Glucose is available at inference time, so it passes the usual "no
+# information from the future" test. It fails the test that matters here: it is a
+# measurement of the SAME LATENT QUANTITY as the label. HbA1c and glucose are two
+# assays of glycaemia. Predicting one from the other is measurement agreement
+# dressed up as risk prediction.
+#
+# The mistake that was almost shipped: glucose alone reaches AUC 0.7029, below
+# this model's own 0.7523, and the rule glucose>=100 alone misses 54.2% of cases.
+# That was read as "insufficient, therefore not a leak". INSUFFICIENCY IS NOT
+# NON-LEAKAGE. A noisy partial measurement of the target is still a measurement
+# of the target, and 0.70 is what a proxy target looks like, not what a covariate
+# looks like.
+#
+# The clinical argument is the decisive one. This module's whole claim is that it
+# finds dysglycaemia WITHOUT measuring glycaemia. A clinician holding a glucose
+# result does not need a model to tell them to order an HbA1c -- fasting glucose
+# 100-125 is itself the ADA criterion for prediabetes. The only patients where a
+# glucose-fed model adds anything are those with normal glucose and high HbA1c,
+# which is precisely the F9-08 population whose HbA1c is shifted by red-cell
+# indices rather than by blood sugar. The apparent +0.029 AUC could therefore be
+# the model getting better at predicting an ASSAY, artefact included.
+#
+# Glucose still has real clinical value -- it belongs in the ACTION PLAN, where an
+# `uncertain` result sends the patient for a cheap glucose test and the clinician
+# acts on the number directly. It does not belong in the model.
+GLYCEMIC_BANNED = frozenset({
+    "LBXGH",      # HbA1c — the label itself
+    "LBXSGL",     # serum glucose
+    "LBDSGLSI",   # serum glucose, SI units
+    "LBXGLU",     # fasting plasma glucose
+    "LBDGLUSI",   # fasting plasma glucose, SI units
+    "LBXGLT",     # OGTT 2-hour glucose
+    "LBDGLTSI",   # OGTT 2-hour glucose, SI units
+    "LBXIN",      # insulin
+    "LBDINSI",    # insulin, SI units
+    "LBXSOSSI",   # osmolality — CALCULATED as 2Na + glucose/18 + BUN/2.8
+})
+
 # F9-29 / D9-03. A complete blood count raises AUC by +0.0218 against this HbA1c
 # label and by -0.0040 against a glucose label: the entire gain is the red-cell /
 # HbA1c assay artefact, not risk information. The ban is asserted in the training
@@ -86,10 +128,6 @@ CBC_BANNED = frozenset({
     "LBXHCT", "LBXRBCSI", "LBDLYMNO", "LBDNENO", "LBDMONO", "LBDEONO", "LBDBANO",
     "LBXLYPCT", "LBXNEPCT", "LBXMOPCT", "LBXEOPCT", "LBXBAPCT", "LBXMPSI", "LBXSCK",
 })
-
-
-class NoUsableModel(ValueError):
-    """Neither bundle can score this row. Raised instead of guessing."""
 
 
 class MandatoryFieldMissing(ValueError):
@@ -147,7 +185,6 @@ class DiabetesEbmConformalBackend(ModelBackend):
     def __init__(self, config: dict):
         super().__init__(config)
         self._bundle: Dict[str, Any] | None = None
-        self._fallback: Dict[str, Any] | None = None
 
     # ── artifacts ────────────────────────────────────────────────────────
 
@@ -166,6 +203,15 @@ class DiabetesEbmConformalBackend(ModelBackend):
                 )
             bundle = joblib.load(path)
 
+            glyc = GLYCEMIC_BANNED.intersection(bundle["features"])
+            if glyc:
+                raise ValueError(
+                    f"D9-09 VIOLATION: this bundle's feature list contains glycaemic "
+                    f"measurements {sorted(glyc)}. These measure the SAME latent quantity as "
+                    f"the label, so a model reading them is doing measurement agreement, not "
+                    f"screening. The module's claim is that it finds dysglycaemia WITHOUT "
+                    f"measuring glycaemia. Refusing to load."
+                )
             leaked = CBC_BANNED.intersection(bundle["features"])
             if leaked:
                 raise ValueError(
@@ -185,62 +231,13 @@ class DiabetesEbmConformalBackend(ModelBackend):
             )
         return self._bundle
 
-    @property
-    def fallback(self) -> Dict[str, Any] | None:
-        """The 20-feature bundle, used only when serum glucose is genuinely absent.
-
-        D9-08 made glucose the 21st feature because it arrives on the same
-        biochemistry panel as the eight analytes this model already needs, and
-        because including it is strictly better on every measured axis. But a panel
-        can come back without one analyte, and the honest response to that is a
-        model that was actually fitted without it -- NOT imputing a glucose value
-        and pretending. The two bundles are separate models with separate
-        calibration and separate conformal layers; nothing is shared between them.
-        """
-        if self._fallback is None:
-            import joblib
-
-            path = (self.config.get("model", {}) or {}).get("fallback_weights_path")
-            if not path:
-                return None
-            path = path if os.path.isabs(path) else os.path.join(_PROJECT_ROOT, path)
-            if not os.path.exists(path):
-                log.warning("Fallback 20-feature bundle not found at %s", path)
-                return None
-            self._fallback = joblib.load(path)
-            log.info("Loaded diabetes fallback bundle: %d features",
-                     len(self._fallback["features"]))
-        return self._fallback
-
-    def _bundle_for(self, patients_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Pick the model by what the patient actually has, never by imputation."""
-        primary = self.bundle
-        needed = set(primary["features"])
-        if all(
-            row.get(f) is not None and not (
-                isinstance(row.get(f), float) and np.isnan(row.get(f))
-            )
-            for row in patients_data
-            for f in needed & set(primary["mandatory_fields"])
-        ):
-            return primary
-        fb = self.fallback
-        if fb is None:
-            raise NoUsableModel(
-                "Serum glucose is missing and no 20-feature fallback bundle is "
-                "configured. Refusing to impute it."
-            )
-        return fb
-
     def load(self) -> "DiabetesEbmConformalBackend":
         _ = self.bundle
-        _ = self.fallback
         return self
 
     def invalidate(self) -> None:
         super().invalidate()
         self._bundle = None
-        self._fallback = None
 
     @property
     def feature_names(self) -> List[str]:
@@ -252,33 +249,26 @@ class DiabetesEbmConformalBackend(ModelBackend):
 
     # ── input discipline (D9-06) ─────────────────────────────────────────
 
-    def _model_matrix(self, patients_data: List[Dict[str, Any]],
-                      bundle: Dict[str, Any] | None = None) -> pd.DataFrame:
+    def _model_matrix(self, patients_data: List[Dict[str, Any]]) -> pd.DataFrame:
         """Build the model matrix, refusing any row with a mandatory field blank.
 
         Deliberately NOT named `_frame`: the base class already has a `_frame`
         that takes ONE patient dict, and explain() calls it. Shadowing it with a
         list-taking override broke explain() the first time this was written.
         """
-        bundle = bundle or self.bundle
-        features = list(bundle["features"])
-        mandatory = list(bundle["mandatory_fields"])
         frame = pd.DataFrame(patients_data)
-        for column in features:
+        for column in self.feature_names:
             if column not in frame.columns:
                 frame[column] = np.nan
-        frame = frame[features].apply(pd.to_numeric, errors="coerce")
+        frame = frame[self.feature_names].apply(pd.to_numeric, errors="coerce")
 
-        missing = [c for c in mandatory if frame[c].isna().any()]
+        missing = [c for c in self.mandatory_fields if frame[c].isna().any()]
         if missing:
             raise MandatoryFieldMissing(missing)
         return frame
 
-    def _optional_blanks(self, frame: pd.DataFrame, row: int,
-                         bundle: Dict[str, Any] | None = None) -> List[str]:
-        bundle = bundle or self.bundle
-        mandatory = set(bundle["mandatory_fields"])
-        optional = [c for c in bundle["features"] if c not in mandatory]
+    def _optional_blanks(self, frame: pd.DataFrame, row: int) -> List[str]:
+        optional = [c for c in self.feature_names if c not in self.mandatory_fields]
         return [c for c in optional if pd.isna(frame.iloc[row][c])]
 
     # ── probability layer (D9-04) ────────────────────────────────────────
@@ -288,28 +278,26 @@ class DiabetesEbmConformalBackend(ModelBackend):
         p = np.clip(np.asarray(p, dtype=float), 1e-6, 1 - 1e-6)
         return np.log(p / (1 - p))
 
-    def _platt(self, raw: np.ndarray, bundle: Dict[str, Any] | None = None) -> np.ndarray:
-        clf = (bundle or self.bundle)["calibrator"]
+    def _platt(self, raw: np.ndarray) -> np.ndarray:
+        clf = self.bundle["calibrator"]
         return clf.predict_proba(self._logit(raw).reshape(-1, 1))[:, 1]
 
-    def _interval(self, raw: np.ndarray,
-                  bundle: Dict[str, Any] | None = None) -> tuple[np.ndarray, np.ndarray]:
+    def _interval(self, raw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Percentile interval over B bootstrap refits of the Platt map.
 
         The draws are precomputed in the bundle, so this is two matrix products
         rather than a thousand logistic fits per request. It states uncertainty in
         the calibration map only -- see the module docstring.
         """
-        boot = (bundle or self.bundle)["platt_bootstrap"]
+        boot = self.bundle["platt_bootstrap"]
         lp = self._logit(raw)[:, None]                         # (n, 1)
         draws = 1.0 / (1.0 + np.exp(-(lp * boot["a"][None, :] + boot["b"][None, :])))
         return np.percentile(draws, 2.5, axis=1), np.percentile(draws, 97.5, axis=1)
 
     # ── decision layer (D9-05) ───────────────────────────────────────────
 
-    def _decide(self, raw: np.ndarray, bands: np.ndarray,
-                bundle: Dict[str, Any] | None = None) -> tuple[List[str], List[List[int]]]:
-        q = (bundle or self.bundle)["conformal"]["q_group"]
+    def _decide(self, raw: np.ndarray, bands: np.ndarray) -> tuple[List[str], List[List[int]]]:
+        q = self.bundle["conformal"]["q_group"]
         q1 = np.array([q[f"{b}|1"] for b in bands])
         q0 = np.array([q[f"{b}|0"] for b in bands])
         in1 = (1.0 - raw) <= q1
@@ -333,10 +321,9 @@ class DiabetesEbmConformalBackend(ModelBackend):
 
     # ── model level ──────────────────────────────────────────────────────
 
-    def predict_proba(self, df: pd.DataFrame, bundle: Dict[str, Any] | None = None) -> np.ndarray:
+    def predict_proba(self, df: pd.DataFrame) -> np.ndarray:
         """Raw EBM score — the model's own scale, before Platt."""
-        bundle = bundle or self.bundle
-        return bundle["model"].predict_proba(df[list(bundle["features"])])[:, 1]
+        return self.bundle["model"].predict_proba(df[self.feature_names])[:, 1]
 
     def shap_values(self, df: pd.DataFrame) -> ShapResult:
         """Per-feature contributions in log-odds, read out of the EBM itself.
@@ -348,9 +335,8 @@ class DiabetesEbmConformalBackend(ModelBackend):
         `term_contributions`, so the engineering view can show the interaction as
         its own row rather than as two halves.
         """
-        bundle = self.bundle
-        model = bundle["model"]
-        names = list(bundle["features"])
+        model = self.bundle["model"]
+        names = self.feature_names
         frame = df[names].iloc[:1]
 
         terms = np.asarray(model.eval_terms(frame))[0]
@@ -386,15 +372,13 @@ class DiabetesEbmConformalBackend(ModelBackend):
         if not patients_data:
             return []
         model_config = self.config.get("model", {}) or {}
-        bundle = self._bundle_for(patients_data)
-        used_fallback = bundle is not self.bundle
-        frame = self._model_matrix(patients_data, bundle)
+        frame = self._model_matrix(patients_data)
 
-        raw = self.predict_proba(frame, bundle)
-        probability = self._platt(raw, bundle)
-        lower, upper = self._interval(raw, bundle)
+        raw = self.predict_proba(frame)
+        probability = self._platt(raw)
+        lower, upper = self._interval(raw)
         bands = np.array([age_band(a) for a in frame["RIDAGEYR"].values])
-        decisions, sets = self._decide(raw, bands, bundle)
+        decisions, sets = self._decide(raw, bands)
 
         results = []
         for i, (score, p, lo, hi, decision, cset) in enumerate(
@@ -427,21 +411,7 @@ class DiabetesEbmConformalBackend(ModelBackend):
                 "clinical_action_plan": build_clinical_action_plan(decision).model_dump(),
             }
             _record_decision(self.config, decision)
-            if used_fallback:
-                # Never silent. The clinician is told which model answered and
-                # exactly what it cost, because the two models are not
-                # interchangeable and their numbers are not the same numbers.
-                result["model_variant"] = "fallback_20_feature_no_glucose"
-                result["model_variant_note"] = (
-                    "Serum glucose was not supplied, so this patient was scored by the "
-                    "20-feature model rather than the primary 21-feature one. On the "
-                    "held-out cycle that model clears 35.5% of healthy patients instead "
-                    "of 42.8% and misses 14.2% of dysglycaemic patients instead of 13.1%. "
-                    "Glucose is on the same biochemistry panel as the other analytes here."
-                )
-            else:
-                result["model_variant"] = "primary_21_feature"
-            blanks = self._optional_blanks(frame, i, bundle)
+            blanks = self._optional_blanks(frame, i)
             if blanks:
                 result["data_completeness_warning"] = (
                     f"{len(blanks)} optional field(s) left empty: {', '.join(blanks)}. "

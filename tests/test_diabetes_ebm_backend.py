@@ -14,6 +14,7 @@ import yaml
 from backend.model_backends import get_backend, registered_families
 from backend.model_backends.diabetes_ebm_conformal import (
     CBC_BANNED,
+    GLYCEMIC_BANNED,
     DiabetesEbmConformalBackend,
     MandatoryFieldMissing,
     age_band,
@@ -27,7 +28,7 @@ PATIENT = {
     "SBP": 138, "DBP": 84, "BPXPLS": 78, "MCQ300C": 1.0, "CVD_ANY": 0.0,
     "PAQ650": 0.0, "PAQ665": 0.0, "LBDHDD": 41, "LBXSCH": 205, "LBXSTR": 190,
     "LBXSATSI": 28, "LBXSGTSI": 34, "LBXSCR": 0.95, "LBXSBU": 15,
-    "LBXSAL": 4.2, "LBXSUA": 6.4, "LBXSGL": 118,
+    "LBXSAL": 4.2, "LBXSUA": 6.4,
 }
 
 
@@ -63,6 +64,38 @@ def test_no_blood_count_column_is_an_input(backend):
     -0.0040 against a glucose label: the gain is an assay artefact, not risk
     information. It must never become an input."""
     assert not CBC_BANNED.intersection(backend.feature_names)
+
+
+def test_no_glycaemic_measurement_is_an_input(backend):
+    """D9-09. The module's claim is that it finds dysglycaemia WITHOUT measuring
+    glycaemia. Glucose passes the usual leakage test — it is available at
+    inference time — and fails the one that matters: it measures the same latent
+    quantity as the label. Insufficiency is not non-leakage; glucose alone reaches
+    AUC 0.7029, which is what a proxy target looks like."""
+    assert not GLYCEMIC_BANNED.intersection(backend.feature_names)
+    for name in ("LBXGH", "LBXSGL", "LBDSGLSI", "LBXGLU", "LBXSOSSI"):
+        assert name in GLYCEMIC_BANNED
+
+
+def test_bundle_with_glucose_is_refused(config, tmp_path):
+    """The ban is code, not a comment. A bundle built elsewhere cannot smuggle a
+    glycaemic column in, and this is the test that stops D9-08 being re-made."""
+    import joblib
+
+    original = joblib.load(config["model"]["weights_path"])
+    tampered = dict(original)
+    tampered["features"] = list(original["features"]) + ["LBXSGL"]
+    path = tmp_path / "with_glucose.joblib"
+    joblib.dump(tampered, path)
+
+    cfg = {**config, "model": {**config["model"], "weights_path": str(path)}}
+    with pytest.raises(ValueError, match="D9-09"):
+        DiabetesEbmConformalBackend(cfg).load()
+
+
+def test_config_lists_the_glycaemic_ban(config):
+    banned = set(config["features"]["glycaemic_banned"])
+    assert GLYCEMIC_BANNED.issubset(banned)
 
 
 def test_bundle_with_a_cbc_column_is_refused(config, tmp_path):
@@ -192,49 +225,6 @@ def test_config_states_no_deployment_prevalence(config):
     label."""
     assert config["prevalence"]["deploy"] is None
     assert config["prevalence"]["requires_local_recalibration"] is True
-
-
-def test_glucose_is_the_21st_feature(backend):
-    """D9-08. Reverses the research exclusion of glycaemic variables, on evidence:
-    glucose alone reaches AUC 0.7029, BELOW the 20-feature model, and the rule
-    glucose>=100 alone misses 54.2% of cases. It is a covariate, not the label."""
-    assert "LBXSGL" in backend.feature_names
-    assert len(backend.feature_names) == 21
-    assert "LBXSGL" in backend.mandatory_fields
-
-
-def test_hba1c_itself_is_never_an_input(backend):
-    """The permanent exclusion. LBXGH IS the label."""
-    for banned in ("LBXGH", "LBDSGLSI", "LBXGLU", "LBDGLUSI", "LBXSOSSI"):
-        assert banned not in backend.feature_names
-
-
-def test_a_20_feature_fallback_exists_and_is_a_separate_model(backend):
-    """Glucose missing must not be imputed. A separately fitted model answers."""
-    assert backend.fallback is not None
-    assert len(backend.fallback["features"]) == 20
-    assert "LBXSGL" not in backend.fallback["features"]
-    assert backend.fallback["model"] is not backend.bundle["model"]
-    assert backend.fallback["calibrator"] is not backend.bundle["calibrator"]
-
-
-def test_missing_glucose_routes_to_the_fallback_and_says_so(backend):
-    patient = {k: v for k, v in PATIENT.items() if k != "LBXSGL"}
-    result = backend.predict(patient)
-    assert result["model_variant"] == "fallback_20_feature_no_glucose"
-    assert "not supplied" in result["model_variant_note"]
-
-
-def test_supplying_glucose_uses_the_primary(backend):
-    assert backend.predict(PATIENT)["model_variant"] == "primary_21_feature"
-
-
-def test_higher_glucose_never_lowers_risk(backend):
-    """LBXSGL carries an increasing monotone constraint. If this fails the
-    constraint was lost in a refit."""
-    probabilities = [backend.predict({**PATIENT, "LBXSGL": g})["confidence"]
-                     for g in (75, 90, 105, 120, 150, 200)]
-    assert probabilities == sorted(probabilities)
 
 
 def test_config_headline_auc_matches_the_bundle(backend, config):
