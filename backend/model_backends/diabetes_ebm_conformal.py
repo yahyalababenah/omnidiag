@@ -51,12 +51,22 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
+from backend.diabetes_what_if_levers import (
+    DIABETES_LEVERS,
+    IMMUTABLE,
+    all_improvements,
+    is_engaged,
+    lowest_achievable,
+    policy_violations,
+    simulate_hdl,
+)
 from backend.model_backends.base import (
     BackendCapabilities,
     ModelBackend,
     ShapResult,
     register_backend,
 )
+from backend.schemas_clinical_action import build_clinical_action_plan
 
 log = logging.getLogger("omnidiag.model_backends.diabetes_ebm")
 
@@ -93,6 +103,21 @@ class MandatoryFieldMissing(ValueError):
             "one blank moves the predicted risk measurably rather than being "
             "treated as unknown: " + ", ".join(self.fields)
         )
+
+
+def _record_decision(config: dict, decision: str) -> None:
+    """Count the decision for /metrics. A module that decides with a conformal set
+    has no threshold to watch, so the abstention rate IS the operating point: if
+    the uncertain share drifts away from the 38% this module was shipped at, the
+    input distribution has moved. Never allowed to fail a prediction."""
+    try:
+        from backend.monitoring.metrics import record_conformal_decision
+
+        record_conformal_decision(
+            (config.get("disease", {}) or {}).get("name", "diabetes_nhanes"), decision
+        )
+    except Exception:  # pragma: no cover - monitoring must never break serving
+        log.debug("conformal decision not recorded", exc_info=True)
 
 
 def age_band(age: float) -> int:
@@ -328,7 +353,13 @@ class DiabetesEbmConformalBackend(ModelBackend):
                 "score_raw": float(score),
                 "output_type": model_config.get("output_type"),
                 "probability_scale": model_config.get("probability_scale"),
+                # Gate 9.3. The decision alone leaves `uncertain` to be read as
+                # "moderate risk"; the plan says what to order instead. Serialised
+                # to a plain dict so consumers that never import Pydantic models
+                # (the PDF path, the batch CSV writer) can read it unchanged.
+                "clinical_action_plan": build_clinical_action_plan(decision).model_dump(),
             }
+            _record_decision(self.config, decision)
             blanks = self._optional_blanks(frame, i)
             if blanks:
                 result["data_completeness_warning"] = (
@@ -367,39 +398,15 @@ class DiabetesEbmConformalBackend(ModelBackend):
         fact, not a lever. Lab values move only within the ranges the model was
         trained on, which the bundle's feature_meta already records.
         """
-        from backend.counterfactual_generator import (
-            NO_IMPROVEMENT_MESSAGE_DECISION,
-            all_improvements,
-            lowest_achievable,
-            policy_violations,
-        )
+        from backend.counterfactual_generator import NO_IMPROVEMENT_MESSAGE_DECISION
 
-        # Same policy shape as the heart module: feature -> (kind, bound).
-        # Clinical targets, not model-derived ones. ADIPOSITY_BAND is a lever
-        # because losing central fat is exactly what the patient is being asked
-        # to do; age, sex, family history and prior CVD are facts, not levers,
-        # and so are the renal and hepatic markers a patient cannot act on
-        # directly (LBXSCR, LBXSBU, LBXSAL).
-        policy = {
-            "BMXBMI": ("decrease", 24.9),
-            "ADIPOSITY_BAND": ("decrease", 0),
-            "SBP": ("decrease", 120),
-            "DBP": ("decrease", 80),
-            "LBXSTR": ("decrease", 150),
-            "LBXSCH": ("decrease", 200),
-            "LBXSGTSI": ("decrease", 40),
-            "LBXSATSI": ("decrease", 40),
-            "LBXSUA": ("decrease", 6.0),
-            "PAQ650": ("to", 1),
-            "PAQ665": ("to", 1),
-        }
-        # F9-32: raising HDL is a real lever and it is NOT here, because the shared
-        # counterfactual_generator only understands "decrease" and "to".
-        # `all_improvements` would set LBDHDD to the bound unconditionally, pulling a
-        # healthy HDL of 70 DOWN to 40, and `policy_violations` has no branch that
-        # would catch it. Adding an "increase" kind means editing a module the heart
-        # module also uses, so it is deferred to Gate 9.3 with its own regression test.
-        # The exercise levers (PAQ650/PAQ665) already carry most of the same advice.
+        # Gate 9.3 / F9-32. The levers live in backend/diabetes_what_if_levers.py,
+        # NOT in the shared counterfactual_generator, because raising HDL means
+        # something different here than it does in cardiology and because the
+        # shared module cannot express an "increase" lever without overwriting a
+        # healthy value. Nothing the heart module reads is touched.
+        policy = DIABETES_LEVERS
+
         baseline = self.predict(patient_data)
         if baseline["prediction"] == 0:
             return {
@@ -409,17 +416,10 @@ class DiabetesEbmConformalBackend(ModelBackend):
                 "message": "This patient is already cleared. No counterfactuals needed.",
             }
 
-        def engaged(feature: str, kind: str, bound: float) -> bool:
-            value = patient_data.get(feature)
-            if value is None:
-                return False
-            if kind == "decrease":
-                return float(value) > float(bound)
-            if kind == "increase":
-                return float(value) < float(bound)
-            return float(value) != float(bound)
-
-        levers = [f for f, (k, b) in policy.items() if engaged(f, k, b)]
+        levers = [
+            f for f, (kind, bound) in policy.items()
+            if is_engaged(patient_data.get(f), kind, bound)
+        ]
 
         def changes_of(candidate: Dict[str, Any]) -> List[Dict[str, Any]]:
             return [
@@ -453,9 +453,10 @@ class DiabetesEbmConformalBackend(ModelBackend):
                     })
                 else:
                     found = lowest_achievable(
-                        patient_data, policy,
+                        patient_data,
                         lambda row: self.predict(row)["confidence"],
                         baseline["confidence"],
+                        policy,
                     )
                     if found is not None:
                         rows, after = found
@@ -480,6 +481,13 @@ class DiabetesEbmConformalBackend(ModelBackend):
             "best_achievable": best_achievable,
             "baseline_probability": baseline["confidence"],
             "probability_scale": (self.config.get("model", {}) or {}).get("probability_scale"),
+            "immutable_features": list(IMMUTABLE),
+            # The HDL curve is reported separately from the combined scenarios
+            # because the EBM's HDL shape function is not a straight line: a single
+            # "what if HDL were 60" hides where the benefit actually sits.
+            "hdl_simulation": simulate_hdl(
+                patient_data, lambda row: self.predict(row)["confidence"]
+            ),
             "message": None if counterfactuals else (
                 "Even with every modifiable factor at its target, this patient is still "
                 "sent for an HbA1c test. The dominant factors — age above all — are not "

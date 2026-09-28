@@ -95,6 +95,19 @@ if _prometheus_available:
         ["disease"],
     )
 
+    # Gate 9.3. A module that decides with a conformal set has no threshold to
+    # watch, so `prediction` 0/1 hides the thing that actually matters: how often
+    # it abstains. The uncertain share is the module's operating point drifting in
+    # public, and for the NHANES module it is 38% by design -- if it climbs, the
+    # input distribution has moved. Labelled by disease because the three-way
+    # decision only exists for the modules that have one.
+    CONFORMAL_DECISIONS_TOTAL = Counter(
+        "omnidiag_conformal_decisions_total",
+        "Conformal decisions by disease and decision (referral / no_referral / uncertain)",
+        ["disease", "decision"],
+        registry=REGISTRY,
+    )
+
     BATCH_ROWS_PROCESSED = Counter(
         "omnidiag_batch_rows_total",
         "Total rows processed in batch predictions",
@@ -116,6 +129,15 @@ def record_prediction(
         return
     PREDICTIONS_TOTAL.labels(disease=disease, prediction=str(prediction)).inc()
     PREDICTION_CONFIDENCE.labels(disease=disease).observe(probability_corrected)
+
+
+def record_conformal_decision(disease: str, decision: str) -> None:
+    """Count one conformal decision. A no-op when prometheus_client is absent,
+    like every other recorder here, so a missing dependency never fails a
+    prediction."""
+    if not _prometheus_available:
+        return
+    CONFORMAL_DECISIONS_TOTAL.labels(disease=disease, decision=decision).inc()
 
 
 def record_batch(disease: str, succeeded: int, failed: int) -> None:

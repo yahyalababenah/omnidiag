@@ -168,10 +168,12 @@ def test_platt_preserves_the_ranking(backend):
     assert np.all(np.diff(calibrated) > 0)
 
 
-def test_conformal_layer_is_group_conditional(backend):
+def test_conformal_layer_is_group_conditional(backend, config):
+    """alpha is read from the config rather than hardcoded: D9-07 moved it once
+    already and a hardcoded copy here would have to be chased every time."""
     conformal = backend.bundle["conformal"]
     assert conformal["layer"] == "group_conditional_age_band"
-    assert conformal["alpha"] == 0.15
+    assert conformal["alpha"] == config["model"]["conformal"]["alpha"]
     # one quantile per (band, class); F9-31 is why this is not two numbers
     assert len(conformal["q_group"]) == 6
 

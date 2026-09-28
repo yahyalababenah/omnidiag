@@ -56,8 +56,14 @@ performance:
   calibration_slope: 0.952          # ideal 1
   ece: 0.0249
   scaled_brier: 0.1755
-  sensitivity_flagged: 0.8986       # referral OR uncertain -> an HbA1c is ordered
-  specificity_no_referral: 0.2777
+  sensitivity_flagged: 0.8585       # referral OR uncertain -> a test is ordered
+  specificity_no_referral: 0.3549
+  # The number that matters most clinically, stated here so it cannot be missed:
+  # 14.1% of genuinely dysglycaemic patients receive no_referral at this alpha
+  # (9.8% aged 20-39, 15.8% aged 40-59, 14.3% aged 60+). At alpha = 0.15 it was
+  # 10.1%. This is the cost side of D9-07 and it is reflected in the NO_REFER
+  # clinical action plan's safety_note.
+  missed_positive_rate: 0.141
   # What the model is NOT: 0.7523 is the honest ceiling for this label and these
   # twenty fields (D9-03). Larger feature sets score ~0.80 but only by including a
   # complete blood count, whose gain is an assay artefact -- see limitations.
@@ -91,18 +97,45 @@ model:
   # failing groups behind acceptable pooled numbers (F9-31). Race is never an
   # input and never a conditioning variable.
   conformal:
-    alpha: 0.15
+    # D9-07: alpha moved 0.15 -> 0.20 after F9-33 measured the healthy-patient
+    # burden. See `alpha_decision` below for what that bought and what it cost.
+    alpha: 0.20
     layer: "group_conditional_age_band"
     bands: "0: 20-39, 1: 40-59, 2: 60+"
-    coverage_pos: 0.8986
-    coverage_neg: 0.8140
-    decision_shares: {referral: 0.2574, no_referral: 0.2144, uncertain: 0.5282}
-    # Coverage per band, the number this layer exists for. Before D9-05 the
-    # 20-39 positive cell was 0.444 and the 60+ negative cell was 0.391.
+    coverage_pos: 0.8585
+    coverage_neg: 0.7467
+    decision_shares: {referral: 0.3386, no_referral: 0.2784, uncertain: 0.3830}
+    # Coverage per band, the number this layer exists for. Under the previous
+    # class-conditional layer the 20-39 positive cell was 0.444 and the 60+
+    # negative cell was 0.391 while the pooled figures looked acceptable (F9-31).
     per_band_coverage:
-      "20-39": {positive: 0.9422, negative: 0.8147}
-      "40-59": {positive: 0.8866, negative: 0.8044}
-      "60+":   {positive: 0.8939, negative: 0.8251}
+      "20-39": {positive: 0.9022, negative: 0.7658}
+      "40-59": {positive: 0.8420, negative: 0.7417}
+      "60+":   {positive: 0.8571, negative: 0.7170}
+
+  # ── D9-07: the alpha decision, with both sides measured ──────────────
+  # Recorded in full because the trade is not obvious and a future reader will
+  # otherwise see only the chosen number. Both columns are the held-out cycle.
+  alpha_decision:
+    chosen: 0.20
+    rejected: 0.15
+    what_it_bought:
+      uncertain_share: {at_0_15: 0.528, at_0_20: 0.383}
+      no_referral_share: {at_0_15: 0.214, at_0_20: 0.278}
+      healthy_told_to_test:
+        "20-39": {at_0_15: 0.710, at_0_20: 0.612}
+        "40-59": {at_0_15: 0.662, at_0_20: 0.599}
+        "60+":   {at_0_15: 0.824, at_0_20: 0.768}
+    what_it_cost:
+      missed_positive_rate: {at_0_15: 0.101, at_0_20: 0.141}
+      sensitivity_flagged: {at_0_15: 0.899, at_0_20: 0.859}
+      worst_per_band_coverage: {at_0_15: 0.804, at_0_20: 0.717}
+    note: >-
+      Moving to 0.20 spares roughly 6 percentage points of healthy patients a
+      test and misses roughly 4 percentage points more dysglycaemic patients.
+      It does not remove the "test most people" character of the module: the
+      share of healthy patients still told to test only falls from 66-82% to
+      60-77%. Reverting is one line here plus a bundle rebuild.
 
   max_batch_rows: 100
   max_batch_rows_reason: "EBM scoring is about 0.01 s per patient; the bootstrap interval is vectorised"
@@ -159,6 +192,36 @@ features:
     [LBXRDW, LBXMC, LBXMCHSI, LBXMCVSI, LBXWBCSI, LBXPLTSI, LBXHGB, LBXHCT,
      LBXRBCSI, LBDLYMNO, LBDNENO, LBDMONO, LBDEONO, LBDBANO, LBXLYPCT,
      LBXNEPCT, LBXMOPCT, LBXEOPCT, LBXBAPCT, LBXMPSI, LBXSCK]
+
+# ---------------------------------------------------------------------------
+# Tiered clinical triage (Gate 9.3)
+# ---------------------------------------------------------------------------
+# Every /predict response carries `clinical_action_plan`, mapping the conformal
+# decision to the next clinical step so that `uncertain` leads to a cheap, fast
+# test rather than being read as "moderate risk". Built by
+# backend/schemas_clinical_action.py; the wording is policy and is reviewed there.
+clinical_action_plan:
+  enabled: true
+  tiers:
+    referral:    {urgency: "High",   test: "HbA1c, or OGTT where HbA1c is unreliable"}
+    uncertain:   {urgency: "Medium", test: "Fasting or random capillary blood glucose"}
+    no_referral: {urgency: "Low",    test: "None"}
+  # Each tier carries a safety_note. The no_referral note states the 14.1%
+  # missed-positive rate outright, because a negative here is not a clearance.
+
+# ---------------------------------------------------------------------------
+# What-If levers (Gate 9.3, F9-32)
+# ---------------------------------------------------------------------------
+# Implemented in backend/diabetes_what_if_levers.py, deliberately NOT in the
+# shared counterfactual_generator. Two reasons, one clinical and one mechanical:
+# raising HDL means something different in dysglycaemia (a marker of insulin
+# resistance) than in cardiology (a lipid target); and the shared module
+# understands only "decrease" and "to", so it would pull a healthy HDL of 70
+# down to the bound. Zero blast radius on the heart module.
+what_if:
+  module: "backend.diabetes_what_if_levers"
+  hdl_lever: {kind: "increase", ceiling: 60, unit: "mg/dL"}
+  immutable: [RIDAGEYR, RIAGENDR, MCQ300C, CVD_ANY, BPXPLS, LBXSCR, LBXSBU, LBXSAL]
 
 # ---------------------------------------------------------------------------
 # Explainability

@@ -197,8 +197,16 @@ def _decision_block(
             probability=probability, threshold_note=threshold_note, label=label, band=band,
         )
 
+    # The interval's NAME follows the module's calibration layer. Calling a Platt
+    # bootstrap interval "Venn-Abers" in a clinical report is a factual error about
+    # how the number was produced (Gate 9.3).
+    interval_name = (
+        "calibration interval"
+        if probability_scale == "platt_calibrated_nhanes_2015_2016"
+        else "Venn-Abers interval"
+    )
     interval = (
-        f"  (Venn-Abers interval {lower:.1%} to {upper:.1%})"
+        f"  ({interval_name} {lower:.1%} to {upper:.1%})"
         if lower is not None and upper is not None else ""
     )
     decision_text = {
@@ -215,6 +223,14 @@ def _decision_block(
         "model was trained on, NOT to the population of the hospital reading it. Do not "
         "present it as this patient's population risk."
         if probability_scale == "ivap_calibrated_training_mix"
+        else (
+            "This probability is calibrated to a US national survey sample of adults "
+            "who had NOT been diagnosed with diabetes and were NOT on treatment. It is "
+            "not calibrated to this clinic's population and must not be presented as "
+            "this patient's absolute risk. The estimate targets dysglycaemia (HbA1c at "
+            "or above 5.7%), which is not a diabetes diagnosis."
+        )
+        if probability_scale == "platt_calibrated_nhanes_2015_2016"
         else "State no assumption about what this probability is calibrated to."
     )
     uncertain_note = (
@@ -299,6 +315,29 @@ _FEATURE_GLOSSARY: Dict[str, str] = {
     "DiffWalk": "serious difficulty walking or climbing stairs (yes/no)",
     "Education": "education level band",
     "Income": "income band",
+    # diabetes_nhanes (NHANES, measured — not self-reported). Added in Gate 9.3.
+    # These are clinical measurements and lab analytes, so naming the wrong one
+    # is a factual error about the patient, exactly as with `Cholesterol` above.
+    "RIDAGEYR": "age in years",
+    "RIAGENDR": "recorded sex",
+    "BMXBMI": "body mass index (kg/m^2), from measured height and weight",
+    "ADIPOSITY_BAND": "central adiposity assessed by the clinician (normal / increased / high), standing in for waist-to-height ratio",
+    "SBP": "systolic blood pressure (mm Hg), mean of the seated readings",
+    "DBP": "diastolic blood pressure (mm Hg), mean of the seated readings",
+    "BPXPLS": "resting pulse (beats per minute)",
+    "MCQ300C": "close blood relative with diabetes (yes/no)",
+    "CVD_ANY": "any prior cardiovascular disease — heart failure, coronary disease, myocardial infarction or stroke (yes/no)",
+    "PAQ650": "vigorous recreational physical activity in a typical week (yes/no)",
+    "PAQ665": "moderate recreational physical activity in a typical week (yes/no)",
+    "LBDHDD": "serum HDL cholesterol (mg/dL) — in this module a marker of insulin resistance, not a lipid target on its own",
+    "LBXSCH": "serum TOTAL cholesterol (mg/dL) — not LDL, and no fractions are measured",
+    "LBXSTR": "serum triglycerides (mg/dL)",
+    "LBXSATSI": "alanine aminotransferase, ALT (U/L) — a liver enzyme, raised in hepatic steatosis",
+    "LBXSGTSI": "gamma-glutamyl transferase, GGT (U/L) — a liver enzyme",
+    "LBXSCR": "serum creatinine (mg/dL) — renal function",
+    "LBXSBU": "blood urea nitrogen (mg/dL) — renal function",
+    "LBXSAL": "serum albumin (g/dL)",
+    "LBXSUA": "serum uric acid (mg/dL)",
 }
 
 
