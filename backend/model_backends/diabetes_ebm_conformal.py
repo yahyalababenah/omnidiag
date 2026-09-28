@@ -67,6 +67,7 @@ from backend.model_backends.base import (
     register_backend,
 )
 from backend.schemas_clinical_action import build_clinical_action_plan
+from backend.schemas_diabetes_nhanes import ADIPOSITY_BAND_LEVELS
 
 log = logging.getLogger("omnidiag.model_backends.diabetes_ebm")
 
@@ -257,6 +258,15 @@ class DiabetesEbmConformalBackend(ModelBackend):
         list-taking override broke explain() the first time this was written.
         """
         frame = pd.DataFrame(patients_data)
+        # ADIPOSITY_BAND arrives as a clinician-facing level ("normal" /
+        # "increased" / "high") so the form renders a labelled dropdown rather
+        # than an unlabelled 0-2 slider, and so a stored record says what was
+        # meant instead of carrying a bare integer. The model reads the ordinal.
+        # Integers are still accepted, for API clients and the batch CSV path.
+        if "ADIPOSITY_BAND" in frame.columns:
+            frame["ADIPOSITY_BAND"] = frame["ADIPOSITY_BAND"].map(
+                lambda v: ADIPOSITY_BAND_LEVELS.get(v, v) if isinstance(v, str) else v
+            )
         for column in self.feature_names:
             if column not in frame.columns:
                 frame[column] = np.nan

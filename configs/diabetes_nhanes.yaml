@@ -310,6 +310,21 @@ limitations:
       cohort sits inside that band. Excluding them the same model scores 0.85. A
       large part of the 53% "uncertain" rate is the decision layer correctly
       declining a label that is itself ambiguous.
+  - id: F9-37
+    text: >-
+      The monotone clinical priors are enforced on MAIN EFFECTS ONLY. EBM's
+      monotonize() does not constrain pairwise interaction terms, and on the
+      held-out cycle those terms reverse the net direction for some patients:
+      GGT +5 U/L lowers predicted risk for 16.3% of them, BMI +1 for 9.1%, HDL
+      +5 raises it for 4.0%, and age +5 years lowers it for 1.2% (largest single
+      reversal 0.040). Four to ten patients per feature have their DECISION flip
+      the wrong way. The research describes this constraint as "a hard
+      mathematical guarantee that the model can never say older implies lower
+      risk"; for the shipped model that guarantee is FALSE and must not be
+      repeated in any document or on any screen. Refitting with interactions
+      disabled makes every prior hold and costs 0.0028 validation AUC and 0.0010
+      on test, inside the CI; that refit was measured and deliberately not taken,
+      so this limitation is the standing state of the module, not a pending fix.
   - id: F9-32
     text: >-
       Raising HDL is a genuine lever and is absent from the What-If policy,

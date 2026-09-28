@@ -1147,3 +1147,81 @@ that this path will refuse far more often than it fires, and that is the correct
 behaviour: on the data as it is collected today, every candidate would be refused for
 F9-36. Making it fire requires collecting outcomes for cleared patients — a
 data-collection change, not a modelling one.
+
+---
+
+# Gate 9.8 — the frontend, and one defect it exposed
+
+The form turned out to be **fully schema-driven**: `useDiseaseSchema` fetches the JSON
+Schema from the API, `schemaFieldParser` picks a widget from it, and
+`featureCategorizer` groups the fields. So the 20-field form needed no new React. What it
+needed was for the schema to say the right things.
+
+## What changed
+
+- **`featureCategorizer.js`** — a `Laboratory` category, and the NHANES codes added to
+  the existing groups. All twenty fields now land somewhere meaningful; none falls into
+  `General`. The Laboratory keywords are **NHANES column codes only** — never a generic
+  word like "cholesterol", which would also match the heart module's `Cholesterol` field
+  through its description and silently move it out of Vitals & Signs. Verified by
+  simulating the categorizer before and after against all 30 heart and BRFSS fields:
+  **every one keeps its category.**
+- **`ADIPOSITY_BAND` is now a labelled dropdown.** As `int` with `ge=0, le=2` it hit the
+  parser's small-range rule and rendered an **unlabelled 0-2 slider** — asking a clinician
+  to express a visual judgement by dragging a number. It is now
+  `Literal["normal", "increased", "high"]`, which the parser renders as a select. The
+  model still reads the ordinal; the mapping lives in exactly one place and integers are
+  still accepted for API clients and the batch CSV path. A stored record now says
+  `"high"` rather than `2`.
+
+## F9-38 — HIGH — The form pre-fills every field from the schema example, which defeats D9-06
+
+`extractDefaultValues` takes the schema's `example` block first and uses it as the form's
+initial values. Our schema carries a full example patient, so **the form opens with all
+twenty fields already filled in with someone else's values.**
+
+The D9-06 firewall rejects a *null* mandatory field. It cannot reject a *pre-filled* one,
+because the form never sends null — it sends the example. So a clinician who skips the
+adiposity question submits `"high"` because that is what the example patient had, and the
+backend has no way to know the question was never answered. That is worse than the blank
+it was built to prevent: a blank is refused, a wrong value is scored.
+
+This is pre-existing behaviour shared with the heart and BRFSS forms, so it is not a
+regression introduced here — but D9-06 is the reason it now matters. The fix belongs in
+`extractDefaultValues` (do not pre-fill required fields; block submit until they are
+answered) which is shared frontend logic, so it is recorded rather than changed in this
+pass.
+
+**Until it is fixed, the D9-06 firewall protects the API but not the form.**
+
+## F9-37 — HIGH — The monotone clinical priors are enforced on main effects only
+
+`monotonize()` does not constrain pairwise interaction terms. Every main effect is
+correctly monotone; the interactions reverse the net direction for real patients:
+
+| feature | step | patients whose risk moves the wrong way | worst reversal | decisions flipped |
+|---|---|---|---|---|
+| GGT | +5 U/L | **668 / 4099 (16.3%)** | 0.0100 | 10 |
+| BMI | +1 | **371 / 4099 (9.1%)** | 0.0117 | 7 |
+| HDL | +5 | 165 / 4099 (4.0%) | 0.0275 | 4 |
+| age | +5 years | 50 / 4099 (1.2%) | **0.0403** | 4 |
+| SBP, triglycerides | — | 0 | — | 0 |
+
+The research describes this constraint as *"a hard mathematical guarantee that the model
+can never say older implies lower risk"*. **For the shipped model that is false.**
+
+Refitting with `interactions=0` makes every prior hold and costs **0.0028 validation AUC
+and 0.0010 on test** — inside the CI. That refit was measured and **deliberately not
+taken** (Yahya's call: the AUC difference does not justify the rebuild). So this is the
+standing state of the module, not a pending fix, and the claim has been corrected in the
+config accordingly. It is recorded as a limitation with its finding ID so that no
+document or screen repeats the guarantee.
+
+## Status
+
+**789 tests passing, zero failures.** Heart and BRFSS byte-identical to the branch point
+apart from the two additive shared-file edits recorded in Gate 9.3.
+
+Remaining before the module is fully live: demo patients for the new disease, a drift
+reference on the NHANES distribution, a component to display `clinical_action_plan`, and
+F9-38.

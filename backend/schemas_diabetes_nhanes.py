@@ -25,7 +25,7 @@ The remaining fourteen fields are optional, and leaving one empty is allowed but
 not free: the backend attaches a `data_completeness_warning` naming them.
 """
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,15 +45,17 @@ class DiabetesNhanesInput(BaseModel):
     BMXBMI: float = Field(
         ..., ge=10, le=100, description="Body mass index, kg/m^2.",
     )
-    ADIPOSITY_BAND: int = Field(
+    ADIPOSITY_BAND: Literal["normal", "increased", "high"] = Field(
         ...,
-        ge=0, le=2,
         description=(
-            "Central adiposity, assessed by the clinician: 0 = normal, 1 = increased, "
-            "2 = high. Trained against waist-to-height ratio at the published "
-            "boundaries 0.50 and 0.60, so no tape measure is needed. There is no "
-            "'unknown' level on purpose: blanking this field lowers predicted risk, "
-            "which would be a false reassurance the clinician did not intend."
+            "Central adiposity, assessed by the clinician by eye — no tape measure. "
+            "normal = no visible central fat; increased = noticeable; high = prominent. "
+            "Trained against waist-to-height ratio at the published boundaries 0.50 "
+            "and 0.60. Declared as named levels rather than 0/1/2 so the form renders "
+            "a labelled dropdown instead of an unlabelled slider, and so the value is "
+            "self-describing in a stored record. There is no 'unknown' level on "
+            "purpose: F9-25 measured that blanking this field LOWERS predicted risk, "
+            "which is a false reassurance the clinician did not intend."
         ),
     )
     LBDHDD: float = Field(
@@ -119,7 +121,7 @@ class DiabetesNhanesInput(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
-            "RIDAGEYR": 58, "BMXBMI": 31.2, "ADIPOSITY_BAND": 2,
+            "RIDAGEYR": 58, "BMXBMI": 31.2, "ADIPOSITY_BAND": "high",
             "LBDHDD": 41, "PAQ650": 0, "PAQ665": 0,
             "RIAGENDR": 1, "SBP": 138, "DBP": 84, "BPXPLS": 78,
             "MCQ300C": 1, "CVD_ANY": 0, "LBXSCH": 205, "LBXSTR": 190,
@@ -134,3 +136,8 @@ class DiabetesNhanesInput(BaseModel):
 MANDATORY_FIELDS = [
     "RIDAGEYR", "BMXBMI", "ADIPOSITY_BAND", "LBDHDD", "PAQ650", "PAQ665",
 ]
+
+
+#: The clinician-facing levels, and the integer the model reads. Exported so the
+#: backend maps them in exactly one place and a test can assert the two agree.
+ADIPOSITY_BAND_LEVELS = {"normal": 0, "increased": 1, "high": 2}

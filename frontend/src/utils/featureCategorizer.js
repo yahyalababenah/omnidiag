@@ -29,13 +29,37 @@
  */
 
 // ── Category definitions ──────────────────────────────────────────────
+// ORDER MATTERS: categorizeField returns the FIRST category that matches, so
+// Laboratory is declared first. Its keywords are NHANES column codes ONLY —
+// never generic words like "cholesterol" — because a generic word would also
+// match the heart module's `Cholesterol` field via its description and silently
+// move it out of Vitals & Signs. Exact codes keep the blast radius at zero.
 const CATEGORIES = {
+  Laboratory: {
+    icon: 'Pill',
+    keywords: [
+      'lbdhdd', 'lbxsch', 'lbxstr', 'lbxsatsi', 'lbxsgtsi',
+      'lbxscr', 'lbxsbu', 'lbxsal', 'lbxsua',
+    ],
+  },
+  // Declared before Vitals on purpose: the string "riagendr" contains the
+  // substring "age", so Vitals' 'age' keyword would otherwise claim it.
+  Demographics: {
+    icon: 'User',
+    keywords: [
+      'sex', 'education', 'income', 'race', 'region',
+      'geography', 'marital',
+      'riagendr',
+    ],
+  },
   'Vitals & Signs': {
     icon: 'Activity',
     keywords: [
       'age', 'restingbp', 'maxhr', 'cholesterol', 'oldpeak',
       'chestpain', 'st_slope', 'fastingbs', 'bmi', 'heartrate',
       'pulse', 'temperature', 'respiratory', 'o2', 'bp', 'blood pressure',
+      // NHANES codes, matched exactly (see the note above CATEGORIES)
+      'ridageyr', 'bmxbmi', 'sbp', 'dbp', 'bpxpls', 'adiposity_band',
     ],
   },
   Lifestyle: {
@@ -44,13 +68,7 @@ const CATEGORIES = {
       'smoker', 'physactivity', 'fruits', 'veggies',
       'hvyalcoholconsump', 'exercise', 'diet', 'activity',
       'alcohol', 'smoking',
-    ],
-  },
-  Demographics: {
-    icon: 'User',
-    keywords: [
-      'sex', 'education', 'income', 'race', 'region',
-      'geography', 'marital',
+      'paq650', 'paq665',
     ],
   },
   'Medical History': {
@@ -60,6 +78,7 @@ const CATEGORIES = {
       'restingecg', 'cholcheck', 'diffwalk', 'diabetes',
       'anyhealthcare', 'nodocbccost', 'kidney', 'cancer',
       'condition', 'diagnosis',
+      'mcq300c', 'cvd_any', 'cardiovascular',
     ],
   },
   'Healthcare Access': {
@@ -80,6 +99,7 @@ const CATEGORIES = {
 
 const CATEGORY_ORDER = [
   'Vitals & Signs',
+  'Laboratory',
   'Medical History',
   'Lifestyle',
   'Demographics',
