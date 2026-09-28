@@ -120,6 +120,18 @@ class DiabetesNhanesInput(BaseModel):
     )
 
     model_config = ConfigDict(json_schema_extra={
+        # F9-38 / D9-06. The form pre-fills from `example`, so without this the six
+        # mandatory fields arrive already carrying the example patient's values and
+        # the firewall is defeated: it rejects a NULL, but the form never sends one.
+        # A clinician who skips the adiposity question would submit "high" because
+        # that is what the example patient had. A blank is refused; a wrong value is
+        # scored. Fields listed here are never pre-filled and must be answered.
+        # Same mechanism as `x_unused_by_model` (Gate 8.9): a schema-level hint the
+        # parser reads, absent from every other module's schema, so nothing else
+        # changes behaviour.
+        "x_requires_deliberate_entry": [
+            "RIDAGEYR", "BMXBMI", "ADIPOSITY_BAND", "LBDHDD", "PAQ650", "PAQ665",
+        ],
         "example": {
             "RIDAGEYR": 58, "BMXBMI": 31.2, "ADIPOSITY_BAND": "high",
             "LBDHDD": 41, "PAQ650": 0, "PAQ665": 0,

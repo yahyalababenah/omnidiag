@@ -1225,3 +1225,84 @@ apart from the two additive shared-file edits recorded in Gate 9.3.
 Remaining before the module is fully live: demo patients for the new disease, a drift
 reference on the NHANES distribution, a component to display `clinical_action_plan`, and
 F9-38.
+
+---
+
+# Gate 9.9 — F9-38 closed, and monitoring is live
+
+## F9-38 CLOSED — required fields are no longer pre-filled
+
+The form seeds its initial values from the schema `example`, so the six D9-06 fields
+arrived already carrying the example patient's values and the firewall was defeated: it
+rejects a null, and the form never sent one.
+
+Fixed with the mechanism the codebase already had for exactly this shape of problem —
+`x_unused_by_model` (Gate 8.9). A new schema-level key `x_requires_deliberate_entry`
+lists the six fields; `schemaFieldParser` reads it, never pre-fills them, and exposes
+`requiresDeliberateEntry` on the field so the form can mark them.
+
+Every other module is unaffected **by construction**: a schema that does not declare the
+key gets an empty set. Verified by simulating the default logic before and after across
+all three modules:
+
+| module | fields | defaults changed |
+|---|---|---|
+| heart_disease | 11 | **0** |
+| diabetes (BRFSS) | 21 | **0** |
+| diabetes_nhanes | 20 | **6** — exactly the mandatory six |
+
+## Monitoring is live, and it fires
+
+A reference profile now sits at `models/diabetes_nhanes/drift_reference.json`.
+`get_monitor()` already fell back to `models/{disease}/drift_reference.json`, so **no
+edit to `drift.py` was needed** — and `scripts/build_drift_reference.py` was left alone,
+because adding this disease there would break every run for heart and BRFSS, whose CI
+rebuilds and diffs them from committed CSVs. Our source is 79 MB of raw survey files that
+are not committed (F9-17), so the profile is built by
+`build_nhanes_drift_reference.py` in the experiments folder — reusing the repo's own
+profile functions so the JSON shape cannot drift — and it records
+`rebuildable_in_repo: false` rather than looking checkable and silently never being
+checked.
+
+The reference is the **training split** (2007-2014, n=18508), not the whole cohort: drift
+means incoming patients differ from the ones the model learned on. Unlike the BRFSS
+profile there is **no reweighting**, because this cohort is a natural-prevalence screening
+population rather than a 50/50 balanced sample.
+
+Run against five scenarios:
+
+| scenario | rows | flagged | which |
+|---|---|---|---|
+| training years vs themselves | 2000 | **0/20** | — |
+| held-out 2017-2018 vs 2007-2014 | 4099 | 2/20 | `LBXSAL`, `LBXSATSI` |
+| corrupted: BMI +4, HDL ×0.85 | 4099 | 4/20 | `BMXBMI`, `LBDHDD`, + the two above |
+| older clinic: age +12 years | 4099 | 3/20 | `RIDAGEYR` + the two above |
+| 30 rows (below the 50-row floor) | 30 | — | refused: `insufficient_data` |
+
+It stays quiet where it should and fires where it should, including on injected faults it
+had never seen.
+
+## F9-39 — MEDIUM — Two model inputs had already drifted before the model shipped
+
+The held-out cycle is not clean against the training years:
+
+    LBXSAL   (serum albumin)   PSI 0.382   p 1.1e-185
+    LBXSATSI (ALT)             PSI 0.247   p 1.6e-109
+
+PSI above 0.2 is major drift by the module's own rule. So the headline **AUC 0.7523 was
+measured under real input drift on two of its twenty features** — which is a robustness
+result and mildly reassuring, but it has two consequences that must be stated rather than
+discovered:
+
+1. A clinic whose albumin or ALT assay is calibrated differently again from NHANES
+   2017-2018 is a third distribution, further from the training one than the test set was.
+2. The drift monitor will flag these two on day one in production. That is correct
+   behaviour, not a fault, and whoever reads the first report needs to know it was already
+   true at ship time — otherwise the first alert looks like a deployment problem.
+
+The cohort's own positive rate also rose across these cycles (31.7% to 35.9%), so part of
+the movement is the population changing rather than an assay fault.
+
+## Status
+
+**802 tests passing, zero failures.**
