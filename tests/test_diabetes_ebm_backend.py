@@ -27,7 +27,7 @@ PATIENT = {
     "SBP": 138, "DBP": 84, "BPXPLS": 78, "MCQ300C": 1.0, "CVD_ANY": 0.0,
     "PAQ650": 0.0, "PAQ665": 0.0, "LBDHDD": 41, "LBXSCH": 205, "LBXSTR": 190,
     "LBXSATSI": 28, "LBXSGTSI": 34, "LBXSCR": 0.95, "LBXSBU": 15,
-    "LBXSAL": 4.2, "LBXSUA": 6.4,
+    "LBXSAL": 4.2, "LBXSUA": 6.4, "LBXSGL": 118,
 }
 
 
@@ -192,6 +192,49 @@ def test_config_states_no_deployment_prevalence(config):
     label."""
     assert config["prevalence"]["deploy"] is None
     assert config["prevalence"]["requires_local_recalibration"] is True
+
+
+def test_glucose_is_the_21st_feature(backend):
+    """D9-08. Reverses the research exclusion of glycaemic variables, on evidence:
+    glucose alone reaches AUC 0.7029, BELOW the 20-feature model, and the rule
+    glucose>=100 alone misses 54.2% of cases. It is a covariate, not the label."""
+    assert "LBXSGL" in backend.feature_names
+    assert len(backend.feature_names) == 21
+    assert "LBXSGL" in backend.mandatory_fields
+
+
+def test_hba1c_itself_is_never_an_input(backend):
+    """The permanent exclusion. LBXGH IS the label."""
+    for banned in ("LBXGH", "LBDSGLSI", "LBXGLU", "LBDGLUSI", "LBXSOSSI"):
+        assert banned not in backend.feature_names
+
+
+def test_a_20_feature_fallback_exists_and_is_a_separate_model(backend):
+    """Glucose missing must not be imputed. A separately fitted model answers."""
+    assert backend.fallback is not None
+    assert len(backend.fallback["features"]) == 20
+    assert "LBXSGL" not in backend.fallback["features"]
+    assert backend.fallback["model"] is not backend.bundle["model"]
+    assert backend.fallback["calibrator"] is not backend.bundle["calibrator"]
+
+
+def test_missing_glucose_routes_to_the_fallback_and_says_so(backend):
+    patient = {k: v for k, v in PATIENT.items() if k != "LBXSGL"}
+    result = backend.predict(patient)
+    assert result["model_variant"] == "fallback_20_feature_no_glucose"
+    assert "not supplied" in result["model_variant_note"]
+
+
+def test_supplying_glucose_uses_the_primary(backend):
+    assert backend.predict(PATIENT)["model_variant"] == "primary_21_feature"
+
+
+def test_higher_glucose_never_lowers_risk(backend):
+    """LBXSGL carries an increasing monotone constraint. If this fails the
+    constraint was lost in a refit."""
+    probabilities = [backend.predict({**PATIENT, "LBXSGL": g})["confidence"]
+                     for g in (75, 90, 105, 120, 150, 200)]
+    assert probabilities == sorted(probabilities)
 
 
 def test_config_headline_auc_matches_the_bundle(backend, config):

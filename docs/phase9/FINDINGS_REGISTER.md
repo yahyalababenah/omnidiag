@@ -979,3 +979,200 @@ But it must be on screen and in the config rather than discovered by a reviewer,
 prefer alpha = 0.20 (uncertain 0.383, worst per-band coverage 0.717) once he sees this table.
 
 **This is the one number that should decide alpha, and it was not available when alpha was chosen.**
+
+---
+
+# Gate 9.4 — the two-stage cascade, measured before being built
+
+Yahya's design: stage 1 is the shipped 20-feature model; `referral` and `no_referral` are final;
+`uncertain` sends the patient for a cheap glucose test and they return to a second model trained on
+21 features (the 20 plus serum glucose), which decides.
+
+Nothing was built. This is the measurement that decides whether to build it.
+
+## First: glucose is NOT a leak, and I expected it to be
+
+The research excluded every glycaemic variable as label-defining, and the leakage ladder's
+"+glycemic" layer scored AUC 1.0000 — but that layer contained `LBXGH`, the label itself. Serum
+glucose on its own is a different matter:
+
+| | |
+|---|---|
+| AUC(serum glucose alone -> HbA1c >= 5.7) | **0.7029** — *below* the 20-feature model's 0.7523 |
+| correlation with HbA1c | r = 0.661 |
+| the rule "glucose >= 100" used alone | sensitivity 0.458, **misses 54.2% of cases** |
+
+So glucose is an informative covariate, not a relabelled target. The leak guards do not apply to
+stage 2 and it is not circular. **Stage 2's AUC is still not comparable to stage 1's** — different
+populations — and must never be quoted as "the module improved".
+
+## Stage 2 earns its place as a model
+
+Measured inside the population stage 2 actually sees: the 1570 test patients stage 1 called
+uncertain (prevalence 0.344 there, against 0.359 overall).
+
+| candidate | AUC inside the uncertain group |
+|---|---|
+| glucose alone | 0.6634 |
+| the 20-feature model, refit on this subgroup | 0.6875 |
+| the 20-feature model, unchanged | 0.6929 |
+| **21 features including glucose** | **0.7396** |
+
+**+0.047 over the strongest rival**, against a pre-declared bar of 0.02 — a bar set higher than
+elsewhere because this one costs the patient a second visit and a second test. Glucose is the
+model's **second** term by importance (0.265) behind age (0.565). The idea works.
+
+## But the naive cascade LOSES sensitivity
+
+| design | HbA1c ordered | **missed positives** | still uncertain |
+|---|---|---|---|
+| single stage (shipped) | 0.722 | **0.141** | 0.383 |
+| cascade, symmetric stage-2 alpha 0.10 | 0.583 | **0.194** | 0.215 |
+| cascade, symmetric stage-2 alpha 0.20 | 0.568 | **0.209** | 0.162 |
+
+Because stage 2 *resolves* abstentions. Under a single stage every uncertain patient was counted as
+flagged and got an HbA1c; the cascade sends about half of them to `no_referral`, and some of those
+are positive. Fewer expensive tests, more missed diabetics — the same trade as raising alpha, only
+sharper.
+
+## The fix: make stage 2 reluctant to CLEAR, relaxed about REFERRING
+
+Mondrian conformal already supports a separate alpha per class. A small alpha on the positive class
+means high coverage of positives, so few positives are ever cleared.
+
+| stage-2 alpha+ / alpha- | glucose | HbA1c | missed | correctly cleared | still uncertain |
+|---|---|---|---|---|---|
+| single stage (none) | 0.000 | 0.722 | **0.141** | 0.355 | 0.383 |
+| **0.01 / 0.50** | 0.383 | 0.711 | **0.144** | 0.370 | **0.137** |
+| **0.02 / 0.50** | 0.383 | 0.681 | **0.150** | 0.414 | **0.107** |
+| 0.05 / 0.30 | 0.383 | 0.625 | 0.171 | 0.489 | 0.150 |
+| 0.10 / 0.20 | 0.383 | 0.596 | 0.184 | 0.526 | 0.187 |
+
+## F9-34 — What the cascade actually buys is not what it looks like it buys
+
+At matched sensitivity (alpha+ = 0.01: missed 0.144 against 0.141, a difference of about four
+patients in 4099) the cascade barely reduces HbA1c volume — 0.722 to 0.711.
+
+**What it does is collapse the abstention rate from 38.3% to 13.7%.**
+
+That is the answer to F9-33, and it is a better answer than moving alpha was. Two thirds of the
+patients who currently receive no answer receive one, paid for with a cheap glucose test on 38% of
+patients, at no measurable cost in missed cases. Accepting a small sensitivity cost
+(alpha+ = 0.02: missed 0.150, about thirteen more patients in 4099) also drops HbA1c volume by four
+points and abstention to 10.7%.
+
+The cascade is therefore recommended — but its value must be stated as *resolving ambiguity*, not
+as *saving expensive tests*. Writing it up the second way would be a claim the measurements do not
+support.
+
+## Open issues that must be settled before this is built
+
+1. **Loss to follow-up is not modelled, and it is the design's real weakness.** The cascade needs
+   the patient to come back. A single-stage module gives everyone an answer today, even if that
+   answer is "take the test". Every patient who does not return is left in limbo with no recorded
+   decision. The module needs an explicit policy for the non-returner — the safe default being that
+   a stage-1 `uncertain` who never returns stays flagged for an HbA1c.
+2. **Which glucose?** This was measured on `LBXSGL`, random serum glucose from the NHANES
+   biochemistry panel (98.6% coverage). A clinic's capillary fingerstick is a different measurement
+   with different precision and different fasting state. Deploying stage 2 against capillary values
+   when it was trained on serum is exactly the units/instrument mismatch that F9-14 and the
+   osmolality incident warn about. Either restrict stage 2 to venous serum glucose, or measure the
+   degradation.
+3. **Stage 2 is a second shipped model and carries every obligation of the first**: its own bundle,
+   calibration, conformal layer, blank-field audit, fairness audit by sex and age band, leak
+   guards run on its own feature set, and its own model card. It is not a bolt-on.
+4. **F9-08 interacts with this in a way nobody has checked.** HbA1c and glucose disagree partly
+   because HbA1c responds to red-cell indices independently of glucose. Stage 2 may therefore be
+   systematically clearing patients whose HbA1c is artefactually high — or correctly identifying
+   them. Which of those it is has not been measured and should be, because the two have opposite
+   clinical meanings.
+
+---
+
+# D9-08 — serum glucose becomes the 21st feature. The cascade is not built.
+
+Objective set by Yahya: **spare healthy patients the false alarm without letting a single extra
+real patient slip.** That is a hard two-sided constraint, and it is what decided this.
+
+## Why the cascade was rejected
+
+Gate 9.5 searched every routing policy and every asymmetric stage-2 alpha under the constraint
+"missed positives must not rise above the shipped 0.1415". **Nothing met it.** The strictest
+setting (alpha+ = 0.005) still gave 0.1435.
+
+The reason is structural. A cascade only *resolves* stage-1 abstentions, so every healthy patient
+it clears is bought against the risk of clearing a sick one — on a model whose discrimination
+inside that group is only 0.74. It moves along the frontier; it does not move the frontier.
+
+**Only better discrimination moves the frontier.** So the question became: what would give us that?
+
+## Why glucose, and why it is not a leak
+
+The research excluded every glycaemic variable as label-defining. For HbA1c that is correct and
+permanent. For **serum glucose** it was assumed, not measured. Measured:
+
+| | |
+|---|---|
+| AUC(serum glucose alone -> HbA1c >= 5.7) | **0.7029** — *below* the 20-feature model's 0.7523 |
+| correlation with HbA1c | r = 0.661 |
+| the rule "glucose >= 100" used alone | misses **54.2%** of cases |
+
+It is an informative covariate, not a relabelled target. The ladder layer that scored AUC 1.0000
+contained `LBXGH` — the label itself — not glucose.
+
+**Leak guard 2 is re-scoped, and this is the part to check hardest.** Asking "can the features
+reconstruct glucose" is meaningless once glucose is an input. The guard now targets what it always
+stood in for — the actual label:
+
+    R2(HbA1c | 21 features) = 0.472   PASS (< 0.60)
+    leak guard 1: max univariate AUC 0.7168 (age, not glucose)   PASS (< 0.85)
+
+`LBXGH`, `LBDSGLSI`, `LBXGLU`, `LBDGLUSI` and `LBXSOSSI` remain permanently banned, asserted in
+the test suite.
+
+## What it costs: nothing
+
+`LBXSGL` is on the **same standard biochemistry panel** as `LBXSCR`, `LBXSBU`, `LBXSAL`, `LBXSUA`,
+`LBXSCH`, `LBXSTR`, `LBXSATSI` and `LBXSGTSI` — eight analytes this model already requires.
+Verified in the raw NHANES files for both the calibration and test cycles. Same tube, same assay
+run, same result sheet. **The module was declining to read a number already in front of the
+clinician.**
+
+## What it buys, against the 20-feature model at its own best operating point
+
+| | shipped (20 feat, alpha 0.20) | **D9-08 (21 feat)** |
+|---|---|---|
+| AUC | 0.7523 [0.7378, 0.7662] | **0.7812 [0.7676, 0.7948]** |
+| **missed dysglycaemic patients** | 0.1415 | **0.1306** |
+| **healthy patients CLEARED** | 0.3549 | **0.4283** |
+| HbA1c tests ordered | 0.722 | **0.678** |
+| left uncertain | 0.383 | **0.364** |
+| worst per-band coverage | 0.717 | **0.775** |
+
+**Strictly better on every axis at once** — roughly 16 fewer missed patients and 193 more healthy
+patients cleared, per 4099 screened. And it beats the 20-feature model at **7 of 7** missed-positive
+levels, so this is not one lucky operating point.
+
+Glucose is the model's **top term** by contribution, ahead of age.
+
+## The fallback, and why it is a separate model
+
+When glucose is genuinely absent the 20-feature bundle answers. It is a **separately fitted model
+with its own calibration and its own conformal layer** — not the primary model with a guessed
+glucose. Nothing is imputed. The response carries `model_variant` and a note stating what the
+fallback costs (0.355 cleared instead of 0.428; 0.142 missed instead of 0.131), because the two
+models are not interchangeable and their numbers are not the same numbers.
+
+## What this supersedes
+
+- The cascade (Gate 9.4 / 9.5): **not built.** It could not meet the constraint.
+- D9-07's alpha trade: recorded but moot. The 21-feature model beats *both* the 0.15 and 0.20
+  operating points at once, so nobody has to make that trade.
+
+## Still open
+
+- **F9-28 got worse, not better.** On the sharper model, blanking `PAQ650` now shifts median risk
+  by **+0.143** and flips **56.8%** of decisions (was +0.108 / 31%). It stays mandatory and is
+  blocked at the schema, so it cannot reach the model — but the underlying sensitivity is larger.
+- The fairness, blank-field and subgroup-calibration limitations (F9-08 to F9-11) carry over and
+  must be re-read off the new model card rather than assumed unchanged.

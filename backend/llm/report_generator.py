@@ -338,6 +338,10 @@ _FEATURE_GLOSSARY: Dict[str, str] = {
     "LBXSBU": "blood urea nitrogen (mg/dL) — renal function",
     "LBXSAL": "serum albumin (g/dL)",
     "LBXSUA": "serum uric acid (mg/dL)",
+    "LBXSGL": (
+        "serum glucose (mg/dL) from the standard biochemistry panel — a single "
+        "non-fasting reading, NOT a diagnosis and not the same measurement as HbA1c"
+    ),
 }
 
 

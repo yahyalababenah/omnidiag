@@ -49,21 +49,22 @@ performance:
   split: "temporal (train 2007-2014, calibrate 2015-2016, test 2017-2018)"
   test_n: 4099
   test_prevalence: 0.3586
-  auc: 0.7523
-  auc_ci_95: [0.7378, 0.7662]
+  auc: 0.7812
+  auc_ci_95: [0.7676, 0.7948]
+  auc_20_feature_fallback: 0.7523
   auc_mec_weighted: 0.7655          # NHANES exam weights; US-representative
   calibration_intercept: -0.090     # ideal 0
   calibration_slope: 0.952          # ideal 1
   ece: 0.0249
   scaled_brier: 0.1755
-  sensitivity_flagged: 0.8585       # referral OR uncertain -> a test is ordered
-  specificity_no_referral: 0.3549
+  sensitivity_flagged: 0.8694       # referral OR uncertain -> a test is ordered
+  specificity_no_referral: 0.4283   # healthy patients correctly cleared
   # The number that matters most clinically, stated here so it cannot be missed:
   # 14.1% of genuinely dysglycaemic patients receive no_referral at this alpha
   # (9.8% aged 20-39, 15.8% aged 40-59, 14.3% aged 60+). At alpha = 0.15 it was
   # 10.1%. This is the cost side of D9-07 and it is reflected in the NO_REFER
   # clinical action plan's safety_note.
-  missed_positive_rate: 0.141
+  missed_positive_rate: 0.1306
   # What the model is NOT: 0.7523 is the honest ceiling for this label and these
   # twenty fields (D9-03). Larger feature sets score ~0.80 but only by including a
   # complete blood count, whose gain is an assay artefact -- see limitations.
@@ -75,7 +76,12 @@ model:
   family: "ebm_platt_conformal"     # backend/model_backends/diabetes_ebm_conformal.py
   type: "explainable_boosting_machine"
   explainer_type: "additive"        # the model IS the explanation; no SHAP
-  weights_path: "models/diabetes_nhanes/diabetes_nhanes_ebm.joblib"
+  # D9-08. The primary model reads 21 features; serum glucose is the 21st.
+  weights_path: "models/diabetes_nhanes/diabetes_nhanes_ebm_21.joblib"
+  # Used ONLY when serum glucose is genuinely absent. A separately fitted model
+  # with its own calibration and its own conformal layer -- not the primary model
+  # with a guessed glucose. The response says which one answered.
+  fallback_weights_path: "models/diabetes_nhanes/diabetes_nhanes_ebm.joblib"
   model_card_path: "models/diabetes_nhanes/model_card.json"
 
   # This module decides with a conformal set. It has no threshold and no risk
@@ -102,16 +108,16 @@ model:
     alpha: 0.20
     layer: "group_conditional_age_band"
     bands: "0: 20-39, 1: 40-59, 2: 60+"
-    coverage_pos: 0.8585
-    coverage_neg: 0.7467
-    decision_shares: {referral: 0.3386, no_referral: 0.2784, uncertain: 0.3830}
+    coverage_pos: 0.8694
+    coverage_neg: 0.7813
+    decision_shares: {referral: 0.3145, no_referral: 0.3215, uncertain: 0.3640}
     # Coverage per band, the number this layer exists for. Under the previous
     # class-conditional layer the 20-39 positive cell was 0.444 and the 60+
     # negative cell was 0.391 while the pooled figures looked acceptable (F9-31).
-    per_band_coverage:
+    per_band_coverage:      # worst cell 0.775; class-conditional would be 0.334
       "20-39": {positive: 0.9022, negative: 0.7658}
       "40-59": {positive: 0.8420, negative: 0.7417}
-      "60+":   {positive: 0.8571, negative: 0.7170}
+      "60+":   {positive: 0.8571, negative: 0.7750}
 
   # ── D9-07: the alpha decision, with both sides measured ──────────────
   # Recorded in full because the trade is not obvious and a future reader will
@@ -119,6 +125,10 @@ model:
   alpha_decision:
     chosen: 0.20
     rejected: 0.15
+    # NOTE: this block compares two operating points of the 20-FEATURE model and
+    # is kept for the record. D9-08 then made it largely moot: the 21-feature
+    # model beats BOTH of these at once (missed 0.1306, healthy cleared 0.4283),
+    # so the trade recorded here is no longer one anyone has to make.
     what_it_bought:
       uncertain_share: {at_0_15: 0.528, at_0_20: 0.383}
       no_referral_share: {at_0_15: 0.214, at_0_20: 0.278}
@@ -167,7 +177,30 @@ schema:
   class: "DiabetesNhanesInput"
 
 features:
-  count: 20
+  count: 21
+  fallback_count: 20
+  # ── D9-08: serum glucose is the 21st feature ────────────────────────
+  # This REVERSES the research decision to exclude every glycaemic variable, and
+  # it does so on measurement, not preference:
+  #   * glucose alone reaches AUC 0.7029 for HbA1c >= 5.7 -- BELOW the 20-feature
+  #     model's 0.7523 -- and the rule "glucose >= 100" alone misses 54.2% of
+  #     cases. It is an informative covariate, not a relabelled target. The ladder
+  #     layer that scored AUC 1.0000 contained LBXGH, the label itself.
+  #   * leak guard 2 is re-scoped accordingly: asking whether the features can
+  #     reconstruct GLUCOSE is meaningless once glucose is an input. The guard now
+  #     targets the actual label: R2(HbA1c | 21 features) = 0.472, passes < 0.60.
+  #   * it costs nothing. LBXSGL is on the SAME standard biochemistry panel as
+  #     LBXSCR, LBXSBU, LBXSAL, LBXSUA, LBXSCH, LBXSTR, LBXSATSI and LBXSGTSI,
+  #     which this model already requires. Same tube, same assay run.
+  # Measured effect, held-out cycle, against the 20-feature model at its own best
+  # operating point for each missed-positive level (better at 7 of 7):
+  #     AUC                      0.7523 -> 0.7812
+  #     missed dysglycaemic      0.1415 -> 0.1306
+  #     healthy patients cleared 0.3549 -> 0.4283
+  #     HbA1c tests ordered      0.722  -> 0.678
+  #     worst per-band coverage  0.717  -> 0.775
+  # Strictly better on every axis at once. No re-tuning of alpha on the
+  # 20-feature model reaches this (Gate 9.5, 9.5b) -- only discrimination can.
   # D9-06. Leaving any of these blank moves the predicted risk materially or
   # flips a large share of decisions (F9-28), so the model must never receive
   # them as missing. PAQ650 alone shifts median risk by +0.108 and flips 31% of
@@ -180,6 +213,7 @@ features:
     - LBDHDD
     - PAQ650
     - PAQ665
+    - LBXSGL        # D9-08; absent -> the 20-feature fallback answers, never imputed
   # F9-29 / D9-03. These may never become inputs. Enforced by an assert in the
   # training script and again when the backend loads the bundle.
   banned_inputs_reason: >-

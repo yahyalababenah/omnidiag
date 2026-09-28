@@ -26,7 +26,7 @@ PATIENT = {
     "SBP": 138, "DBP": 84, "BPXPLS": 78, "MCQ300C": 1.0, "CVD_ANY": 0.0,
     "PAQ650": 0.0, "PAQ665": 0.0, "LBDHDD": 41, "LBXSCH": 205, "LBXSTR": 190,
     "LBXSATSI": 28, "LBXSGTSI": 34, "LBXSCR": 0.95, "LBXSBU": 15,
-    "LBXSAL": 4.2, "LBXSUA": 6.4,
+    "LBXSAL": 4.2, "LBXSUA": 6.4, "LBXSGL": 118,
 }
 HEALTHY = {**PATIENT, "RIDAGEYR": 28, "BMXBMI": 22.0, "ADIPOSITY_BAND": 0.0,
            "PAQ650": 1.0, "PAQ665": 1.0, "LBDHDD": 68, "SBP": 110, "DBP": 68,
@@ -122,14 +122,25 @@ def test_config_and_bundle_agree_on_alpha(backend, config):
 
 
 def test_config_records_both_sides_of_the_alpha_trade(config):
-    """D9-07 moved alpha to reduce over-referral. The cost — more missed
-    positives — has to be recorded next to the benefit, or a future reader sees
-    only the chosen number."""
+    """D9-07 moved alpha to reduce over-referral, and the cost had to be recorded
+    next to the benefit. D9-08 then made that trade moot — the 21-feature model
+    beats both operating points at once — but the record stays, because a future
+    reader needs to see what was weighed, not just what was chosen."""
     decision = config["model"]["alpha_decision"]
     assert decision["chosen"] == 0.20 and decision["rejected"] == 0.15
     cost = decision["what_it_cost"]["missed_positive_rate"]
     assert cost["at_0_15"] == 0.101 and cost["at_0_20"] == 0.141
-    assert config["performance"]["missed_positive_rate"] == 0.141
+
+
+def test_d9_08_beats_both_alpha_options_it_superseded(config):
+    """The claim that justified adding glucose: strictly better than either
+    20-feature operating point, on both axes at once."""
+    shipped_missed = config["performance"]["missed_positive_rate"]
+    shipped_cleared = config["performance"]["specificity_no_referral"]
+    old = config["model"]["alpha_decision"]["what_it_cost"]["missed_positive_rate"]
+    assert shipped_missed < old["at_0_20"]        # fewer missed than alpha 0.20
+    assert shipped_missed < old["at_0_15"] + 0.03  # and near the strictest option
+    assert shipped_cleared > 0.40                  # while clearing more healthy
 
 
 # ── Task 4: independent levers, zero blast radius ────────────────────────

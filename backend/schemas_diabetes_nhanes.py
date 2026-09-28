@@ -67,6 +67,19 @@ class DiabetesNhanesInput(BaseModel):
         ..., ge=0, le=1,
         description="Moderate recreational activity in a typical week: 1 = yes, 0 = no.",
     )
+    LBXSGL: Optional[float] = Field(
+        None, ge=20, le=600,
+        description=(
+            "Serum glucose, mg/dL. Optional in the schema but REQUIRED by the primary "
+            "model: it arrives on the same standard biochemistry panel as creatinine, "
+            "urea, albumin, uric acid, cholesterol, triglycerides, ALT and GGT, so in "
+            "practice it is already on the result sheet. Supplying it selects the "
+            "21-feature model, which on the held-out cycle clears 42.8% of healthy "
+            "patients (against 35.5%) while missing 13.1% of dysglycaemic patients "
+            "(against 14.2%). Omitting it falls back to the 20-feature model, and the "
+            "response says so — the value is never imputed."
+        ),
+    )
 
     # ── optional ─────────────────────────────────────────────────────────
     RIAGENDR: Optional[int] = Field(
@@ -124,7 +137,7 @@ class DiabetesNhanesInput(BaseModel):
             "RIAGENDR": 1, "SBP": 138, "DBP": 84, "BPXPLS": 78,
             "MCQ300C": 1, "CVD_ANY": 0, "LBXSCH": 205, "LBXSTR": 190,
             "LBXSATSI": 28, "LBXSGTSI": 34, "LBXSCR": 0.95, "LBXSBU": 15,
-            "LBXSAL": 4.2, "LBXSUA": 6.4,
+            "LBXSAL": 4.2, "LBXSUA": 6.4, "LBXSGL": 104,
         }
     })
 
@@ -134,3 +147,7 @@ class DiabetesNhanesInput(BaseModel):
 MANDATORY_FIELDS = [
     "RIDAGEYR", "BMXBMI", "ADIPOSITY_BAND", "LBDHDD", "PAQ650", "PAQ665",
 ]
+
+#: Required by the PRIMARY (21-feature) model. Absent -> the 20-feature fallback
+#: answers instead, and says so in `model_variant`. Never imputed.
+PRIMARY_ONLY_FIELDS = ["LBXSGL"]
