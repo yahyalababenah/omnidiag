@@ -241,9 +241,11 @@ although race is never an input (see the limits above).
 >   produce one is still broken (see the Known limitation below). `docker-compose`
 >   and the k8s manifest do point at a real MLflow server, and the same code logs
 >   there when one is reachable.
-> - **Clinical notes: regex, English only.** The BioBERT path exists in the
->   code but is never called — the frontend always sends `use_bert: false` and
->   `transformers` is not part of the deployed dependency set. Arabic is not
+> - **Clinical notes: spaCy + regex, English only.** Numbers are assigned to
+>   clinical concepts through spaCy's dependency parse, with a regex baseline
+>   as fallback. The BioBERT path exists in the code but is never called — the
+>   frontend always sends `use_bert: false` and `transformers` is not part of
+>   the deployed dependency set. Arabic is not
 >   supported: `/api/v4/parse-notes` reports `language.supported: false` for
 >   any note containing Arabic and the UI says so explicitly.
 > - **Patient Comparison compares two different patients**, side by side. It
@@ -385,7 +387,7 @@ When `DEEPSEEK_API_KEY` is absent or the API call raises any exception, [`_rule_
 
 ### Clinical NLP Notes Parser
 
-[`parse_clinical_note()`](backend/nlp/notes_parser.py:249) implements two-tier extraction from free-text clinical notes. [`_regex_extract()`](backend/nlp/notes_parser.py:97) runs first as the always-available baseline: it applies 20+ regex patterns (matched fresh via `re.search()` per call, not pre-compiled) across categories including age (with short-form aliases like `y/o`), BP systolic/diastolic, cholesterol, glucose, BMI, heart rate, creatinine, hemoglobin, oldpeak, and boolean flags for hypertension, diabetes, stroke, smoking, chest pain, exercise angina, edema, and anemia. If `use_bert=True` and HuggingFace Transformers is installed, `_bert_extract()` runs the `d4data/biomedical-ner-all` NER pipeline (lazy-loaded on first call, CPU inference, confidence threshold 0.7) and merges its output — BERT values win on overlapping keys. **This path is never taken in the deployment**: the frontend hard-codes `use_bert: false` and `transformers` is not installed in the Space image, so every extraction is regex. Describing the deployed parser as "BioBERT" is inaccurate. Every pattern is English; `language_support()` classifies the note by script and returns `supported: false` for anything containing Arabic (including mixed notes, where only the English abbreviations are read), which the UI surfaces instead of reporting "0 fields extracted". [`map_to_disease_schema()`](backend/nlp/notes_parser.py:236) applies disease-specific field name and value transformations: for `heart_disease`, `bp_systolic → RestingBP` (int); for `diabetes`, `cholesterol → HighChol` (binarised at 200 mg/dL). Missing `transformers` degrades silently to regex-only with no user-visible error.
+[`parse_clinical_note()`](backend/nlp/notes_parser.py) extracts structured fields from free-text clinical notes in three tiers. [`_regex_extract()`](backend/nlp/notes_parser.py) runs first as the always-available baseline: patterns tolerate linking words ("age is 50", "BP of 150 over 95", "cholesterol level was 240"), spelled-out numbers ("sixty-two") and short forms ("45M", "71F"), and cover age, BP, cholesterol, fasting glucose, BMI, max heart rate, oldpeak, sex and condition flags (hypertension, diabetes, stroke, smoking, chest pain, exercise angina) with negation handling. [`_spacy_extract()`](backend/nlp/notes_parser.py) then reads the numbers by context: each number is linked to the nearest clinical concept in the sentence's dependency tree (adjacency as a fallback for telegraphic notes), each concept takes one number and each number one concept, numbers followed by non-clinical units (kg, cm, months) are skipped, every field has a plausible range, and a bare number predicated of the patient ("who is now 58") is the age. spaCy values override the regex ones; without spaCy the regex baseline alone runs. Resting heart rate and LDL/HDL are deliberately not mapped to MaxHR/Cholesterol. If `use_bert=True` and HuggingFace Transformers is installed, `_bert_extract()` runs the `d4data/biomedical-ner-all` NER pipeline (lazy-loaded, CPU, confidence threshold 0.7) and its values win on overlapping keys. **The BERT path is never taken in the deployment**: the frontend hard-codes `use_bert: false` and `transformers` is not installed in the Space image, so extraction is spaCy + regex. Describing the deployed parser as "BioBERT" is inaccurate. Every pattern is English; `language_support()` classifies the note by script and returns `supported: false` for anything containing Arabic (including mixed notes, where only the English abbreviations are read), which the UI surfaces instead of reporting "0 fields extracted". [`map_to_disease_schema()`](backend/nlp/notes_parser.py:236) applies disease-specific field name and value transformations: for `heart_disease`, `bp_systolic → RestingBP` (int); for `diabetes`, `cholesterol → HighChol` (binarised at 200 mg/dL). Missing `transformers` degrades silently to regex-only with no user-visible error.
 
 ### Explainable Inference Core
 
@@ -899,7 +901,7 @@ Two different prefixes are actually in use — verified live against a running i
 | Auth | [python-jose + passlib](backend/auth/jwt.py) | JWT + bcrypt |
 | Rate Limiting | [SlowAPI](backend/rate_limit.py:49) | Per-route request caps |
 | LLM | [OpenAI SDK → DeepSeek](backend/llm/report_generator.py:100) | Clinical report generation |
-| NLP | [Transformers + regex](backend/nlp/notes_parser.py:249) | Clinical note feature extraction |
+| NLP | [spaCy dependency parse + regex](backend/nlp/notes_parser.py) | Clinical note feature extraction |
 | Metrics | [prometheus-client 0.20+](backend/monitoring/metrics.py) | `/metrics` scrape endpoint |
 | Drift | [Evidently 0.4+](backend/monitoring/drift.py:48) | Dataset drift detection — **code only, not live** |
 | MLOps | [MLflow 2.10+](backend/monitoring/mlflow_tracker.py:63) | Experiment tracking — **code only, not live** |

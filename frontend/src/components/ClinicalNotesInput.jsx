@@ -165,6 +165,11 @@ export default function ClinicalNotesInput({ onExtracted, disease }) {
                   <span className="font-medium">{k}</span>
                   <span className="text-purple-400">→</span>
                   <span className="font-mono">{String(fields[k])}</span>
+                  {disease === 'diabetes' && k === 'Age' && (
+                    <span className="text-purple-400">
+                      (age group {Number(fields[k]) >= 13 ? '80+' : Number(fields[k]) === 1 ? '18–24' : `${(Number(fields[k]) - 2) * 5 + 25}–${(Number(fields[k]) - 2) * 5 + 29}`})
+                    </span>
+                  )}
                 </label>
               </li>
             ))}

@@ -22,10 +22,9 @@ from typing import Any, Dict, Optional
 
 try:
     import spacy
-    from spacy.matcher import Matcher
+    
 except ImportError:  # spaCy is optional: without it the regex baseline still runs
     spacy = None
-    Matcher = None
 
 log = logging.getLogger("omnidiag.nlp")
 
@@ -33,38 +32,17 @@ log = logging.getLogger("omnidiag.nlp")
 # spaCy NLP Logic (Lazy-loaded)
 # ---------------------------------------------------------------------------
 _nlp_spacy = None
-_age_matcher = None
 
 
 def _get_spacy_pipeline():
-    global _nlp_spacy, _age_matcher
+    global _nlp_spacy
     if _nlp_spacy is None:
         if spacy is None:
             _nlp_spacy = "unavailable"
             return None
         try:
             log.info("Loading spaCy en_core_web_sm model...")
-            # استخدم نموذج اللغة الإنجليزية الصغير لتوفير استهلاك الذاكرة
             _nlp_spacy = spacy.load("en_core_web_sm")
-            _age_matcher = Matcher(_nlp_spacy.vocab)
-
-            # النمط الأول: يتعرف على جمل مثل "the age is 50" أو "Age: 50"
-            # (at most one linking token: "age is 50", "age: 50", "age of 50")
-            pattern1 = [
-                {"LOWER": "age"},
-                {"LOWER": {"IN": ["is", "was", "of", ":", "="]}, "OP": "?"},
-                {"LIKE_NUM": True},
-            ]
-
-            # النمط الثاني: "50 years old" فقط. بدون "old" تصبح "smoked 20 years"
-            # أو "diabetic for 10 years" عمرًا خاطئًا.
-            pattern2 = [
-                {"LIKE_NUM": True},
-                {"LOWER": {"IN": ["year", "years", "yr", "yrs"]}},
-                {"LOWER": "old"},
-            ]
-
-            _age_matcher.add("AGE_PATTERNS", [pattern1, pattern2])
             log.info("spaCy pipeline ready")
         except Exception as exc:
             log.warning(f"spaCy model not found or failed to load: {exc!r}")
@@ -73,30 +51,176 @@ def _get_spacy_pipeline():
     return _nlp_spacy if _nlp_spacy != "unavailable" else None
 
 
+# A number is assigned to the clinical concept nearest to it in the sentence's
+# dependency tree, not to a fixed "keyword then digits" template. So
+# "his total cholesterol came back at 240" and "she has a BMI of 31" resolve
+# the same way whatever words sit in between.
+_CONCEPT_WORDS = {
+    "age": {"age", "aged"},
+    "bp": {"pressure", "bp"},
+    "cholesterol": {"cholesterol", "chol"},
+    "bmi": {"bmi"},
+    "glucose": {"glucose", "sugar", "fbs", "fpg"},
+    "hr": {"rate", "hr"},
+    "st": {"oldpeak", "depression"},
+}
+# concept -> (feature, min, max)
+_CONCEPT_RANGE = {
+    "age": ("age", 0, 120),
+    "cholesterol": ("cholesterol", 50, 700),
+    "bmi": ("bmi", 10, 80),
+    "glucose": ("fasting_glucose", 30, 700),
+    "hr": ("max_heart_rate", 30, 250),
+    "st": ("oldpeak", -3, 10),
+}
+_WORD_TO_CONCEPT = {w: c for c, ws in _CONCEPT_WORDS.items() for w in ws}
+_MAX_TREE_DIST = 4
+_NON_CLINICAL_UNITS = {"month", "months", "week", "weeks", "day", "days", "hours", "hour", "kg", "kgs", "lb", "lbs", "cm", "m", "pounds", "kilograms", "feet", "ft", "inches"}
+_PERSON_WORDS = {"he", "she", "who", "patient", "pt", "man", "woman", "gentleman", "lady"}
+
+
+def _tree_dist(a, b) -> int:
+    pa = [a] + list(a.ancestors)
+    pb = [b] + list(b.ancestors)
+    for i, x in enumerate(pa):
+        if x in pb:
+            return i + pb.index(x)
+    return 99
+
+
+def _prev_words(doc, i, n=3):
+    return {t.lower_ for t in doc[max(0, i - n):i]}
+
+
+def _concept_of(doc, tok):
+    """Concept a token names, or None. Resolves ambiguous words from context."""
+    c = _WORD_TO_CONCEPT.get(tok.lower_)
+    if c is None:
+        return None
+    prev = _prev_words(doc, tok.i)
+    if c == "hr":
+        # Only MAXIMUM heart rate is a feature; resting "HR 88" is not MaxHR.
+        near = prev | {t.lower_ for t in doc[tok.i + 1:tok.i + 3]}
+        if not near & {"max", "maximum", "maximal", "peak"}:
+            return None
+        if tok.lower_ == "rate" and "heart" not in prev:
+            return None
+    if c == "st" and tok.lower_ == "depression" and "st" not in prev:
+        return None
+    if c == "glucose" and tok.lower_ in {"glucose", "sugar"} and not (
+        prev | {t.lower_ for t in doc[tok.i + 1:tok.i + 2]}
+    ) & {"fasting", "fbs", "fpg"}:
+        return None
+    return c
+
+
+def _number_mentions(doc):
+    """(value(s), first_token, last_token) for every numeric mention."""
+    out, i, n = [], 0, len(doc)
+    while i < n:
+        t = doc[i]
+        m = re.match(r"(\d{2,3})/(\d{2,3})\W*$", t.text)
+        if m:
+            out.append(((float(m.group(1)), float(m.group(2))), t, t))
+            i += 1
+            continue
+        if not t.like_num:
+            i += 1
+            continue
+        j = i
+        # join spelled-out numbers: "sixty five"
+        while not doc[i].text.replace(".", "").isdigit():
+            if j + 1 < n and doc[j + 1].like_num:
+                j += 1
+            elif j + 2 < n and doc[j + 1].text == "-" and doc[j + 2].like_num:
+                j += 2  # "sixty-two"
+            else:
+                break
+        digits = _words_to_digits(" ".join(x.lower_ for x in doc[i:j + 1]))
+        try:
+            v = float(digits.replace(",", ""))
+        except ValueError:
+            i = j + 1
+            continue
+        # "150 over 95" / "150 / 95"
+        if j + 2 < n and doc[j + 1].lower_ in {"over", "/"} and doc[j + 2].text.isdigit():
+            out.append(((v, float(doc[j + 2].text)), t, doc[j + 2]))
+            i = j + 3
+            continue
+        out.append(((v,), t, doc[j]))
+        i = j + 1
+    return out
+
+
 def _spacy_extract(text: str) -> dict:
     nlp = _get_spacy_pipeline()
     if nlp is None:
         return {}
 
     doc = nlp(text)
-    extracted = {}
+    extracted: dict = {}
+    concepts = [(t, _concept_of(doc, t)) for t in doc]
+    concepts = [(t, c) for t, c in concepts if c]
 
-    # 1. استخراج العمر باستخدام Matcher
-    matches = _age_matcher(doc)
-    for match_id, start, end in matches:
-        span = doc[start:end]
-        # البحث عن الرقم الفعلي داخل التطابق الذي وجدناه
-        for token in span:
-            if token.like_num:
-                try:
-                    value = float(token.text)
-                except ValueError:
-                    continue  # a number word such as "fifty"
-                if 0 < value <= 120:
-                    extracted["age"] = value
+    mentions = _number_mentions(doc)
+    pending, mi_count, fallback = [], {}, []
+    for mi, (vals, first, last) in enumerate(mentions):
+        fallback.append(mi)
+        nxt = doc[last.i + 1] if last.i + 1 < len(doc) else None
+        nxt2 = doc[last.i + 2] if last.i + 2 < len(doc) else None
+        # "50 years old", "50-year-old", "50 yo": the phrase itself says age.
+        if nxt is not None and (
+            nxt.lower_ in {"yo", "y/o", "yrs", "yr"}
+            or (nxt.lower_ in {"year", "years"} and nxt2 is not None and nxt2.lower_ in {"old", "-"})
+            or nxt.lower_ in {"year-old", "years-old"}
+        ):
+            if len(vals) == 1 and 0 < vals[0] <= 120:
+                extracted.setdefault("age", vals[0])
+            continue
+        if nxt is not None and nxt.lower_ in _NON_CLINICAL_UNITS:
+            continue
+        cands = [
+            ((0 if 0 < first.i - c_tok.i <= 1 else min(_tree_dist(first, c_tok), _MAX_TREE_DIST), abs(c_tok.i - first.i)), c, mi)
+            for c_tok, c in concepts
+            # Broken parses (telegraphic or mixed-language notes) fall back to
+            # plain adjacency: "BP 132/84".
+            if _tree_dist(first, c_tok) <= _MAX_TREE_DIST or 0 < first.i - c_tok.i <= 2
+        ]
+        pending.extend((k, c, mi) for k, c, _ in cands)
+        mi_count[mi] = len(cands)
+    # Each number goes to one concept and each concept takes one number: the
+    # closest pair first, so "BMI of 31" keeps 31 even beside "sixty five".
+    used_n, used_c = set(), set()
+    for _, c, mi in sorted(pending):
+        if mi in used_n or c in used_c:
+            continue
+        used_n.add(mi)
+        used_c.add(c)
+        vals = mentions[mi][0]
+        if c == "bp":
+            if len(vals) == 2 and 50 <= vals[0] <= 260 and 30 <= vals[1] <= 160:
+                extracted.setdefault("bp_systolic", vals[0])
+                extracted.setdefault("bp_diastolic", vals[1])
+            elif len(vals) == 1 and 50 <= vals[0] <= 260:
+                extracted.setdefault("bp_systolic", vals[0])
+            continue
+        feat, lo, hi = _CONCEPT_RANGE[c]
+        if lo <= vals[0] <= hi:
+            extracted.setdefault(feat, vals[0])
+
+    # "who is now 58": a bare number predicated of the patient is the age.
+    if "age" not in extracted:
+        for mi in fallback:
+            if mi in used_n:
+                continue
+            first = mentions[mi][1]
+            head = first.head
+            subj = [c for c in head.children if c.dep_ in {"nsubj", "nsubjpass"}]
+            if head.lemma_ == "be" and subj and subj[0].lower_ in _PERSON_WORDS:
+                v = mentions[mi][0]
+                if len(v) == 1 and 0 < v[0] <= 120:
+                    extracted["age"] = v[0]
                     break
-        if "age" in extracted:
-            break  # نكتفي بأول عمر نجده لتجنب التكرار
 
     return extracted
 
@@ -112,40 +236,70 @@ def _spacy_extract(text: str) -> dict:
 # an absence of it. Before negation handling, "No stroke, no heart disease,
 # non-smoker" was extracted as stroke = heart disease = smoker = 1.
 
+# Words that may sit between a field name and its value: "age is 50",
+# "cholesterol level was around 240", "BP of 150 over 95", "HR: 172 bpm".
+_L = r"(?:\s*[:=\-]\s*|\s+(?:(?:is|was|of|at|about|around|approximately|approx|reading|level|levels|measured|measures|came\s+(?:back\s+)?(?:at|to)|to|the)\b\s*)*)"
+_SLASH = r"\s*(?:/|over)\s*"
+
 _NUMERIC: Dict[str, list] = {
     "age": [
         r"\b(\d{1,3})[- ]?(?:year[s]?[- ]?old|y/?o|yr[s]?)\b",
-        r"\bage[:\s]+(\d{1,3})\b",
+        r"\bage[d]?" + _L + r"(\d{1,3})\b(?!\s*(?:months?|weeks?|days?))",
+        r"\bage[d]?\s+(\d{1,3})\b(?!\s*(?:months?|weeks?|days?))",
         r"\b(\d{2,3})\s*[-,]?\s*(?:year[s]?[-\s]?old\s+)?(?:male|female|man|woman)\b",
+        r"\b(\d{2,3})\s?[mf]\b",
+        r"\b(?:patient|pt|he|she)\s+is\s+(?:a\s+)?(\d{2,3})\b(?!\s*(?:kg|cm|mg|mmhg|bpm|%))",
+        r"\bturned\s+(\d{2,3})\b",
     ],
     "bp_systolic": [
-        r"\b(?:bp|blood pressure)[:\s]*(\d{2,3})\s*/\s*\d{2,3}",
-        r"\b(?:systolic|sbp)[:\s]*(\d{2,3})",
-        r"\b(?:bp|blood pressure)[:\s]+(\d{2,3})\b",
+        r"\b(?:bp|blood\s+pressure)(?:" + _L + r")?(\d{2,3})" + _SLASH + r"\d{2,3}",
+        r"\b(?:systolic|sbp)(?:\s+(?:bp|blood\s+pressure))?" + _L + r"(\d{2,3})",
+        r"\b(?:bp|blood\s+pressure)" + _L + r"(\d{2,3})\b",
     ],
     "bp_diastolic": [
-        r"\b(?:bp|blood pressure)[:\s]*\d{2,3}\s*/\s*(\d{2,3})",
-        r"\b(?:diastolic|dbp)[:\s]*(\d{2,3})",
+        r"\b(?:bp|blood\s+pressure)(?:" + _L + r")?\d{2,3}" + _SLASH + r"(\d{2,3})",
+        r"\b(?:diastolic|dbp)(?:\s+(?:bp|blood\s+pressure))?" + _L + r"(\d{2,3})",
     ],
     # Total cholesterol only: "LDL 160" is not the Cholesterol field.
     "cholesterol": [
-        r"\b(?:total\s+cholesterol|total\s+chol|cholesterol)\b(?:\s+checked[^:\d]*)?[:\s]*(\d{2,3})",
+        r"\b(?:total\s+cholesterol|total\s+chol|cholesterol)\b(?:\s+checked[^:\d]*)?" + _L + r"(\d{2,3})\b",
     ],
     "fasting_glucose": [
-        r"\b(?:fasting\s+(?:blood\s+)?(?:sugar|glucose)|fbs|fpg)[:\s]*(\d{2,3})",
+        r"\b(?:fasting\s+(?:blood\s+)?(?:sugar|glucose)|fbs|fpg)" + _L + r"(\d{2,3})",
     ],
     "bmi": [
-        r"\b(?:bmi|body mass index)[:\s]*(\d{1,2}(?:\.\d)?)",
+        r"\b(?:bmi|body\s+mass\s+index)" + _L + r"(\d{1,2}(?:\.\d+)?)",
     ],
     # Maximum heart rate only. A resting "HR 72" or "pulse 88" is not MaxHR.
     "max_heart_rate": [
-        r"\b(?:max(?:imum|imal)?|peak)\s+(?:heart\s+rate|hr)\s*(?:achieved|reached)?[:\s]*(?:of\s+)?(\d{2,3})",
-        r"\b(?:heart\s+rate|hr)\s+max(?:imum)?[:\s]*(\d{2,3})",
+        r"\b(?:max(?:imum|imal)?|peak)\s+(?:heart\s+rate|hr)\s*(?:achieved|reached)?" + _L + r"(\d{2,3})",
+        r"\b(?:heart\s+rate|hr)\s+max(?:imum)?" + _L + r"(\d{2,3})",
     ],
     "oldpeak": [
-        r"\b(?:st\s+depression|oldpeak)[:\s]*(?:of\s+)?(\d+(?:\.\d+)?)",
+        r"\b(?:st\s+depression|oldpeak)" + _L + r"(\d+(?:\.\d+)?)",
     ],
 }
+
+_ONES = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+         "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+         "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+         "eighteen": 18, "nineteen": 19}
+_TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60,
+         "seventy": 70, "eighty": 80, "ninety": 90}
+_NUMWORD = re.compile(
+    r"\b(" + "|".join(_TENS) + r")(?:[-\s]+(" + "|".join(k for k in _ONES if 0 < _ONES[k] < 10) + r"))?\b"
+    r"|\b(" + "|".join(_ONES) + r")\b"
+)
+
+
+def _words_to_digits(text: str) -> str:
+    """'fifty five' -> '55', so the numeric patterns see one form."""
+    def sub(m):
+        if m.group(1):
+            return str(_TENS[m.group(1)] + (_ONES[m.group(2)] if m.group(2) else 0))
+        return str(_ONES[m.group(3)])
+    return _NUMWORD.sub(sub, text)
+
 
 _CONDITIONS: Dict[str, list] = {
     "smoking": [
@@ -219,7 +373,7 @@ def _condition(text: str, patterns: list) -> Optional[int]:
 
 
 def _regex_extract(text: str) -> Dict[str, Any]:
-    text_lower = text.lower()
+    text_lower = _words_to_digits(text.lower())
     extracted: Dict[str, Any] = {}
 
     for key, patterns in _NUMERIC.items():
@@ -233,9 +387,9 @@ def _regex_extract(text: str) -> Dict[str, Any]:
                     pass
 
     # Sex: explicit words first; pronouns only when no explicit word exists.
-    if re.search(r"\b(?:female|woman|lady|girl|mrs|ms)\b", text_lower):
+    if re.search(r"\b(?:female|woman|lady|girl|mrs|ms)\b|\b\d{2,3}\s?f\b", text_lower):
         extracted["sex"] = "Female"
-    elif re.search(r"\b(?:male|man|gentleman|boy|mr)\b", text_lower):
+    elif re.search(r"\b(?:male|man|gentleman|boy|mr)\b|\b\d{2,3}\s?m\b", text_lower):
         extracted["sex"] = "Male"
     elif re.search(r"\b(?:she|her)\b", text_lower):
         extracted["sex"] = "Female"
@@ -430,9 +584,9 @@ def parse_clinical_note(note: str, use_bert: bool = True) -> Dict[str, Any]:
     result = _regex_extract(note)
 
     # 2. spaCy Extraction (يطغى على Regex في حالة إيجاد العمر بصياغة معقدة)
-    # Fills a gap only: a value the explicit regex already found is kept.
-    for key, value in _spacy_extract(note).items():
-        result.setdefault(key, value)
+    # The dependency-based reading wins over the regex baseline, which stays
+    # as the fallback when spaCy is not installed.
+    result.update(_spacy_extract(note))
 
     # 3. Merge BERT results (BERT takes precedence for overlapping keys)
     if use_bert:
