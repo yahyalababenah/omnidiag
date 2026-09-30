@@ -4,7 +4,7 @@ OmniDiag — Active Learning / Review Queue API
 Mounted at /api/v4/review in main.py.
 
 Endpoints:
-    GET  /api/v4/review/queue          — List pending review items (doctors)
+    GET  /api/v4/review/queue          — List review items, ?status=pending|reviewed|skipped (doctors)
     POST /api/v4/review/{id}/annotate  — Submit expert label
     POST /api/v4/review/{id}/skip      — Skip/dismiss a review item
     GET  /api/v4/review/stats          — Queue statistics
@@ -47,10 +47,11 @@ async def list_review_queue(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     disease: Optional[str] = Query(None),
+    status_filter: str = Query("pending", alias="status", pattern="^(pending|reviewed|skipped)$"),
     current_user: User = Depends(require_role(*CLINICAL_ROLES)),
     db: AsyncSession = Depends(get_db),
 ):
-    filters = [ReviewQueue.status == "pending"]
+    filters = [ReviewQueue.status == status_filter]
     if disease:
         # Join Prediction to filter by disease
         q_count = (
@@ -63,8 +64,8 @@ async def list_review_queue(
             select(ReviewQueue)
             .join(Prediction, ReviewQueue.prediction_id == Prediction.id)
             .where(and_(*filters, Prediction.disease == disease))
-            .options(selectinload(ReviewQueue.prediction))
-            .order_by(ReviewQueue.created_at.desc())
+            .options(selectinload(ReviewQueue.prediction), selectinload(ReviewQueue.reviewer))
+            .order_by((ReviewQueue.reviewed_at if status_filter != "pending" else ReviewQueue.created_at).desc())
             .offset((page - 1) * limit)
             .limit(limit)
         )
@@ -77,8 +78,8 @@ async def list_review_queue(
         q_rows = (
             select(ReviewQueue)
             .where(and_(*filters))
-            .options(selectinload(ReviewQueue.prediction))
-            .order_by(ReviewQueue.created_at.desc())
+            .options(selectinload(ReviewQueue.prediction), selectinload(ReviewQueue.reviewer))
+            .order_by((ReviewQueue.reviewed_at if status_filter != "pending" else ReviewQueue.created_at).desc())
             .offset((page - 1) * limit)
             .limit(limit)
         )
@@ -96,6 +97,8 @@ async def list_review_queue(
             "notes": rq.notes,
             "label": rq.label,
             "status": rq.status,
+            "reviewed_at": rq.reviewed_at.isoformat() if rq.reviewed_at else None,
+            "reviewer": (rq.reviewer.email if rq.reviewer else None),
             "created_at": rq.created_at.isoformat() if rq.created_at else None,
             "disease": pred.disease if pred else None,
             "model_prediction": pred.prediction if pred else None,

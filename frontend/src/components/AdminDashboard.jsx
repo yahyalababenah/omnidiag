@@ -312,6 +312,8 @@ function AnnotationQueueTable({ token }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [statusTab, setStatusTab] = useState('pending') // pending | reviewed | skipped
+  const [stats, setStats] = useState(null)
   const [annotating, setAnnotating] = useState({}) // { [itemId]: 0|1|'skip' }
   // The reviewer's reasoning, per row. The endpoint has always accepted a
   // `notes` field; until now nothing sent one and nothing stored it, so the
@@ -322,18 +324,20 @@ function AnnotationQueueTable({ token }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_V4}/review/queue?page=${p}&limit=10`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const headers = { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${API_V4}/review/queue?page=${p}&limit=10&status=${statusTab}`, { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setData(await res.json())
       setPage(p)
+      // Counters are best-effort: a failure here must not hide the table.
+      fetch(`${API_V4}/review/stats`, { headers })
+        .then(r => (r.ok ? r.json() : null)).then(setStats).catch(() => {})
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, statusTab])
 
   useEffect(() => { load(1) }, [load])
 
@@ -374,10 +378,19 @@ function AnnotationQueueTable({ token }) {
         </button>
       </div>
       <div className="card-body">
+        <div className="flex gap-1 mb-3">
+          {['pending', 'reviewed', 'skipped'].map(t => (
+            <button key={t} onClick={() => setStatusTab(t)}
+              className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                statusTab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {t}{stats?.[t] != null ? ` (${stats[t]})` : ''}
+            </button>
+          ))}
+        </div>
         {loading && <p className="text-sm text-gray-400 py-4 text-center">Loading…</p>}
         {error && <p className="text-sm text-red-500 py-4">{error}</p>}
         {!loading && !error && items.length === 0 && (
-          <p className="text-sm text-gray-400 py-4 text-center">No pending items in the review queue.</p>
+          <p className="text-sm text-gray-400 py-4 text-center">No {statusTab} items in the review queue.</p>
         )}
         {items.length > 0 && (
           <>
@@ -390,7 +403,7 @@ function AnnotationQueueTable({ token }) {
                   <th className="py-2 px-2 text-gray-500 font-medium">Entropy</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Queued</th>
                   <th className="py-2 px-2 text-gray-500 font-medium">Note</th>
-                  <th className="py-2 px-2 text-gray-500 font-medium">Actions</th>
+                  <th className="py-2 px-2 text-gray-500 font-medium">{statusTab === 'pending' ? 'Actions' : 'Outcome'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -438,6 +451,18 @@ function AnnotationQueueTable({ token }) {
                       <td className="py-2 px-2 text-gray-400">
                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : '—'}
                       </td>
+                      {statusTab !== 'pending' ? (<>
+                      <td className="py-2 px-2 text-gray-600 max-w-[16rem] truncate" title={item.notes ?? ''}>{item.notes ?? '—'}</td>
+                      <td className="py-2 px-2">
+                        {statusTab === 'reviewed' && (
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.label === 1 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                            {item.label === 1 ? 'Positive' : 'Negative'}
+                          </span>
+                        )}
+                        <span className="ml-2 text-[10px] text-gray-400">
+                          {item.reviewer ?? '—'}{item.reviewed_at ? ` · ${new Date(item.reviewed_at).toLocaleString()}` : ''}
+                        </span>
+                      </td></>) : (<>
                       <td className="py-2 px-2">
                         {/* Optional. Saved with the label, not instead of it. */}
                         <input
@@ -470,14 +495,14 @@ function AnnotationQueueTable({ token }) {
                             title="Skip this item"
                           >Skip</button>
                         </div>
-                      </td>
+                      </td></>)}
                     </tr>
                   )
                 })}
               </tbody>
             </table>
             <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
-              <span>{total} item{total !== 1 ? 's' : ''} pending</span>
+              <span>{total} item{total !== 1 ? 's' : ''} {statusTab}</span>
               <div className="flex gap-1">
                 <button onClick={() => load(page - 1)} disabled={page <= 1} className="btn-secondary py-1 px-2 disabled:opacity-40">
                   <ChevronLeft className="w-3.5 h-3.5" />
