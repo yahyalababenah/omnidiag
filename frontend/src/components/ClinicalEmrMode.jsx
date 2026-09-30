@@ -35,6 +35,7 @@ import ClinicalNotesInput from './ClinicalNotesInput';
 import ClinicalReportModal from './ClinicalReportModal';
 import ThresholdBar from './ThresholdBar';
 import ClinicalActionPlan from './ClinicalActionPlan';
+import ReviewLabelBox from './ReviewLabelBox';
 import { getDisplayThreshold } from '../constants/thresholds';
 import { SCREENING_LABEL, screeningText } from '../utils/screening';
 import {
@@ -740,6 +741,9 @@ export default function ClinicalEmrMode() {
                     {/* Next clinical step; renders nothing for a module whose
                         response carries no plan (heart). */}
                     <ClinicalActionPlan plan={result.clinical_action_plan} />
+
+                    {/* Human-in-the-loop: only when the model queued this case. */}
+                    <ReviewLabelBox key={result.review_id} reviewId={result.review_id} />
 
                     {/* Key metrics row */}
                     <div className="grid grid-cols-3 gap-4">

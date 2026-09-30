@@ -84,6 +84,10 @@ flwr>=1.0.0
 # ── Clinical NLP (BioBERT notes parser) ───────────────────────────────────
 # Used by backend/nlp/notes_parser.py; falls back to regex if unavailable.
 transformers>=4.30.0
+# spaCy age matcher (optional: the parser degrades to regex without it).
+# The model is a wheel, not on PyPI, so it is pinned by URL.
+spacy>=3.8,<3.9
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
 # ── Testing ────────────────────────────────────────────────────────────────
 pytest>=8.0.0

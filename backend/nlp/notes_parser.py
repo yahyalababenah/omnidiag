@@ -15,12 +15,91 @@ Missing values are omitted so the frontend can prompt the user to fill them in.
 Supported diseases: heart_disease, diabetes
 """
 
-import re
 import logging
 import os
+import re
 from typing import Any, Dict, Optional
 
+try:
+    import spacy
+    from spacy.matcher import Matcher
+except ImportError:  # spaCy is optional: without it the regex baseline still runs
+    spacy = None
+    Matcher = None
+
 log = logging.getLogger("omnidiag.nlp")
+
+# ---------------------------------------------------------------------------
+# spaCy NLP Logic (Lazy-loaded)
+# ---------------------------------------------------------------------------
+_nlp_spacy = None
+_age_matcher = None
+
+
+def _get_spacy_pipeline():
+    global _nlp_spacy, _age_matcher
+    if _nlp_spacy is None:
+        if spacy is None:
+            _nlp_spacy = "unavailable"
+            return None
+        try:
+            log.info("Loading spaCy en_core_web_sm model...")
+            # استخدم نموذج اللغة الإنجليزية الصغير لتوفير استهلاك الذاكرة
+            _nlp_spacy = spacy.load("en_core_web_sm")
+            _age_matcher = Matcher(_nlp_spacy.vocab)
+
+            # النمط الأول: يتعرف على جمل مثل "the age is 50" أو "Age: 50"
+            # (at most one linking token: "age is 50", "age: 50", "age of 50")
+            pattern1 = [
+                {"LOWER": "age"},
+                {"LOWER": {"IN": ["is", "was", "of", ":", "="]}, "OP": "?"},
+                {"LIKE_NUM": True},
+            ]
+
+            # النمط الثاني: "50 years old" فقط. بدون "old" تصبح "smoked 20 years"
+            # أو "diabetic for 10 years" عمرًا خاطئًا.
+            pattern2 = [
+                {"LIKE_NUM": True},
+                {"LOWER": {"IN": ["year", "years", "yr", "yrs"]}},
+                {"LOWER": "old"},
+            ]
+
+            _age_matcher.add("AGE_PATTERNS", [pattern1, pattern2])
+            log.info("spaCy pipeline ready")
+        except Exception as exc:
+            log.warning(f"spaCy model not found or failed to load: {exc!r}")
+            _nlp_spacy = "unavailable"
+
+    return _nlp_spacy if _nlp_spacy != "unavailable" else None
+
+
+def _spacy_extract(text: str) -> dict:
+    nlp = _get_spacy_pipeline()
+    if nlp is None:
+        return {}
+
+    doc = nlp(text)
+    extracted = {}
+
+    # 1. استخراج العمر باستخدام Matcher
+    matches = _age_matcher(doc)
+    for match_id, start, end in matches:
+        span = doc[start:end]
+        # البحث عن الرقم الفعلي داخل التطابق الذي وجدناه
+        for token in span:
+            if token.like_num:
+                try:
+                    value = float(token.text)
+                except ValueError:
+                    continue  # a number word such as "fifty"
+                if 0 < value <= 120:
+                    extracted["age"] = value
+                    break
+        if "age" in extracted:
+            break  # نكتفي بأول عمر نجده لتجنب التكرار
+
+    return extracted
+
 
 # ---------------------------------------------------------------------------
 # Regex patterns for the rule-based fallback
@@ -116,11 +195,11 @@ def _negated(text: str, start: int) -> bool:
     "non-"/"non " (non-smoker), or a negation cue appears earlier in the
     same clause (clauses end at . ; , : newline or " but ").
     """
-    if re.search(r"\bnon[-\s]?$", text[max(0, start - 4):start], re.IGNORECASE):
+    if re.search(r"\bnon[-\s]?$", text[max(0, start - 4) : start], re.IGNORECASE):
         return True
-    clause_start = max(
-        text.rfind(ch, 0, start) for ch in (".", ";", ",", ":", "\n")
-    ) + 1
+    clause_start = (
+        max(text.rfind(ch, 0, start) for ch in (".", ";", ",", ":", "\n")) + 1
+    )
     but = text.lower().rfind(" but ", clause_start, start)
     if but >= 0:
         clause_start = but + 5
@@ -202,6 +281,7 @@ def _get_ner_pipeline():
     if _ner_pipeline is None:
         try:
             from transformers import pipeline  # type: ignore
+
             log.info(f"Loading clinical NER model: {_NER_MODEL}")
             _ner_pipeline = pipeline(
                 "ner",
@@ -260,6 +340,7 @@ def _bert_extract(text: str) -> Dict[str, Any]:
 # Maps generic extracted keys → schema field names for each disease
 # ---------------------------------------------------------------------------
 
+
 def _brfss_age_bucket(age: float) -> int:
     """BRFSS _AGEG5YR: 1 = 18-24, 2 = 25-29, ... 12 = 75-79, 13 = 80+."""
     age = int(age)
@@ -269,36 +350,38 @@ def _brfss_age_bucket(age: float) -> int:
 
 
 _HEART_DISEASE_MAP = {
-    "age":             ("Age",            lambda v: int(v)),
-    "sex":             ("Sex",            lambda v: "M" if str(v).lower().startswith("m") else "F"),
-    "bp_systolic":     ("RestingBP",      lambda v: int(v)),
-    "cholesterol":     ("Cholesterol",    lambda v: int(v)),
-    "max_heart_rate":  ("MaxHR",          lambda v: int(v)),
-    "oldpeak":         ("Oldpeak",        lambda v: float(v)),
-    "fasting_glucose": ("FastingBS",      lambda v: 1 if float(v) > 120 else 0),
-    "chest_pain_type": ("ChestPainType",  lambda v: v),
-    "resting_ecg":     ("RestingECG",     lambda v: v),
+    "age": ("Age", lambda v: int(v)),
+    "sex": ("Sex", lambda v: "M" if str(v).lower().startswith("m") else "F"),
+    "bp_systolic": ("RestingBP", lambda v: int(v)),
+    "cholesterol": ("Cholesterol", lambda v: int(v)),
+    "max_heart_rate": ("MaxHR", lambda v: int(v)),
+    "oldpeak": ("Oldpeak", lambda v: float(v)),
+    "fasting_glucose": ("FastingBS", lambda v: 1 if float(v) > 120 else 0),
+    "chest_pain_type": ("ChestPainType", lambda v: v),
+    "resting_ecg": ("RestingECG", lambda v: v),
     "exercise_angina": ("ExerciseAngina", lambda v: "Y" if int(v) else "N"),
 }
 
 # Order matters: a later key overwrites an earlier one mapped to the same
 # field, so a stated hypertension history wins over a single BP reading.
 _DIABETES_MAP = {
-    "age":                   ("Age",                 _brfss_age_bucket),
-    "bmi":                   ("BMI",                 lambda v: float(v)),
-    "bp_systolic":           ("HighBP",              lambda v: 1 if int(v) >= 130 else 0),
-    "cholesterol":           ("HighChol",            lambda v: 1 if int(v) >= 200 else 0),
-    "sex":                   ("Sex",                 lambda v: 1 if str(v).lower().startswith("m") else 0),
-    "hypertension":          ("HighBP",              lambda v: int(v)),
-    "heart_disease_flag":    ("HeartDiseaseorAttack",lambda v: int(v)),
-    "stroke_flag":           ("Stroke",              lambda v: int(v)),
-    "smoking_flag":          ("Smoker",              lambda v: int(v)),
+    "age": ("Age", _brfss_age_bucket),
+    "bmi": ("BMI", lambda v: float(v)),
+    "bp_systolic": ("HighBP", lambda v: 1 if int(v) >= 130 else 0),
+    "cholesterol": ("HighChol", lambda v: 1 if int(v) >= 200 else 0),
+    "sex": ("Sex", lambda v: 1 if str(v).lower().startswith("m") else 0),
+    "hypertension": ("HighBP", lambda v: int(v)),
+    "heart_disease_flag": ("HeartDiseaseorAttack", lambda v: int(v)),
+    "stroke_flag": ("Stroke", lambda v: int(v)),
+    "smoking_flag": ("Smoker", lambda v: int(v)),
 }
 
 
 def map_to_disease_schema(extracted: Dict[str, Any], disease: str) -> Dict[str, Any]:
     """Map generic NLP-extracted fields to disease-specific schema field names."""
-    mapping = {"heart_disease": _HEART_DISEASE_MAP, "diabetes": _DIABETES_MAP}.get(disease, {})
+    mapping = {"heart_disease": _HEART_DISEASE_MAP, "diabetes": _DIABETES_MAP}.get(
+        disease, {}
+    )
     result: Dict[str, Any] = {}
     for generic_key, (schema_key, transform) in mapping.items():
         if generic_key in extracted:
@@ -316,7 +399,10 @@ def bert_status() -> Dict[str, Any]:
     model itself is downloaded on first use.
     """
     import importlib.util
-    missing = [m for m in ("transformers", "torch") if importlib.util.find_spec(m) is None]
+
+    missing = [
+        m for m in ("transformers", "torch") if importlib.util.find_spec(m) is None
+    ]
     return {
         "available": not missing,
         "model": _NER_MODEL,
@@ -326,11 +412,12 @@ def bert_status() -> Dict[str, Any]:
 
 def parse_clinical_note(note: str, use_bert: bool = True) -> Dict[str, Any]:
     """
-    Parse a free-text clinical note and extract structured features.
+    Parse a free-text clinical note and extract structured features using a hybrid NLP pipeline.
 
     Args:
         note:      The clinical note text.
-        use_bert:  Whether to attempt BioBERT NER (falls back to regex on failure).
+        use_bert:  Whether to attempt BioBERT NER. The extraction pipeline merges
+                results from baseline Regex, spaCy pattern matching, and BioBERT.
 
     Returns:
         Dict of extracted feature_name → value. Only present for detected values.
@@ -339,10 +426,15 @@ def parse_clinical_note(note: str, use_bert: bool = True) -> Dict[str, Any]:
     if not note or not note.strip():
         return {}
 
-    # Regex baseline (always runs)
+    # 1. Regex baseline (always runs)
     result = _regex_extract(note)
 
-    # Merge BERT results (BERT takes precedence for overlapping keys)
+    # 2. spaCy Extraction (يطغى على Regex في حالة إيجاد العمر بصياغة معقدة)
+    # Fills a gap only: a value the explicit regex already found is kept.
+    for key, value in _spacy_extract(note).items():
+        result.setdefault(key, value)
+
+    # 3. Merge BERT results (BERT takes precedence for overlapping keys)
     if use_bert:
         bert_result = _bert_extract(note)
         result.update(bert_result)
@@ -409,7 +501,11 @@ def language_support(note: str) -> Dict[str, Any]:
     """
     script = detect_script(note)
     if script == "arabic":
-        return {"script": script, "supported": False, "message": UNSUPPORTED_LANGUAGE_MESSAGE}
+        return {
+            "script": script,
+            "supported": False,
+            "message": UNSUPPORTED_LANGUAGE_MESSAGE,
+        }
     if script == "mixed":
         return {"script": script, "supported": False, "message": MIXED_LANGUAGE_MESSAGE}
     return {"script": script, "supported": True, "message": None}

@@ -96,6 +96,14 @@ class OmniDiagApi {
    * be attached to. It is a query parameter: the response is identical with
    * or without it.
    */
+  /** POST /api/v4/review/{id}/annotate — clinician's ground-truth label (0/1). */
+  annotateReview(reviewId, label, notes = null) {
+    return this._fetch(`/api/v4/review/${reviewId}/annotate`, {
+      method: 'POST',
+      body: JSON.stringify({ label, notes }),
+    });
+  }
+
   predict(disease, patientData, patientId = null) {
     return this._fetch(`/api/v4/${disease}/predict${this._patientQuery(patientId)}`, {
       method: 'POST',

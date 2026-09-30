@@ -552,6 +552,7 @@ async def predict_disease(
                 # A threshold module (diabetes) keeps the entropy rule unchanged:
                 # it publishes no per-patient uncertainty, so proximity to its
                 # boundary is the only signal available.
+                queued_review_id = None
                 if result.get("decision") is not None:
                     queue_row = result.get("decision") == "uncertain"
                     uncertainty_score = 1.0 if queue_row else 0.0
@@ -574,8 +575,14 @@ async def predict_disease(
                         decision_threshold=decision_threshold,
                     )
                     db.add(rq)
+                    queued_review_id = rq.id
 
                 await db.commit()
+                # Only after the commit: an id that was never persisted would
+                # send the clinician's label to a row that does not exist.
+                # The UI shows Positive/Negative buttons when this is present.
+                if queued_review_id:
+                    result["review_id"] = queued_review_id
             except Exception as _exc:
                 log.warning("predict: failed to persist prediction record — %s", _exc)
 

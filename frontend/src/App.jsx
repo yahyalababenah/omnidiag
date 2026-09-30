@@ -19,6 +19,7 @@ import DiseaseSelector from './components/DiseaseSelector';
 import EngineeringMode from './components/EngineeringMode';
 import ClinicalEmrMode from './components/ClinicalEmrMode';
 import AdminDashboard from './components/AdminDashboard';
+import ReviewQueuePanel from './components/ReviewQueuePanel';
 import BatchUpload from './components/BatchUpload';
 import ComparisonMode from './components/ComparisonMode';
 import OfflineBanner from './components/OfflineBanner';
@@ -30,6 +31,7 @@ const CLINICAL_VIEWS = [
   { id: 'clinical',    label: 'Clinical EMR Mode',   icon: Stethoscope,    component: ClinicalEmrMode },
   { id: 'batch',       label: 'Batch Prediction',    icon: Table2,         component: BatchUpload },
   { id: 'comparison',  label: 'Patient Comparison', icon: ArrowLeftRight, component: ComparisonMode },
+  { id: 'review',      label: 'Review Queue',       icon: Stethoscope,    component: ReviewQueuePanel, clinicalOnly: true },
 ];
 
 function AppContent() {
@@ -41,6 +43,7 @@ function AppContent() {
   const { dark, toggle: toggleTheme } = useTheme();
   const { currentDiseaseInfo }        = useDisease();
 
+  const isClinician = user?.roles?.some(r => ['doctor', 'nurse', 'admin', 'super_admin'].includes(typeof r === 'string' ? r : r?.name)) ?? false;
   const isAdminView = activeView === 'admin';
 
   let ActiveComponent = CLINICAL_VIEWS.find((v) => v.id === activeView)?.component || EngineeringMode;
@@ -105,7 +108,7 @@ function AppContent() {
 
         {/* Navigation */}
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
-          {CLINICAL_VIEWS.map((view) => {
+          {CLINICAL_VIEWS.filter((v) => !v.clinicalOnly || isClinician).map((view) => {
             const Icon = view.icon;
             const isActive = activeView === view.id;
             return (
