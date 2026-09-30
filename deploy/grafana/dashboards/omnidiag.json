@@ -78,7 +78,7 @@
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "histogram_quantile(0.95, rate(omnidiag_request_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(omnidiag_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p95 {{endpoint}}"
         }
       ]
