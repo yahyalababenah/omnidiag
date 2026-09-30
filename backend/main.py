@@ -81,7 +81,7 @@ from backend.middleware.audit import AuditMiddleware
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.rate_limit import limiter, LIMIT_CLINICAL, LIMIT_ADMIN
 from backend.monitoring.routes import router as monitoring_router
-from backend.monitoring.metrics import record_prediction, record_batch
+from backend.monitoring.metrics import record_prediction, record_batch, record_cache, MetricsMiddleware
 
 # Feature modules — imported lazily inside endpoints; safe stubs defined here
 # so the rest of the file doesn't need try/except everywhere.
@@ -315,6 +315,10 @@ app.add_middleware(AuditMiddleware)
 _enforce_https = os.getenv("ENFORCE_HTTPS", "true").lower() == "true"
 app.add_middleware(SecurityHeadersMiddleware, enforce_https=_enforce_https)
 
+# Request latency + in-flight gauge for the Grafana dashboard. Added last so it
+# is the outermost layer and times everything beneath it, CORS and audit included.
+app.add_middleware(MetricsMiddleware)
+
 # =========================================================================
 # المسارات العامة (System)
 # =========================================================================
@@ -486,6 +490,7 @@ async def predict_disease(
             await cache_set(cache_key, result, ttl=PREDICT_TTL_SECONDS)
 
         response.headers["Cache-Hit"] = "true" if cache_hit else "false"
+        record_cache(disease, cache_hit)
 
         # Record Prometheus metrics. Counted on cache hits too: the metric
         # measures predictions served to clinicians, not model invocations.

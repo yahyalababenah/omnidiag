@@ -153,6 +153,55 @@ def record_drift(disease: str, drift_share: float) -> None:
     DRIFT_SHARE.labels(disease=disease).set(drift_share)
 
 
+def record_cache(disease: str, hit: bool) -> None:
+    """Count one prediction-cache lookup. A no-op when prometheus_client is absent."""
+    if not _prometheus_available:
+        return
+    (CACHE_HITS if hit else CACHE_MISSES).labels(disease=disease).inc()
+
+
+class MetricsMiddleware:
+    """Times every HTTP request and tracks how many are in flight.
+
+    REQUEST_DURATION and ACTIVE_REQUESTS were registered and charted on the
+    Grafana dashboard but nothing ever wrote to them, so both panels were empty.
+
+    The `endpoint` label is the matched route template (`/api/v4/{disease}/predict`),
+    never the raw path, so label cardinality stays bounded; a request that
+    matched no route is `unmatched`. `/metrics` itself is not timed. Pure ASGI
+    rather than BaseHTTPMiddleware, so it cannot interfere with streamed bodies.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not _prometheus_available or scope.get("path") == "/metrics":
+            await self.app(scope, receive, send)
+            return
+
+        import time
+        status = {"code": 500}
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                status["code"] = message["status"]
+            await send(message)
+
+        ACTIVE_REQUESTS.inc()
+        start = time.perf_counter()
+        try:
+            await self.app(scope, receive, send_wrapper)
+        finally:
+            ACTIVE_REQUESTS.dec()
+            route = scope.get("route")
+            REQUEST_DURATION.labels(
+                method=scope.get("method", "GET"),
+                endpoint=getattr(route, "path", None) or "unmatched",
+                status=str(status["code"]),
+            ).observe(time.perf_counter() - start)
+
+
 def get_metrics_response():
     """Return (body_bytes, content_type) for /metrics endpoint."""
     if not _prometheus_available:
