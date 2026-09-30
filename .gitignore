@@ -262,6 +262,17 @@ backups/
 archive/stale_2026-06/
 evaluation_evidence/**/*.png
 
-# Local copies of the heart candidate artifacts, brought into this worktree only
-# so the heart tests can run. They belong to the heart candidate branch, not here.
+# Retraining candidates: an isolated bundle plus the merged training CSV, which
+# carries patient rows out of the review queue. Never committed; the shipped
+# bundle is built in the image and these are evidence for a human decision.
 models/heart_disease/candidates/
+
+# MLflow local artifact store, created beside mlruns.db by any local run.
+mlruns/
+
+# Local screen recordings of demo/verification sessions. Never committed.
+recordings/
+
+# Generated one-off comparison reports (candidate vs. shipped). Regenerable
+# from models/heart_disease/candidates/<run_id>/candidate_card.json.
+reports/

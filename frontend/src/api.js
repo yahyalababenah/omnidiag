@@ -4,6 +4,15 @@ export const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidi
 const REQUEST_TIMEOUT_MS = 120_000;
 
 /**
+ * A 502/503/504 comes from the host's proxy, not from the model: on the free
+ * Space tier roughly one request in four is rejected there before it reaches
+ * the app (the app's own log shows only 200s for the same calls). Retrying
+ * with a short back-off almost always lands on a healthy path.
+ */
+const RETRY_STATUSES = [502, 503, 504];
+const RETRY_DELAYS_MS = [400, 1000, 2000];
+
+/**
  * Turn an error body into readable text. `detail` can be a string, an
  * object with `error`, or a pydantic list of {loc, msg}; passing the list
  * straight to `new Error()` rendered as "[object Object],[object Object]".
@@ -39,7 +48,19 @@ class OmniDiagApi {
     return this._token ? { Authorization: `Bearer ${this._token}` } : {};
   }
 
+  /** One request, retried on the proxy-level failures listed in RETRY_STATUSES. */
   async _fetch(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this._fetchOnce(path, options, timeoutMs);
+      } catch (err) {
+        if (!RETRY_STATUSES.includes(err.status) || attempt >= RETRY_DELAYS_MS.length) throw err;
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+      }
+    }
+  }
+
+  async _fetchOnce(path, options, timeoutMs) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -139,20 +160,11 @@ class OmniDiagApi {
   }
 
   /** POST /api/v4/{disease}/counterfactuals */
-  async counterfactuals(disease, patientData) {
-    const call = () => this._fetch(`/api/v4/${disease}/counterfactuals`, {
+  counterfactuals(disease, patientData) {
+    return this._fetch(`/api/v4/${disease}/counterfactuals`, {
       method: 'POST',
       body: JSON.stringify(patientData),
     });
-    try {
-      return await call();
-    } catch (err) {
-      // A 502/503/504 comes from the host's proxy while the container restarts
-      // or wakes, not from the model. The request is idempotent, so retry once.
-      if (![502, 503, 504].includes(err.status)) throw err;
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      return call();
-    }
   }
 
   /** POST /api/v4/generate-report */
