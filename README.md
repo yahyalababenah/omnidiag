@@ -15,7 +15,6 @@ pinned: false
 [![React 18](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react)](frontend/package.json)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql)](docker-compose.yml:23)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis)](backend/cache.py:39)
-[![XGBoost](https://img.shields.io/badge/XGBoost-2.x-FF6600)](backend/model_loader.py)
 [![SHAP](https://img.shields.io/badge/SHAP-0.42%2B-800080)](backend/monitoring/metrics.py:37)
 [![MLflow](https://img.shields.io/badge/MLflow-2.10%2B-0194E2?logo=mlflow)](backend/monitoring/mlflow_tracker.py:63)
 [![Prometheus](https://img.shields.io/badge/Prometheus-2.51-E6522C?logo=prometheus)](deploy/prometheus.yml)
@@ -24,6 +23,12 @@ pinned: false
 [![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions)](.github/workflows/ci.yml)
 
 ---
+
+- **OmniDiag** is a config-driven, multi-disease clinical decision support system with SHAP explanations, human-in-the-loop review and an admin dashboard.
+- **Shipped modules:** heart disease (CAD) and NHANES dysglycaemia.
+- **BRFSS diabetes is superseded** and is not a shipped module.
+- **Not live:** the MLflow tracking server, Evidently drift reports and Grafana dashboards.
+- **Federated learning** is a simulation in the research repo; the Flower prototype here is superseded.
 
 **OmniDiag** is a config-driven, multi-disease clinical decision support system built for healthcare professionals. It serves per-disease models behind a unified FastAPI surface, with SHAP-based explainability, a DiCE-inspired counterfactual engine, a human-in-the-loop active learning pipeline, DeepSeek LLM clinical report generation, Prometheus metrics, and Kubernetes deployment with horizontal pod autoscaling.
 
@@ -327,6 +332,8 @@ flowchart LR
     K --> N[Medical: domain-specific markers]
 ```
 
+*Simplified; the shipped heart and NHANES modules return a conformal decision, not an entropy-based or threshold-based one (see modules table).*
+
 ### Active Learning Lifecycle
 
 ```mermaid
@@ -342,6 +349,8 @@ flowchart LR
     J --> K["MLflow run + candidate dir\nNOTHING is replaced or reloaded"]
     K --> L["Human compares the run and decides on promotion"]
 ```
+
+*Simplified; the shipped heart and NHANES modules return a conformal decision, not an entropy-based or threshold-based one (see modules table).*
 
 ---
 
@@ -662,7 +671,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │       ├── datasources/prometheus.yml    # Grafana datasource provisioning
 │       └── dashboards/omnidiag.json      # Pre-built dashboard (predictions, latency, drift)
 │
-├── tests/                                # 41 test modules (SQLite in-memory, no Redis needed)
+├── tests/                                # 48 test modules (SQLite in-memory, no Redis needed)
 │   ├── conftest.py                       # Fixtures: DB, cache, mocked router, seeded roles
 │   ├── test_auth.py
 │   ├── test_rbac.py
@@ -765,16 +774,7 @@ npm run dev   # http://localhost:5173
 
 ### Federated Learning
 
-```bash
-# Central aggregation server
-python -m backend.federated.aggregator --rounds 10 --min-clients 2
-
-# Each hospital site — patient data stays local
-python -m backend.federated.client \
-  --server-address <central>:8080 \
-  --disease heart_disease \
-  --data-path /local/ehr_export.csv
-```
+Superseded prototype (Flower/FedAvg); see the Federated Learning section.
 
 ---
 
@@ -898,7 +898,8 @@ Two different prefixes are actually in use — verified live against a running i
 | Component | Technology | Purpose |
 |---|---|---|
 | API Framework | [FastAPI 0.100+](backend/main.py:1) | Async Python web framework |
-| Model v1 (CAD) | [XGBoost 2.x](backend/model_loader.py) | Single gradient-boosted classifier |
+| Model (CAD) | Spline-GLM + Venn-Abers + Mondrian conformal | Heart module |
+| Model (Dysglycaemia) | EBM + Platt + age-band conformal | NHANES dysglycaemia module |
 | Model v2 (DM) | [Stacking Ensemble](backend/ensemble_loader.py) | XGBoost + LightGBM + RF + LR meta |
 | Explainability | [SHAP 0.42+](backend/monitoring/metrics.py:37) | TreeExplainer → structured JSON |
 | Database ORM | [SQLAlchemy 2.0+](backend/database.py) | Async session + declarative base |
