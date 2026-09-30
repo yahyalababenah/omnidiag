@@ -520,6 +520,77 @@ function AnnotationQueueTable({ token }) {
   )
 }
 
+// ── Retrain from clinician labels ─────────────────────────────────────────────
+
+// Heart only: it builds a CANDIDATE and replaces nothing. The other module's
+// retrain path is not offered here because it does not update a model the
+// live ensemble reads.
+function RetrainPanel({ token }) {
+  const [minSamples, setMinSamples] = useState(5)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
+  async function run() {
+    if (!window.confirm('Build a heart-disease retraining candidate from the clinician-labelled cases? The live model is not changed.')) return
+    setBusy(true); setError(null); setResult(null)
+    try {
+      setResult(await apiFetch('/admin/retrain', token, {
+        method: 'POST',
+        body: JSON.stringify({ disease: 'heart_disease', min_samples: Number(minSamples) || 5 }),
+      }))
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const ok = result?.status === 'success'
+  return (
+    <div className="card mt-6">
+      <div className="card-header">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <RefreshCw className="w-5 h-5 text-primary-600" /> Retrain from clinician labels
+        </h2>
+      </div>
+      <div className="card-body space-y-3">
+        <p className="text-xs text-gray-500">
+          Heart disease. Uses the cases doctors labelled (Reviewed tab) together with the original 920 UCI patients to
+          build a <b>candidate</b> model. The live model is <b>not</b> replaced: the run is logged in MLflow for a human to compare.
+        </p>
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-gray-600">Minimum labelled cases
+            <input type="number" min="1" value={minSamples} onChange={e => setMinSamples(e.target.value)}
+              className="ml-2 w-20 text-xs border border-gray-200 rounded px-2 py-1" />
+          </label>
+          <button onClick={run} disabled={busy} className="btn-primary text-xs disabled:opacity-50">
+            {busy ? 'Building candidate… (can take a while)' : 'Build retraining candidate'}
+          </button>
+        </div>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        {result && (
+          <div className={`rounded-lg border p-3 text-xs space-y-1 ${
+            ok ? 'border-green-200 bg-green-50 text-green-900'
+               : result.status === 'skipped' ? 'border-amber-200 bg-amber-50 text-amber-900'
+               : 'border-red-200 bg-red-50 text-red-900'}`}>
+            <p className="font-semibold capitalize">{result.status}{ok ? ' — candidate built, not promoted' : ''}</p>
+            {result.reason && <p>{result.reason}</p>}
+            {ok && (<>
+              <p>Labelled cases used: {result.samples_used} · rows in training set: {result.rows_total}
+                {result.rows_rejected?.length ? ` · rejected: ${result.rows_rejected.length}` : ''}</p>
+              <p>Decisions changed vs. live model: {result.decisions_changed_total}
+                {' '}(out of uncertain: {result.moved_out_of_uncertain}, into uncertain: {result.moved_into_uncertain})</p>
+              {result.mlflow_run_id && <p>MLflow run: <span className="font-mono">{result.mlflow_run_id}</span></p>}
+              {result.limit && <p className="text-[11px] opacity-80">{result.limit}</p>}
+            </>)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Audit log table ───────────────────────────────────────────────────────────
 
 function AuditLogTable({ token }) {
@@ -966,6 +1037,9 @@ export default function AdminDashboard() {
 
       {/* Annotation / Review Queue */}
       <AnnotationQueueTable token={token} />
+
+      {/* Retrain from the labels above */}
+      <RetrainPanel token={token} />
 
       {/* Audit log */}
       <AuditLogTable token={token} />

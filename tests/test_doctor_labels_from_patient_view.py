@@ -68,3 +68,26 @@ async def test_admin_can_list_reviewed_items(client, doctor_token, admin_token, 
     assert row["reviewer"] and row["reviewed_at"]
     bad = await client.get("/api/v4/review/queue?status=bogus", headers=_auth(admin_token))
     assert bad.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_retrain_route_keeps_candidate_fields_and_is_super_admin_only(client, admin_token, doctor_token, db_tables, monkeypatch):
+    fake = {"status": "success", "disease": "heart_disease", "samples_used": 7,
+            "outcome": "candidate_built_not_promoted", "mlflow_run_id": "abc123",
+            "rows_total": 927, "rows_rejected": [{"index": 1, "reason": "missing Age"}],
+            "moved_out_of_uncertain": 3, "moved_into_uncertain": 1,
+            "decisions_changed_total": 4, "limit": "not validated"}
+
+    async def _fake(db, disease, min_samples):
+        return fake
+    monkeypatch.setattr("backend.active_learning.retrain.run_retrain_pipeline", _fake)
+
+    body = {"disease": "heart_disease", "min_samples": 5}
+    ok = await client.post("/admin/retrain", json=body, headers=_auth(admin_token))
+    assert ok.status_code == 200, ok.text
+    got = ok.json()
+    assert got["mlflow_run_id"] == "abc123" and got["decisions_changed_total"] == 4
+    assert got["outcome"] == "candidate_built_not_promoted" and got["rows_total"] == 927
+
+    denied = await client.post("/admin/retrain", json=body, headers=_auth(doctor_token))
+    assert denied.status_code == 403

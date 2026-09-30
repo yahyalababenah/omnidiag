@@ -331,18 +331,16 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["POST /predict\n(prob = 0.53)"] --> B["prediction_entropy(p)\nH = 0.999"]
-    B --> C{H ≥ 0.88?}
-    C -->|Yes| D["ReviewQueue\nstatus=pending"]
-    C -->|No| E[Return to client]
-    D --> F["GET /review/queue\n(doctor reviews)"]
-    F --> G["POST /review/{id}/annotate\nlabel=0"]
+    A["POST /predict\n(doctor, Clinical EMR)"] --> B{"Model unsure?\nheart: decision = uncertain\ndiabetes: entropy ≥ 0.88"}
+    B -->|No| E[Return to client]
+    B -->|Yes| D["ReviewQueue status=pending\nresponse carries review_id"]
+    D --> F["Patient view: Positive / Negative buttons\n(or Review Queue tab)"]
+    F --> G["POST /review/{id}/annotate\nlabel + notes"]
     G --> H["status=reviewed"]
-    H --> I["run_retrain_pipeline()\nget_annotated_samples()"]
-    I --> J["retrain_xgb()\nxgb_model= param\n20 boost rounds"]
-    J --> K["Model backup .bak.pkl"]
-    K --> L["ModelLoader.reload(disease)"]
-    L --> M["log_model_info()\nMLflow run"]
+    H --> I["Admin dashboard → Retrain from clinician labels\nPOST /admin/retrain (super_admin)"]
+    I --> J["Heart: candidate = 920 UCI rows + labelled rows\nrebuilt by stack.build_bundle()"]
+    J --> K["MLflow run + candidate dir\nNOTHING is replaced or reloaded"]
+    K --> L["Human compares the run and decides on promotion"]
 ```
 
 ---
@@ -357,7 +355,7 @@ Each disease config declares the model architecture, weights paths with fallback
 
 ### RBAC & Security Middleware
 
-[`require_role()`](backend/auth/rbac.py:39) is a FastAPI dependency factory that enforces role membership before any route handler executes. It reads `current_user.roles` (loaded eagerly via `lazy="selectin"` on the `User.roles` relationship) and raises HTTP 403 with a structured payload listing required vs. held roles if the intersection is empty. Five roles are seeded at startup: `super_admin`, `admin`, `doctor`, `nurse`, `viewer`. `CLINICAL_ROLES = ("doctor", "nurse", "super_admin")` gates `batch`; retrain and audit endpoints require `("super_admin",)`. **`predict`, `explain` and `counterfactuals` are deliberately open to anonymous callers** — they depend on `get_optional_user` rather than `require_role`, so the public demo can be tried without an account. Results are persisted (and linkable to a patient record) only for authenticated users; everything that reads or writes stored clinical data is role-gated.
+[`require_role()`](backend/auth/rbac.py:39) is a FastAPI dependency factory that enforces role membership before any route handler executes. It reads `current_user.roles` (loaded eagerly via `lazy="selectin"` on the `User.roles` relationship) and raises HTTP 403 with a structured payload listing required vs. held roles if the intersection is empty. Five roles are seeded at startup: `super_admin`, `admin`, `doctor`, `nurse`, `viewer`. `CLINICAL_ROLES = ("doctor", "nurse", "super_admin")` gates `batch`; retrain and audit endpoints require `("super_admin",)`; labelling a review case is open to `doctor`, `nurse` and `super_admin`. **`predict`, `explain` and `counterfactuals` are deliberately open to anonymous callers** — they depend on `get_optional_user` rather than `require_role`, so the public demo can be tried without an account. Results are persisted (and linkable to a patient record) only for authenticated users; everything that reads or writes stored clinical data is role-gated.
 
 [`get_current_user()`](backend/auth/dependencies.py:31) resolves the authenticated identity in priority order: `Authorization: Bearer <JWT>` header → `access_token` HttpOnly cookie → `X-API-Key` header (hash compared against `users.api_key_hash` via `get_user_by_api_key()`). [`get_optional_user()`](backend/auth/dependencies.py:108) returns `None` instead of raising 401, used on endpoints that permit anonymous one-off predictions while persisting results only for authenticated users.
 
@@ -373,9 +371,17 @@ Rate limiting is applied via [`SlowAPI`](backend/rate_limit.py:49) with per-rout
 
 The active learning pipeline consists of three components. [`sampler.py`](backend/active_learning/sampler.py:26) computes binary entropy **around the module's own decision threshold**, not around 0.5: the probability is first mapped by [`centre_on_threshold()`](backend/active_learning/sampler.py) — the prior-shift map with the threshold `t` sent to 0.5, strictly increasing and the identity when `t = 0.5` — and then `H(q) = -q·log₂(q) - (1-q)·log₂(1-q)` is taken. A prediction with `H ≥ 0.88` ([`_DEFAULT_ENTROPY_THRESHOLD`](backend/active_learning/sampler.py)) is queued via [`should_queue_for_review(probability_corrected, decision_threshold)`](backend/active_learning/sampler.py). For diabetes (`t = 0.108184` on the prevalence-corrected scale) that is ≈5–22 %. **Heart no longer takes this path at all:** its module reports a decision rather than a probability against a cut-point, so a row is queued when the model itself answers `uncertain` — `decision == 'uncertain'`, not an entropy score. Routing it through the threshold rule was wrong in both directions and measurably so: with the 0.5 default it left a patient the model had called UNCERTAIN at p = 0.95 unqueued while queueing a confidently decided one at p = 0.52. A queued heart row records `decision_threshold = NULL`, because writing 0.5 there would make the audit trail claim a threshold the model does not have. The distinction matters: a 0.5-centred sampler on the corrected diabetes scale queued 4,789 of 14,139 test rows, every one a confident Positive at ≥ 5× the threshold, and **0 of the 849** rows within ±20 % of the threshold; the threshold-centred sampler queues 3,566 rows including **all 849**. Each queued row records `uncertainty_scale` and `decision_threshold` beside `uncertainty_score`, so scores from different releases are never compared blindly. [`uncertainty_band()`](backend/active_learning/sampler.py) maps the same centred value to `CERTAIN` / `CONFIDENT` / `BORDERLINE` / `UNCERTAIN`. The [`routes.py`](backend/active_learning/routes.py) module exposes `GET /api/v4/review/queue` (paginated, filterable by disease), `POST /api/v4/review/{id}/annotate` (writes `label` and transitions `status → reviewed`), `POST /api/v4/review/{id}/skip`, and `GET /api/v4/review/stats`.
 
-[`run_retrain_pipeline()`](backend/active_learning/retrain.py:149) is the full async pipeline. [`get_annotated_samples()`](backend/active_learning/retrain.py:38) issues a raw SQL JOIN of `review_queue` and `predictions` filtered to `status='reviewed'` and `label IS NOT NULL`. [`retrain_xgb()`](backend/active_learning/retrain.py:84) loads the current `.pkl`, constructs an `xgb.DMatrix`, and calls `xgb.train()` with `xgb_model=model` for 20 incremental boost rounds at lr=0.05 — the existing tree structure is preserved and extended. The old model is renamed to a timestamped `.bak.pkl` before the new weights are written. On success, [`ModelLoader.invalidate()`](backend/model_loader.py) / [`EnsembleModelLoader.invalidate()`](backend/ensemble_loader.py) clears the live router's cached model object so the very next prediction lazy-reloads the new weights from disk — **no process restart required**. This hot-reload path was verified end-to-end (swap in a differently-shaped model file → confirm the next request immediately errors with a feature-mismatch specific to the *new* file, proving it was actually loaded). [`_log_to_mlflow()`](backend/active_learning/retrain.py:137) records the retrain run unconditionally, with a warning-only failure path if MLflow is unreachable — **but it is never reached in practice, because `retrain_xgb()` fails before it for both diseases** (see the Known limitation below). Until Gate 8.6 that made it the only automatic writer to an experiment that consequently stayed empty.
+**Where the doctor labels.** In Clinical EMR Mode, when the model queues a case, the `/predict` response carries a `review_id` (returned only after the row is committed) and [`ReviewLabelBox`](frontend/src/components/ReviewLabelBox.jsx) shows **Positive / Negative** buttons and an optional reasoning box under the result. A doctor, nurse or super_admin labels the case there, without opening the Admin dashboard. Clinical roles also get a **Review Queue** tab in the sidebar for pending cases. The label is stored on the `review_queue` row (`label`, `notes`, `reviewer_id`, `reviewed_at`, `status = reviewed`); a second label on the same case is rejected with 409, and a `viewer` cannot label. The card appears only for cases the model is unsure about, so a confidently decided patient shows no buttons.
 
-🚧 **Known limitation:** `retrain_xgb()` builds its training matrix directly from the raw predict-time `input_features` (`X = np.array([list(feat.values()) for feat in features_list])`) and always reads/writes the single hardcoded path `models/{disease}/omni_diag_xgb_optimized.pkl`. For **heart_disease**, that filename no longer exists at all — the shipped artifact is `models/heart_disease/heart_l3_glm_stack.pkl`, a `dict` bundle holding a Spline-GLM Pipeline with its calibration and conformal state, not a bare `XGBClassifier` — so `retrain_xgb()` fails immediately at its own `if not model_path.exists()` check, before the un-encoded-categorical-strings issue it was originally written to describe is ever reached. It is also built at image build time from the training CSV and verified against a recorded fingerprint, so retraining it from annotated rows is a larger question than swapping a file. No real annotated-sample retrain cycle for heart_disease currently completes, for a different reason than previously documented. For **diabetes**, that same hardcoded path is **not** one of the three files `EnsembleModelLoader` actually loads (`xgb_model.pkl`, `lgb_model.pkl`, `rf_model.pkl`) — so even a numerically successful run retrains a file the live ensemble never reads, a silent no-op. The hot-reload mechanism described above is implemented and tested; connecting it to a disease-aware, correctly-shaped retrain step is the next piece of work here.
+**Admin view.** The Admin dashboard's Annotation Queue has **Pending / Reviewed / Skipped** tabs with counters (`GET /api/v4/review/queue?status=…` and `/review/stats`). Reviewed rows show the label, the doctor's notes, who labelled and when.
+
+**Retrain, from the Admin dashboard.** The *Retrain from clinician labels* panel (super_admin only) calls `POST /admin/retrain` for `heart_disease`. [`run_retrain_pipeline()`](backend/active_learning/retrain.py) reads the reviewed rows through [`get_annotated_samples()`](backend/active_learning/retrain.py) (a JOIN of `review_queue` and `predictions`, `status='reviewed'` and `label IS NOT NULL`) and skips the run when fewer than `min_samples` labels exist. For heart it does **not** update the live model. [`retrain_candidate()`](backend/active_learning/retrain.py) merges the labelled rows into the 920-row UCI training file ([`heart_glm/candidate.py`](backend/heart_glm/candidate.py) rewrites the chest-pain code from the API's clinical coding to the raw UCI coding, and rejects a row with a missing required field rather than imputing it) and rebuilds the whole Spline-GLM + IVAP + Mondrian-conformal stack with the same `stack.build_bundle()` the shipped build uses. The candidate is written to `models/heart_disease/candidates/<mlflow_run_id>/`; the shipped bundle and `reference_scores.json` are read-only and no loader is invalidated. The result reports how many decisions the candidate changes against the live model (moved out of / into `uncertain`) and the MLflow run id. **Promotion is a human decision made by reading that run.** The MLflow run is opened first and the build aborts if MLflow is unavailable.
+
+🚧 **Limits of the heart retrain.**
+- The labelled rows were selected **by model uncertainty**, not sampled, and their patients were not selected into a catheterisation cohort as the UCI patients were. The conformal guarantee is marginal over the mix it was calibrated on, so coverage measured on the candidate does not transfer to the UCI hospitals or to the hospital using it. The candidate is evidence for a decision, not a validated model (the same statement is stored in the candidate card and the MLflow run).
+- Candidates are written to the container's disk. On Hugging Face Spaces that storage is ephemeral and is lost on rebuild; the MLflow record is what to keep.
+- **Diabetes** still goes through the older incremental `retrain_xgb()`, which writes a file the live ensemble does not read (a silent no-op). The Admin retrain panel therefore offers heart only.
+- Nobody has yet run this on labels from real clinicians; it is covered by tests (`tests/test_heart_candidate_retrain.py`, `tests/test_doctor_labels_from_patient_view.py`), not by a clinical trial.
 
 ### DeepSeek LLM Clinical Report Generation
 
@@ -555,7 +561,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   │   ├── diabetes_ebm_conformal.py     # NHANES: EBM + Platt + age-band conformal + What-If
 │   │   ├── stacking_ensemble.py          # BRFSS diabetes stacking ensemble
 │   │   └── sklearn_pipeline.py, sklearn_generic.py
-│   ├── heart_glm/                        # Heart bundle loader (stack.py) + reference scores
+│   ├── heart_glm/                        # Heart bundle loader (stack.py), reference scores, candidate.py (retrain candidate)
 │   ├── diabetes_what_if_levers.py        # NHANES What-If lever policy (own module; imports nothing from backend)
 │   ├── schemas_diabetes_nhanes.py        # NHANES input schema (20 fields, 6 mandatory)
 │   ├── schemas_clinical_action.py        # clinical_action_plan built from the decision
@@ -584,7 +590,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   ├── active_learning/                  # Human-in-the-loop pipeline
 │   │   ├── sampler.py                    # prediction_entropy(), should_queue_for_review()
 │   │   ├── routes.py                     # /review/queue, /review/{id}/annotate, /skip, /stats
-│   │   ├── retrain.py                    # run_retrain_pipeline() — fetch → retrain → reload → log
+│   │   ├── retrain.py                    # run_retrain_pipeline(); heart → retrain_candidate() (candidate only, never promoted)
 │   │   └── diabetes_nhanes_candidate.py  # NHANES active learning: candidate only, never promoted
 │   │
 │   ├── monitoring/                       # MLOps observability
@@ -861,12 +867,12 @@ A legacy `POST /api/v3/predict` (tagged **Legacy** in Swagger) is still mounted 
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/v4/review/queue` | Paginated pending items, filterable by disease |
-| `POST` | `/api/v4/review/{id}/annotate` | Submit expert label `{label: 0|1}` |
+| `GET` | `/api/v4/review/queue` | Paginated items, `?status=pending\|reviewed\|skipped` (default `pending`), filterable by disease; returns `reviewer` and `reviewed_at` |
+| `POST` | `/api/v4/review/{id}/annotate` | Submit expert label `{label: 0|1, notes?}`; 409 if already reviewed |
 | `POST` | `/api/v4/review/{id}/skip` | Dismiss item |
 | `GET` | `/api/v4/review/stats` | `{pending, reviewed, skipped}` |
 
-> ⚠️ `POST /admin/retrain` currently fails for heart_disease (categorical encoding bug) and is a silent no-op for diabetes (writes to a file the live ensemble doesn't read) — see [Human-in-the-Loop Active Learning](#human-in-the-loop-active-learning) above.
+> `POST /admin/retrain` builds a **candidate** for heart_disease (nothing is replaced) — see [Human-in-the-Loop Active Learning](#human-in-the-loop-active-learning). For diabetes it is still the older path that does not update a model the live ensemble reads.
 
 ### Admin (requires `super_admin`)
 
@@ -875,7 +881,7 @@ Two different prefixes are actually in use — verified live against a running i
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/admin/audit-logs` | Paginated HIPAA audit trail |
-| `POST` | `/admin/retrain` | Trigger retraining pipeline (see limitation above) |
+| `POST` | `/admin/retrain` | Build a heart retraining candidate from clinician labels `{disease, min_samples}`; returns the MLflow run id and decision-change counts |
 | `POST` | `/admin/cache/flush` | Invalidate all cached responses (e.g. after a model update) |
 | `GET` | `/api/v4/admin/drift/{disease}/status` | Latest Evidently drift metrics (JSON) |
 | `POST` | `/api/v4/admin/drift/{disease}/run` | Trigger fresh drift computation |

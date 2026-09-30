@@ -635,6 +635,17 @@ class RetrainResponse(BaseModel):
     samples_used: int = 0
     model_path: Optional[str] = None
     reason: Optional[str] = None
+    # Filled by the heart candidate path (retrain_candidate). Without these the
+    # response model silently dropped the run id and the decision-change counts,
+    # which are the whole result of a candidate build.
+    outcome: Optional[str] = None
+    mlflow_run_id: Optional[str] = None
+    rows_total: Optional[int] = None
+    rows_rejected: Optional[list] = None
+    moved_out_of_uncertain: Optional[int] = None
+    moved_into_uncertain: Optional[int] = None
+    decisions_changed_total: Optional[int] = None
+    limit: Optional[str] = None
 
 
 @router.post(
