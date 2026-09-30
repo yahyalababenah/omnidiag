@@ -1,0 +1,341 @@
+{
+  "generated_at": "2026-09-30T04:17:32.963230+00:00",
+  "environment": {
+    "backend": "uvicorn backend.main:app :7860 (local, sqlite scratch db)",
+    "prometheus": "prom/prometheus:v2.51.0 :9090 (docker, host network)",
+    "grafana": "grafana/grafana:10.4.0 :3001 (docker, host network)",
+    "evidently_installed": false
+  },
+  "verdict": {
+    "prometheus": "WORKING",
+    "grafana": "WORKING (6/6 panels return data)",
+    "drift_monitoring": "WORKING via scipy KS/chi-square/PSI (Gate 8.7c)",
+    "evidently": "NOT USED - installed version 0.7.x has an incompatible API; superseded by drift_stats.py"
+  },
+  "prometheus_targets": [
+    {
+      "job": "omnidiag-backend",
+      "url": "http://localhost:7860/metrics",
+      "health": "up"
+    },
+    {
+      "job": "prometheus",
+      "url": "http://localhost:9090/metrics",
+      "health": "up"
+    }
+  ],
+  "grafana_dashboards": [
+    "OmniDiag — Clinical AI Platform"
+  ],
+  "grafana_panels": {
+    "Total Predictions (Rate)": {
+      "exprs": [
+        "rate(omnidiag_predictions_total[5m])"
+      ],
+      "series_returned": 4
+    },
+    "Active Requests": {
+      "exprs": [
+        "omnidiag_active_requests"
+      ],
+      "series_returned": 1
+    },
+    "Drift Share by Disease": {
+      "exprs": [
+        "omnidiag_drift_share"
+      ],
+      "series_returned": 3
+    },
+    "Prediction Rate per Disease": {
+      "exprs": [
+        "rate(omnidiag_predictions_total[1m])"
+      ],
+      "series_returned": 4
+    },
+    "Request Latency p95 (seconds)": {
+      "exprs": [
+        "histogram_quantile(0.95, sum by (le, endpoint) (rate(omnidiag_request_duration_seconds_bucket[5m])))"
+      ],
+      "series_returned": 4
+    },
+    "Prediction Confidence Distribution": {
+      "exprs": [
+        "rate(omnidiag_prediction_confidence_bucket[5m])"
+      ],
+      "series_returned": 48
+    },
+    "Cache Hit / Miss Rate": {
+      "exprs": [
+        "rate(omnidiag_cache_hits_total[1m])",
+        "rate(omnidiag_cache_misses_total[1m])"
+      ],
+      "series_returned": 6
+    }
+  },
+  "prometheus_queries": {
+    "predictions_by_disease": [
+      {
+        "labels": {
+          "disease": "heart_disease"
+        },
+        "value": "24"
+      },
+      {
+        "labels": {
+          "disease": "diabetes_nhanes"
+        },
+        "value": "24"
+      },
+      {
+        "labels": {
+          "disease": "diabetes"
+        },
+        "value": "24"
+      }
+    ],
+    "drift_share": [
+      {
+        "labels": {
+          "__name__": "omnidiag_drift_share",
+          "disease": "diabetes",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "1"
+      },
+      {
+        "labels": {
+          "__name__": "omnidiag_drift_share",
+          "disease": "heart_disease",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "1"
+      },
+      {
+        "labels": {
+          "__name__": "omnidiag_drift_share",
+          "disease": "diabetes_nhanes",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "0.95"
+      }
+    ],
+    "cache_hits": [
+      {
+        "labels": {
+          "__name__": "omnidiag_cache_hits_total",
+          "disease": "heart_disease",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "12"
+      },
+      {
+        "labels": {
+          "__name__": "omnidiag_cache_hits_total",
+          "disease": "diabetes_nhanes",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "12"
+      },
+      {
+        "labels": {
+          "__name__": "omnidiag_cache_hits_total",
+          "disease": "diabetes",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "12"
+      }
+    ],
+    "cache_misses": [
+      {
+        "labels": {
+          "__name__": "omnidiag_cache_misses_total",
+          "disease": "heart_disease",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "12"
+      },
+      {
+        "labels": {
+          "__name__": "omnidiag_cache_misses_total",
+          "disease": "diabetes_nhanes",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "12"
+      },
+      {
+        "labels": {
+          "__name__": "omnidiag_cache_misses_total",
+          "disease": "diabetes",
+          "instance": "localhost:7860",
+          "job": "omnidiag-backend"
+        },
+        "value": "12"
+      }
+    ],
+    "requests_by_endpoint": [
+      {
+        "labels": {
+          "endpoint": "/login",
+          "status": "200"
+        },
+        "value": "1"
+      },
+      {
+        "labels": {
+          "endpoint": "/api/v4/{disease}/schema",
+          "status": "200"
+        },
+        "value": "4"
+      },
+      {
+        "labels": {
+          "endpoint": "/api/v4/{disease}/predict",
+          "status": "200"
+        },
+        "value": "72"
+      },
+      {
+        "labels": {
+          "endpoint": "/drift/{disease}/run",
+          "status": "200"
+        },
+        "value": "3"
+      }
+    ],
+    "p95_latency_seconds": [
+      {
+        "labels": {
+          "endpoint": "/api/v4/{disease}/schema"
+        },
+        "value": "0.0095"
+      },
+      {
+        "labels": {
+          "endpoint": "/api/v4/{disease}/predict"
+        },
+        "value": "0.21522727272727263"
+      },
+      {
+        "labels": {
+          "endpoint": "/drift/{disease}/run"
+        },
+        "value": "NaN"
+      },
+      {
+        "labels": {
+          "endpoint": "/login"
+        },
+        "value": "NaN"
+      }
+    ]
+  },
+  "drift_runs": {
+    "heart_disease": {
+      "status": "ok",
+      "current_rows": 110,
+      "reference_rows": 920,
+      "dataset_drift": {
+        "dataset_drift_detected": true,
+        "drift_share": 1.0,
+        "number_of_drifted_columns": 7,
+        "number_of_columns": 7
+      },
+      "rule": {
+        "alpha": 0.05,
+        "psi_minor": 0.1,
+        "psi_major": 0.2,
+        "min_current_rows": 50,
+        "flag": "Holm-corrected p < alpha AND PSI >= psi_major",
+        "not_measured": "output/label drift — no follow-up catheterisation result exists for any patient in this system"
+      },
+      "rows_by_probability_scale": {
+        "corrected": 0,
+        "raw": 110,
+        "unknown": 0
+      },
+      "run_at": "2026-09-30T04:14:43.056885+00:00",
+      "per_feature": {}
+    },
+    "diabetes": {
+      "status": "ok",
+      "current_rows": 113,
+      "reference_rows": 70692,
+      "dataset_drift": {
+        "dataset_drift_detected": true,
+        "drift_share": 1.0,
+        "number_of_drifted_columns": 21,
+        "number_of_columns": 21
+      },
+      "rule": {
+        "alpha": 0.05,
+        "psi_minor": 0.1,
+        "psi_major": 0.2,
+        "min_current_rows": 50,
+        "flag": "Holm-corrected p < alpha AND PSI >= psi_major",
+        "not_measured": "output/label drift — no follow-up catheterisation result exists for any patient in this system"
+      },
+      "rows_by_probability_scale": {
+        "corrected": 113,
+        "raw": 0,
+        "unknown": 0
+      },
+      "run_at": "2026-09-30T04:14:43.148651+00:00",
+      "per_feature": {}
+    },
+    "diabetes_nhanes": {
+      "status": "ok",
+      "current_rows": 110,
+      "reference_rows": 18508,
+      "dataset_drift": {
+        "dataset_drift_detected": true,
+        "drift_share": 0.95,
+        "number_of_drifted_columns": 19,
+        "number_of_columns": 20
+      },
+      "rule": {
+        "alpha": 0.05,
+        "psi_minor": 0.1,
+        "psi_major": 0.2,
+        "min_current_rows": 50,
+        "flag": "Holm-corrected p < alpha AND PSI >= psi_major",
+        "not_measured": "output/label drift — no follow-up catheterisation result exists for any patient in this system"
+      },
+      "rows_by_probability_scale": {
+        "corrected": 0,
+        "raw": 110,
+        "unknown": 0
+      },
+      "run_at": "2026-09-30T04:14:43.866623+00:00",
+      "per_feature": {}
+    }
+  },
+  "fixes_applied": [
+    "backend/monitoring/metrics.py: added MetricsMiddleware (request duration + in-flight gauge) and record_cache(); both instruments were registered but never written",
+    "backend/main.py: wired MetricsMiddleware and record_cache() into /predict",
+    "deploy/grafana/dashboards/omnidiag.json: p95 latency query now aggregates 'sum by (le, endpoint)'",
+    "tests/test_request_metrics.py: 4 new tests",
+    "run locally on sqlite: .env points at Postgres but asyncpg is not installed in backend/.venv"
+  ],
+  "tests": "26 passed, 1 warning in 4.08s",
+  "screenshots": [
+    "reports/monitoring_local/01_grafana_dashboard.png",
+    "reports/monitoring_local/02_prometheus_targets.png",
+    "reports/monitoring_local/03_prometheus_drift_share.png",
+    "reports/monitoring_local/04_prometheus_predictions_by_disease.png",
+    "reports/monitoring_local/05_backend_metrics_endpoint.png"
+  ],
+  "caveats": [
+    "Traffic is synthetic (uniform random patients, ~14 to 80 per disease). Drift share 1.0 / 0.95 reflects that synthetic traffic differing from the reference population, NOT real-world drift.",
+    "Drift is INPUT drift only; no follow-up labels exist, so model degradation is not measured.",
+    "Local only. The deployed HF Space still runs the old build (no latency/cache metrics, no drift run) until redeployed.",
+    "Prometheus/Grafana run in docker with host networking and a local config; docker-compose.yml was not modified."
+  ]
+}
