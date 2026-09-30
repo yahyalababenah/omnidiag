@@ -1,7 +1,12 @@
 """spaCy dependency-based numeric extraction: context, not keyword templates."""
 import pytest
 
-from backend.nlp.notes_parser import parse_clinical_note
+from backend.nlp.notes_parser import _get_spacy_pipeline, parse_clinical_note
+
+# The regex baseline reads most of these; "who is now 58" needs the dependency
+# parse. Without spaCy installed that case cannot pass, so it is skipped rather
+# than reported as a parser bug.
+NEEDS_SPACY = "who is now 58"
 
 CASES = [
     ("the age is 50", {"age": 50}),
@@ -24,6 +29,8 @@ ABSENT = [("Age 5 months", "age"), ("Her LDL is 160 and HDL 45", "cholesterol"),
 
 @pytest.mark.parametrize("note,expected", CASES)
 def test_values(note, expected):
+    if NEEDS_SPACY in note and _get_spacy_pipeline() is None:
+        pytest.skip("spaCy / en_core_web_sm not installed in this environment")
     got = parse_clinical_note(note, use_bert=False)
     for k, v in expected.items():
         assert got.get(k) == v, (note, k, got)
