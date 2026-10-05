@@ -16,7 +16,7 @@
 
 /**
  * @typedef {Object} FieldMetadata
- * @property {string}  name        - The field key (e.g., "Age", "HighBP")
+ * @property {string}  name        - The field key (e.g., "Age", "RestingBP")
  * @property {string}  title       - Human-readable label derived from description
  * @property {string}  type        - JSON Schema type: "string" | "integer" | "number"
  * @property {boolean} requiresDeliberateEntry - never pre-filled; the clinician must answer it (F9-38)

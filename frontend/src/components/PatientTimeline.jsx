@@ -23,6 +23,9 @@ import { useAuth } from '../context/AuthContext'
 import { useDisease } from '../context/DiseaseContext'
 import { API_BASE } from '../api'
 
+/** A retired module's row carries `archived_note` (absent on older backends). */
+const archivedNoteOf = (prediction) => prediction?.archived_note ?? null
+
 // Absolute, like every other component that hand-rolls a fetch(). The
 // backend and the frontend are not served from the same origin: a bare
 // relative '/api/v4/...' resolved against Vercel, which answered with
@@ -132,6 +135,14 @@ function PredictionCard({ prediction, index }) {
             {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
           </div>
         </button>
+
+        {/* A retired module's row: the backend says so (absent on an older
+            backend, which then shows the card as before). */}
+        {archivedNoteOf(prediction) && (
+          <p className="mx-4 mb-2 rounded-md bg-gray-100 px-2.5 py-1.5 text-[11px] text-gray-600">
+            {archivedNoteOf(prediction)}
+          </p>
+        )}
 
         {/* Expanded details */}
         {expanded && (

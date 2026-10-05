@@ -69,14 +69,8 @@ class TestLowestAchievable:
         assert lowest_achievable(done, POLICY, lambda r: 0.5, 0.5) is None
 
 
-# Demo patients plus the two diabetes demo cases that are still in the
-# deployed June frontend bundle (both positive, both no-crossing).
-EXTRA = {
-    "diabetes": {
-        "layla": {"HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 32.4, "Smoker": 0, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 0, "Fruits": 0, "Veggies": 0, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 3, "MentHlth": 12, "PhysHlth": 18, "DiffWalk": 1, "Sex": 0, "Age": 10, "Education": 3, "Income": 4},
-        "mohammed": {"HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 28.7, "Smoker": 1, "Stroke": 0, "HeartDiseaseorAttack": 1, "PhysActivity": 0, "Fruits": 1, "Veggies": 0, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 4, "MentHlth": 8, "PhysHlth": 22, "DiffWalk": 1, "Sex": 1, "Age": 11, "Education": 2, "Income": 3},
-    },
-}
+# The two extra BRFSS demo cases went with that module (gate B6).
+EXTRA = {}
 
 
 def _patients(disease):

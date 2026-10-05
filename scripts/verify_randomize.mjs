@@ -23,7 +23,7 @@ function check(ok, message) {
   if (!ok) { console.log(`  FAIL  ${message}`); failures++; }
 }
 
-for (const disease of ['heart_disease', 'diabetes']) {
+for (const disease of ['heart_disease', 'diabetes_nhanes']) {
   console.log(`\n${disease}`);
   const schema = await (await fetch(`${BASE}/api/v4/${disease}/schema`)).json();
   const fields = parseSchema(schema);

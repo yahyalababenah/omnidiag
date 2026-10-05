@@ -7,7 +7,7 @@
  * after the first load.
  *
  * Usage:
- *   const { fields, loading, error, refetch } = useDiseaseSchema('diabetes');
+ *   const { fields, loading, error, refetch } = useDiseaseSchema('diabetes_nhanes');
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

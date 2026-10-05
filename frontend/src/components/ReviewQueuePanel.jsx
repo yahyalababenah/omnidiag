@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback, useContext } from 'react';
 import { CheckCircle, XCircle, SkipForward, Loader2, AlertCircle, Brain, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DiseaseContext from '../context/DiseaseContext';
+import { responseError } from '../utils/apiError';
+
+/** A queue item of a retired module (`retired` absent on older backends). */
+const isRetiredItem = (item) => item?.retired === true;
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://yahyoha-omnidiag.hf.space';
 
@@ -49,6 +53,11 @@ function ReviewCard({ item, onAnnotate, onSkip }) {
           <p className="font-semibold text-gray-900 dark:text-white capitalize text-sm">
             {(item.disease || 'unknown').replace(/_/g, ' ')}
           </p>
+          {isRetiredItem(item) && (
+            <span className="inline-block mt-1 text-[10px] font-semibold uppercase tracking-wide bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded">
+              Archived module — read only
+            </span>
+          )}
         </div>
         <div className="text-right text-xs">
           <p className="text-gray-500 dark:text-gray-400">Model said</p>
@@ -114,7 +123,10 @@ function ReviewCard({ item, onAnnotate, onSkip }) {
         </details>
       )}
 
-      {/* Actions */}
+      {/* Actions. A retired module's item can be read but not labelled (the
+          backend answers 410), so it gets no buttons. Absent flag = old
+          backend = the buttons as before. */}
+      {!isRetiredItem(item) && (
       <div className="flex gap-2 pt-1">
         <button
           onClick={() => handleAction('positive')}
@@ -141,6 +153,7 @@ function ReviewCard({ item, onAnnotate, onSkip }) {
           Skip
         </button>
       </div>
+      )}
     </div>
   );
 }
@@ -184,21 +197,27 @@ export default function ReviewQueuePanel() {
 
   useEffect(() => { load(1); }, [load]);
 
+  // A refused label (e.g. 410 for a retired module) used to be dropped
+  // silently; the reason is shown now, and kept across the reload.
   async function handleAnnotate(id, label) {
-    await fetch(`${API_BASE}/api/v4/review/${id}/annotate`, {
+    const res = await fetch(`${API_BASE}/api/v4/review/${id}/annotate`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ label }),
     });
-    load(page);
+    const failure = res.ok ? '' : await responseError(res);
+    await load(page);
+    if (failure) setError(failure);
   }
 
   async function handleSkip(id) {
-    await fetch(`${API_BASE}/api/v4/review/${id}/skip`, {
+    const res = await fetch(`${API_BASE}/api/v4/review/${id}/skip`, {
       method: 'POST',
       headers,
     });
-    load(page);
+    const failure = res.ok ? '' : await responseError(res);
+    await load(page);
+    if (failure) setError(failure);
   }
 
   return (
@@ -219,9 +238,14 @@ export default function ReviewQueuePanel() {
 
       {/* Stats strip */}
       {stats && (
-        <div className="grid grid-cols-3 gap-3 text-center">
+        <div className={`grid ${typeof stats.retired_pending === 'number' ? 'grid-cols-4' : 'grid-cols-3'} gap-3 text-center`}>
           {[
             { label: 'Pending', value: stats.pending, color: 'text-amber-600' },
+            // Pending items of a retired module cannot be labelled; the backend
+            // counts them apart, so Pending + Archived = the items listed.
+            ...(typeof stats.retired_pending === 'number'
+              ? [{ label: 'Archived', value: stats.retired_pending, color: 'text-gray-400' }]
+              : []),
             { label: 'Reviewed', value: stats.reviewed, color: 'text-green-600' },
             { label: 'Skipped', value: stats.skipped, color: 'text-gray-500' },
           ].map(({ label, value, color }) => (

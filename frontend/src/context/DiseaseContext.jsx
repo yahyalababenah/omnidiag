@@ -11,6 +11,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
+import { withoutRetired } from '../constants/retiredDiseases';
 
 const DiseaseContext = createContext(null);
 
@@ -48,7 +49,8 @@ export function DiseaseProvider({ children }) {
         const res = await api.listDiseases();
         // Flatten { name, info: {...} } → { name, ...info } so consumers can
         // access currentDiseaseInfo.display_name / .supports_counterfactuals directly.
-        const diseases = (res.diseases || []).map(d => ({ name: d.name, ...d.info }));
+        // Retired modules are dropped here, so the picker matches on every backend.
+        const diseases = withoutRetired((res.diseases || []).map(d => ({ name: d.name, ...d.info })));
 
         if (cancelled) return;
 
@@ -88,7 +90,7 @@ export function DiseaseProvider({ children }) {
     setLoading(true);
     try {
       const res = await api.listDiseases();
-      const diseases = (res.diseases || []).map(d => ({ name: d.name, ...d.info }));
+      const diseases = withoutRetired((res.diseases || []).map(d => ({ name: d.name, ...d.info })));
       setAvailableDiseases(diseases);
 
       if (!selectedDisease && diseases.length > 0) {

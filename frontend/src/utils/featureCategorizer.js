@@ -7,19 +7,18 @@
  * Uses keyword matching on field names and descriptions. Categories
  * are returned as an ordered Map so they render in a consistent layout.
  *
- * Category definitions:
+ * Category definitions (the BRFSS column codes went with that module, gate B6):
  *   ┌─────────────────┬──────────────────────────────────────────────┐
  *   │ Category        │ Matched Keywords                             │
  *   ├─────────────────┼──────────────────────────────────────────────┤
  *   │ Vitals & Signs  │ Age, BP, HR, BMI, Cholesterol, Chest, ST,   │
  *   │                 │ Oldpeak, MaxHR, Pulse, Temp, Resp, O2        │
- *   │ Lifestyle       │ Smoke, PhysActivity, Fruits, Veggies, Alc,  │
- *   │                 │ Exercise, Diet, Activity                     │
- *   │ Demographics    │ Sex, Age, Education, Income, Race, Region   │
- *   │ Medical History │ HighBP, HighChol, Stroke, Heart, Diabetes,  │
- *   │                 │ RestingECG, FastingBS, CholCheck, DiffWalk  │
- *   │ Healthcare      │ AnyHealthcare, NoDocbcCost, Insurance       │
- *   │ Mental Health   │ MentHlth, PhysHlth, GenHlth, DiffWalk       │
+ *   │ Lifestyle       │ Smoke, Alc, Exercise, Diet, Activity        │
+ *   │ Demographics    │ Sex, Age, Race, Region                       │
+ *   │ Medical History │ Stroke, Heart, Diabetes, RestingECG,        │
+ *   │                 │ FastingBS, prior conditions                  │
+ *   │ Healthcare      │ Insurance, Doctor, Medication               │
+ *   │ Mental Health   │ Depression, Anxiety, Mental                 │
  *   │ General         │ (fallback for uncategorized fields)          │
  *   └─────────────────┴──────────────────────────────────────────────┘
  */
@@ -47,7 +46,7 @@ const CATEGORIES = {
   Demographics: {
     icon: 'User',
     keywords: [
-      'sex', 'education', 'income', 'race', 'region',
+      'sex', 'race', 'region',
       'geography', 'marital',
       'riagendr',
     ],
@@ -65,8 +64,7 @@ const CATEGORIES = {
   Lifestyle: {
     icon: 'Heart',
     keywords: [
-      'smoker', 'physactivity', 'fruits', 'veggies',
-      'hvyalcoholconsump', 'exercise', 'diet', 'activity',
+      'smoker', 'exercise', 'diet', 'activity',
       'alcohol', 'smoking',
       'paq650', 'paq665',
     ],
@@ -74,9 +72,7 @@ const CATEGORIES = {
   'Medical History': {
     icon: 'Stethoscope',
     keywords: [
-      'highbp', 'highchol', 'stroke', 'heartdiseaseorattack',
-      'restingecg', 'cholcheck', 'diffwalk', 'diabetes',
-      'anyhealthcare', 'nodocbccost', 'kidney', 'cancer',
+      'stroke', 'restingecg', 'diabetes', 'kidney', 'cancer',
       'condition', 'diagnosis',
       'mcq300c', 'cvd_any', 'cardiovascular',
     ],
@@ -84,15 +80,13 @@ const CATEGORIES = {
   'Healthcare Access': {
     icon: 'Pill',
     keywords: [
-      'anyhealthcare', 'nodocbccost', 'insurance', 'doctor',
-      'checkup', 'medication',
+      'insurance', 'doctor', 'checkup', 'medication',
     ],
   },
   'Mental Health': {
     icon: 'Wind',
     keywords: [
-      'menthlth', 'physhlth', 'genhlth', 'depression',
-      'anxiety', 'mental', 'wellbeing',
+      'depression', 'anxiety', 'mental', 'wellbeing',
     ],
   },
 };

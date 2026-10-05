@@ -169,12 +169,9 @@ def test_laboratory_keywords_are_nhanes_codes_only():
     ("Sex", "recorded sex", "Demographics"),
     ("Cholesterol", "serum TOTAL cholesterol (mg/dL) — not LDL", "Vitals & Signs"),
     ("RestingBP", "resting systolic blood pressure (mm Hg)", "Vitals & Signs"),
-    ("PhysActivity", "any physical activity in the past 30 days (yes/no)", "Lifestyle"),
-    ("Education", "education level band", "Demographics"),
-    ("GenHlth", "self-rated general health, 1 (excellent) to 5 (poor)", "Mental Health"),
 ])
 def test_existing_modules_keep_their_categories(name, description, expected):
-    """The heart and BRFSS forms must lay out exactly as they did before."""
+    """The heart form must lay out exactly as it did before (BRFSS retired, gate B6)."""
     assert _categorize(name, description, _categories()) == expected
 
 

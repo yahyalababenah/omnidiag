@@ -7,7 +7,7 @@
  *
  * Usage:
  *   const { form, fields, categorizedFields, schemaState, onSubmit } =
- *     useDiseaseForm('diabetes', { onPredict, onExplain });
+ *     useDiseaseForm('diabetes_nhanes', { onPredict, onExplain });
  */
 
 import { useMemo, useCallback, useEffect, useState } from 'react';

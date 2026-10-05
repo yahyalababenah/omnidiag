@@ -229,8 +229,7 @@ export default function ClinicalEmrMode() {
     if (!meta) return 'normal';
 
     // Coloured by clinical direction per feature (constants/clinicalDirection.js),
-    // never by "value == 1": Fruits/Veggies/PhysActivity/AnyHealthcare = Yes
-    // are healthy and used to render red.
+    // never by "value == 1": for some binary fields 1 is the healthy answer.
     if (value === null || value === undefined || NEUTRAL_FIELDS.has(fieldName)) return 'normal';
 
     // Binary 0/1 field with a known favourable value
@@ -850,60 +849,6 @@ export default function ClinicalEmrMode() {
                         </p>
                       </div>
 
-                      {/* ═══ Feature Spotlight: Diabetes_Clinical_Risk ═══
-                          Only when this disease's model actually has the
-                          engineered feature — read from its own /explain
-                          feature list, not from the disease name. */}
-                      {shapData.chart_data?.some((c) => c.feature === 'Diabetes_Clinical_Risk') && (() => {
-                        const topFeature = shapData.chart_data?.length > 0
-                          ? shapData.chart_data.reduce((a, b) =>
-                              Math.abs(a.shap_value) > Math.abs(b.shap_value) ? a : b
-                            )
-                          : null;
-                        const isClinicalRiskTop = topFeature?.feature === 'Diabetes_Clinical_Risk';
-                        return (
-                          <details className="mt-4" open>
-                            <summary className={`text-xs cursor-pointer flex items-center gap-1 ${isClinicalRiskTop ? 'text-indigo-600 hover:text-indigo-800' : 'text-purple-600 hover:text-purple-800'}`}>
-                              <ChevronDown className="w-3 h-3" />
-                              {isClinicalRiskTop
-                                ? 'Top Feature Spotlight: Diabetes_Clinical_Risk'
-                                : 'Engineered Feature: Diabetes_Clinical_Risk'}
-                            </summary>
-                            <div className={`mt-3 p-4 rounded-lg border ${isClinicalRiskTop ? 'bg-indigo-50 border-indigo-200' : 'bg-purple-50 border-purple-200'}`}>
-                              <div className="flex items-start gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isClinicalRiskTop ? 'bg-indigo-200 text-indigo-700' : 'bg-purple-200 text-purple-700'}`}>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                  </svg>
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-gray-900">
-                                    Diabetes_Clinical_Risk — Engineered Risk Index
-                                  </p>
-                                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                                    A logarithmic risk index computed as:
-                                    <code className="mx-1 px-1 py-0.5 bg-gray-100 rounded text-[11px] font-mono">
-                                      exp(BMI×0.05 + Age×0.03 + GenHlth×0.2 + HighBP×0.5)
-                                    </code>
-                                  </p>
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    HighBP carries 50% weight — the single strongest modifiable risk factor.
-                                    BMI contributes 5% per unit; effect compounds exponentially. This
-                                    engineered feature often dominates the SHAP explanation for diabetes.
-                                  </p>
-                                  {topFeature && (
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      Current top feature: <span className="font-semibold">{topFeature.feature}</span>
-                                      {' '}(SHAP = {topFeature.shap_value.toFixed(4)})
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </details>
-                        );
-                      })()}
-
                       {/* Feature impact table */}
                       <details className="mt-4">
                         <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 flex items-center gap-1">
@@ -928,18 +873,12 @@ export default function ClinicalEmrMode() {
                             <tbody>
                               {shapData.chart_data.map((item) => {
                                 const val = item.shap_value;
-                                const isRisk = item.feature === 'Diabetes_Clinical_Risk';
                                 return (
-                                  <tr key={item.feature} className={`border-b border-gray-100 ${isRisk ? 'bg-indigo-50/50' : ''}`}>
+                                  <tr key={item.feature} className="border-b border-gray-100">
                                     <td className="py-2 px-2 font-medium text-gray-800">
                                       <MedicalTooltip term={item.feature}>
                                         {item.feature}
                                       </MedicalTooltip>
-                                      {isRisk && (
-                                        <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                                          Engineered
-                                        </span>
-                                      )}
                                     </td>
                                     <td className="py-2 px-2 text-right font-mono text-gray-600">{val.toFixed(4)}</td>
                                     <td className="py-2 px-2 text-right">

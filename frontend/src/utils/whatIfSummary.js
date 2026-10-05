@@ -71,10 +71,8 @@ export const LOW_RISK_MESSAGE =
  */
 export const SCENARIOS_TITLE = 'Modelled What-If Scenarios';
 
-/** Post-intervention probability, on whichever scale the module returned. */
+/** Post-intervention probability, as the module returned it (`probability`). */
 export function scenarioProbability(s) {
-  if (typeof s.new_probability_corrected === 'number') return s.new_probability_corrected;
-  if (typeof s.new_probability === 'number') return s.new_probability;
   if (typeof s.probability === 'number') return s.probability;
   return null;
 }
@@ -90,10 +88,6 @@ export function scenarioProbability(s) {
 export function scenarioReductionPct(s, baselineProbability) {
   if (typeof s.risk_reduction_relative_pct === 'number') {
     return Math.round(s.risk_reduction_relative_pct);
-  }
-  if (typeof s.risk_reduction === 'string') {
-    const parsed = parseFloat(s.risk_reduction);
-    if (!Number.isNaN(parsed)) return Math.round(parsed);
   }
   const prob = scenarioProbability(s);
   if (prob !== null && typeof baselineProbability === 'number' && baselineProbability > 0) {

@@ -55,16 +55,10 @@ export function countCsvDataRows(text) {
   return Math.max(0, lines.length - 1)
 }
 
-function downloadCsv(rows, disease, threshold = null, prevalenceCorrected = false) {
-  // The exported file outlives this session and gets opened in Excel with no
-  // legend, so the column name has to carry the scale. For diabetes these are
-  // prevalence-corrected probabilities compared against a ~6% threshold, not
-  // a 50% one; a bare "risk_probability" of 0.07 beside "Positive" reads as
-  // an error. Heart applies no correction, so naming its column
-  // "..._corrected" claimed something untrue about every heart export.
-  const probabilityHeader = prevalenceCorrected
-    ? 'risk_probability_corrected'
-    : 'risk_probability'
+function downloadCsv(rows, disease, threshold = null) {
+  // No live module applies a prevalence correction (removed with the retired
+  // BRFSS module), so the probability column carries no scale suffix.
+  const probabilityHeader = 'risk_probability'
   // `prediction` (0/1) and `diagnosis` ("Positive"/"Negative") were the same
   // fact twice. The label is kept, under the screening name the UI uses.
   const headers = [
@@ -287,7 +281,6 @@ export default function BatchUpload() {
   // probabilities the batch endpoint returns.
   const diseaseInfo = availableDiseases?.find(d => d.name === selectedDisease)
   const threshold = diseaseInfo?.inference_threshold ?? null
-  const prevalenceCorrected = diseaseInfo?.prevalence_corrected === true
   const limit = rowLimitFor(diseaseInfo)
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -399,7 +392,7 @@ export default function BatchUpload() {
         {data && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => downloadCsv(data.results, selectedDisease, threshold, prevalenceCorrected)}
+              onClick={() => downloadCsv(data.results, selectedDisease, threshold)}
               className="btn-secondary text-sm flex items-center gap-2"
             >
               <Download className="w-4 h-4" /> Download CSV

@@ -36,12 +36,12 @@ import { getDisplayThreshold } from '../constants/thresholds'
 
 /**
  * Risk score = probability of the POSITIVE class, on the scale the API
- * returned it (prevalence-corrected for diabetes).
+ * returned it.
  *
  * This used to flip to `1 - confidence` for Negative patients, which reads as
  * "the model's confidence in its own call". That was already confusing and
- * became wrong once the decision threshold moved off 0.5: a Positive diabetes
- * patient at 0.07 displayed a 7% "risk score" while a Negative one at 0.01
+ * became wrong once a decision threshold moved off 0.5: a Positive patient at
+ * 0.07 displayed a 7% "risk score" while a Negative one at 0.01
  * displayed 99%. Both arrows pointed the wrong way. One axis only: higher
  * always means more risk.
  */
@@ -230,9 +230,8 @@ function ComparisonChart({ beforeResult, afterResult, beforeName, afterName, dis
   if (!beforeResult || !afterResult) return null
 
   // Risk score and risk probability are now the same quantity, so the chart
-  // shows it once. What it needs instead is the decision threshold: on the
-  // corrected scale a 12% bar is well above a 6.0% boundary, and without the
-  // line drawn the bar looks reassuringly short.
+  // shows it once. What it needs instead is the decision threshold, when the
+  // module has one: without the line drawn, a short bar can still be above it.
   const threshold = getDisplayThreshold(disease, beforeResult)
   const thresholdPct = threshold != null ? threshold * 100 : null
 

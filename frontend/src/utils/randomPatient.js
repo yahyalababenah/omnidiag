@@ -25,11 +25,9 @@
  * near the middle are common and the extremes stay reachable but rare.
  *
  * Keyed BY DISEASE FIRST, because a bare field name is not enough to know
- * what a number means. `Age` is years in the UCI heart cohort and a BRFSS
- * 5-year BAND (1 = 18-24 … 13 = 80+) in the diabetes module. A single
- * name-keyed table gave diabetes the heart band, which clamped to the
- * schema maximum and made every randomised diabetes patient Age = 13 —
- * constant, and the oldest bracket there is.
+ * what a number means: the same name can carry a different unit in another
+ * module. (The retired BRFSS module's `Age` was a 5-year band; a single
+ * name-keyed table once gave it the heart band.)
  *
  * Sources are ordinary adult clinical reference ranges; the point is
  * believability, not precision.
@@ -42,15 +40,6 @@ export const CLINICAL_PROFILES = {
     MaxHR: { min: 95, typical: 150, max: 190 },        // bpm
     Oldpeak: { min: 0, typical: 0.8, max: 4.0 },       // mm ST depression
   },
-  diabetes: {
-    Age: { min: 4, typical: 8, max: 12 },              // BRFSS band: 35-39 … 75-79
-    BMI: { min: 19, typical: 28, max: 42 },
-    GenHlth: { min: 1, typical: 3, max: 5 },
-    MentHlth: { min: 0, typical: 2, max: 20 },
-    PhysHlth: { min: 0, typical: 3, max: 20 },
-    Education: { min: 3, typical: 5, max: 6 },
-    Income: { min: 2, typical: 5, max: 8 },
-  },
 };
 
 /** The band for one field of one disease, or undefined. */
@@ -60,23 +49,10 @@ export function profileFor(disease, fieldName) {
 
 /**
  * Probability that a binary field is 1, so a randomised patient does not
- * come out with every risk factor flipped on by a coin toss. Roughly
- * BRFSS-adult prevalences; anything unlisted falls back to 0.5.
+ * come out with every risk factor flipped on by a coin toss. Anything
+ * unlisted falls back to 0.5.
  */
 export const BINARY_PREVALENCE = {
-  HighBP: 0.35,
-  HighChol: 0.35,
-  CholCheck: 0.95,
-  Smoker: 0.4,
-  Stroke: 0.05,
-  HeartDiseaseorAttack: 0.08,
-  PhysActivity: 0.7,
-  Fruits: 0.6,
-  Veggies: 0.8,
-  HvyAlcoholConsump: 0.06,
-  AnyHealthcare: 0.9,
-  NoDocbcCost: 0.1,
-  DiffWalk: 0.15,
   FastingBS: 0.2,
   Sex: 0.5,
 };

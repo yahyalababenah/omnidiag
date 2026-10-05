@@ -30,13 +30,6 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CONFIGS_DIR = os.path.join(_ROOT, "configs")
 
 # ── The policy, as specified (independent copy) ─────────────────────────────
-DIABETES_ALLOWED = {
-    "BMI": ("decrease", 18.5),
-    "PhysActivity": ("to", 1),
-    "Fruits": ("to", 1),
-    "Veggies": ("to", 1),
-    "HvyAlcoholConsump": ("to", 0),
-}
 HEART_ALLOWED = {
     "RestingBP": ("decrease", 110),
     "Cholesterol": ("decrease", 150),
@@ -64,28 +57,16 @@ NHANES_IMMUTABLE = {
 }
 POLICIES = {
     "heart_disease": HEART_ALLOWED,
-    "diabetes": DIABETES_ALLOWED,
     "diabetes_nhanes": NHANES_ALLOWED,
 }
 # ADIPOSITY_BAND arrives as a name; its order is what "decrease" means.
 _BAND_LEVEL = {"normal": 0, "increased": 1, "high": 2}
-ENGINEERED = {
-    "BMI_Age_Interaction", "Health_Index", "Lifestyle_Score",
-    "SES_Composite", "Diabetes_Clinical_Risk",
-}
-
 # ── Demo patients (frontend/src/mockPatients.js; drift checked in section D)
 DEMO = {
     "heart_disease": {
         "P-001": {"Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 140, "Cholesterol": 289, "FastingBS": 0, "RestingECG": "Normal", "MaxHR": 122, "ExerciseAngina": "N", "Oldpeak": 0, "ST_Slope": "Flat"},
         "P-002": {"Age": 62, "Sex": "F", "ChestPainType": "ASY", "RestingBP": 158, "Cholesterol": 340, "FastingBS": 1, "RestingECG": "LVH", "MaxHR": 98, "ExerciseAngina": "Y", "Oldpeak": 2.3, "ST_Slope": "Down"},
         "P-003": {"Age": 45, "Sex": "M", "ChestPainType": "NAP", "RestingBP": 120, "Cholesterol": 210, "FastingBS": 0, "RestingECG": "Normal", "MaxHR": 160, "ExerciseAngina": "N", "Oldpeak": 0.5, "ST_Slope": "Up"},
-    },
-    "diabetes": {
-        "D-001": {"HighBP": 0, "HighChol": 0, "CholCheck": 1, "BMI": 24, "Smoker": 0, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 1, "Fruits": 1, "Veggies": 1, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 2, "MentHlth": 0, "PhysHlth": 0, "DiffWalk": 0, "Sex": 0, "Age": 4, "Education": 6, "Income": 7},
-        "D-002": {"HighBP": 1, "HighChol": 0, "CholCheck": 1, "BMI": 29, "Smoker": 0, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 1, "Fruits": 1, "Veggies": 1, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 3, "MentHlth": 0, "PhysHlth": 2, "DiffWalk": 0, "Sex": 1, "Age": 6, "Education": 5, "Income": 6},
-        "D-003": {"HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 33, "Smoker": 1, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 0, "Fruits": 0, "Veggies": 0, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 4, "MentHlth": 5, "PhysHlth": 12, "DiffWalk": 1, "Sex": 1, "Age": 9, "Education": 4, "Income": 4},
-        "D-004": {"HighBP": 1, "HighChol": 0, "CholCheck": 1, "BMI": 26, "Smoker": 0, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 1, "Fruits": 1, "Veggies": 1, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 3, "MentHlth": 0, "PhysHlth": 0, "DiffWalk": 0, "Sex": 0, "Age": 6, "Education": 5, "Income": 6},
     },
     # N-001 is cleared (not applicable), N-002 crosses, N-003 only has a fallback.
     "diabetes_nhanes": {
@@ -100,9 +81,6 @@ EDGE = {
         "all_levers": {"Age": 66, "Sex": "M", "ChestPainType": "ASY", "RestingBP": 190, "Cholesterol": 420, "FastingBS": 1, "RestingECG": "ST", "MaxHR": 110, "ExerciseAngina": "Y", "Oldpeak": 1.5, "ST_Slope": "Flat"},
         "near_threshold": {"Age": 55, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 170, "Cholesterol": 330, "FastingBS": 1, "RestingECG": "Normal", "MaxHR": 120, "ExerciseAngina": "N", "Oldpeak": 1.0, "ST_Slope": "Flat"},
     },
-    "diabetes": {
-        "all_levers": {"HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 38, "Smoker": 1, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 0, "Fruits": 0, "Veggies": 0, "HvyAlcoholConsump": 1, "AnyHealthcare": 1, "NoDocbcCost": 1, "GenHlth": 4, "MentHlth": 10, "PhysHlth": 10, "DiffWalk": 1, "Sex": 1, "Age": 10, "Education": 3, "Income": 3},
-    },
     "diabetes_nhanes": {
         # Every one of the 12 levers engaged.
         "all_levers": {"RIDAGEYR": 50, "RIAGENDR": 1, "BMXBMI": 36, "ADIPOSITY_BAND": "high", "SBP": 150, "DBP": 95, "BPXPLS": 70, "MCQ300C": 1, "CVD_ANY": 0, "PAQ650": 0, "PAQ665": 0, "LBDHDD": 35, "LBXSCH": 260, "LBXSTR": 300, "LBXSATSI": 70, "LBXSGTSI": 80, "LBXSCR": 0.85, "LBXSBU": 13, "LBXSAL": 4.3, "LBXSUA": 8.0},
@@ -116,7 +94,7 @@ EDGE = {
 }
 
 
-DISEASES = ("heart_disease", "diabetes", "diabetes_nhanes")
+DISEASES = ("heart_disease", "diabetes_nhanes")
 
 
 def _patients(disease):
@@ -130,8 +108,9 @@ def _cases():
 
 
 def _marks(disease):
-    # BRFSS cases need the retired module's model files; heart cases must not.
-    return [pytest.mark.brfss] if disease == "diabetes" else []
+    # BRFSS diabetes cases were marked brfss; that module and its cases are gone
+    # (gate B6), so no live case carries a mark.
+    return []
 
 
 CASE_PARAMS = [pytest.param(d, n, p, id=f"{d}-{n}", marks=_marks(d)) for d, n, p in _cases()]
@@ -155,7 +134,6 @@ def assert_allowed(disease, scenario, patient):
     pairs = _as_pairs(scenario, patient)
     assert pairs, "a scenario must change something"
     for feat, before, after in pairs:
-        assert feat not in ENGINEERED, f"engineered feature {feat} was perturbed directly"
         assert feat in allowed, f"immutable feature {feat} changed {before} -> {after}"
         assert before is not None, f"missing lever {feat} was used"
         assert _level(before) == _level(patient[feat])
@@ -274,33 +252,6 @@ class TestPolicyOnDemoPatients:
                 assert prob == pytest.approx(reported, abs=1e-4), (disease, name)
 
 
-@pytest.mark.brfss
-class TestPolicyViolationsFunction:
-    def test_rejects_immutable_wrong_direction_and_floor(self):
-        from backend.counterfactual_generator import DIABETES_POLICY, policy_violations
-
-        patient = DEMO["diabetes"]["D-003"]
-        assert policy_violations(patient, {"HighBP": 0}, DIABETES_POLICY)
-        assert policy_violations(patient, {"Smoker": 0}, DIABETES_POLICY)
-        assert policy_violations(patient, {"MentHlth": 0}, DIABETES_POLICY)
-        assert policy_violations(patient, {"BMI": 35.0}, DIABETES_POLICY)        # gain
-        assert policy_violations(patient, {"BMI": 17.0}, DIABETES_POLICY)        # below floor
-        assert policy_violations(patient, {"Diabetes_Clinical_Risk": 1.0}, DIABETES_POLICY)
-        assert not policy_violations(patient, {"BMI": 30.0, "PhysActivity": 1}, DIABETES_POLICY)
-
-    def test_code_policy_matches_the_specification(self):
-        from backend.counterfactual_generator import DIABETES_POLICY, IMMUTABLE_FEATURES
-
-        assert {k: (kind, float(v)) for k, (kind, v) in DIABETES_POLICY.items()} == {
-            k: (kind, float(v)) for k, (kind, v) in DIABETES_ALLOWED.items()
-        }
-        assert IMMUTABLE_FEATURES == {
-            "HighBP", "HighChol", "CholCheck", "Stroke", "HeartDiseaseorAttack", "Smoker",
-            "DiffWalk", "Age", "Sex", "Education", "Income", "AnyHealthcare", "NoDocbcCost",
-            "GenHlth", "MentHlth", "PhysHlth",
-        }
-
-
 class TestNhanesPolicy:
     def test_code_policy_matches_the_specification(self):
         from backend.diabetes_what_if_levers import DIABETES_LEVERS, IMMUTABLE
@@ -357,27 +308,6 @@ class TestNhanesPolicy:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestFinalFilter:
-    @pytest.mark.brfss
-    def test_diabetes_generator_never_emits_injected_violations(self, real_router, monkeypatch):
-        from backend import counterfactual_generator as cg
-
-        patient = _validated("diabetes", DEMO["diabetes"]["D-003"])
-
-        def poisoned(self, patient_data):
-            bad = []
-            for change in ({"HighBP": 0.0, "HighChol": 0.0, "Smoker": 0.0, "GenHlth": 1.0},
-                           {"BMI": 45.0}, {"MentHlth": 20.0}, {"BMI": 12.0, "PhysActivity": 1.0}):
-                cand = dict(patient_data)
-                cand.update(change)
-                bad.append(cand)
-            return bad
-
-        monkeypatch.setattr(cg.CounterfactualGenerator, "_sample_candidates", poisoned)
-        monkeypatch.setattr(cg, "all_improvements", lambda p, policy: {**p, "HighBP": 0.0, "HighChol": 0.0})
-        result = real_router.counterfactuals("diabetes", patient)
-        assert result["counterfactuals"] == []
-        assert result["best_achievable"] is None
-
     def test_heart_loader_never_emits_injected_violations(self, real_router, monkeypatch):
         from backend import counterfactual_generator as cg
 
@@ -425,24 +355,6 @@ class TestBestAchievable:
         assert 0 < best["probability"] < 0.9650428295135498
         assert best["risk_reduction_relative_pct"] > 0
         assert "Referral is recommended" in result["message"]
-
-    @pytest.mark.brfss
-    def test_diabetes_d003_reports_best_achievable(self, cf_results):
-        result = cf_results["diabetes"]["D-003"]
-        assert result["counterfactuals"] == []
-        assert result["crosses_threshold"] is False
-        best = result["best_achievable"]
-        assert best["crosses_threshold"] is False
-        assert best["changes"] == {"BMI": 18.5, "Fruits": 1.0, "PhysActivity": 1.0, "Veggies": 1.0}
-        assert best["new_probability_corrected"] < best["baseline_probability_corrected"]
-
-    @pytest.mark.brfss
-    def test_crossing_patient_has_no_fallback(self, cf_results):
-        result = cf_results["diabetes"]["D-002"]
-        assert result["crosses_threshold"] is True
-        assert result["best_achievable"] is None
-        assert 1 <= len(result["counterfactuals"]) <= 3
-
 
     def test_nhanes_n003_reports_best_achievable(self, cf_results):
         result = cf_results["diabetes_nhanes"]["N-003"]

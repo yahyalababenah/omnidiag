@@ -325,5 +325,17 @@ async def test_stats_count_retired_items_apart(c, doctor_token, records):
 def test_demo_seed_skips_retired_modules():
     from backend import demo_seed
 
-    assert RETIRED in demo_seed.load_demo_patients()        # the file mirrors the frontend
-    assert RETIRED not in demo_seed.active_demo_patients()  # but nothing is seeded for it
+    # Gate B6 removed the retired module's demo patients from mockPatients.js and
+    # its mirror together; active_demo_patients() still filters, for any later one.
+    assert RETIRED not in demo_seed.load_demo_patients()
+    assert RETIRED not in demo_seed.active_demo_patients()
+
+
+async def test_history_marks_a_retired_row_as_archived(c, doctor_token, records):
+    items = (await c.get(f"/api/v4/patients/{records['pt']}/predictions",
+                         headers=_auth(doctor_token))).json()["items"]
+    assert [i["disease"] for i in items] == [RETIRED]
+    assert items[0]["archived_note"].startswith("Archived module, replaced by the NHANES")
+    heart = (await c.get(f"/api/v4/patients/{records['hpt']}/predictions",
+                         headers=_auth(doctor_token))).json()["items"]
+    assert heart and all(i["archived_note"] is None for i in heart)

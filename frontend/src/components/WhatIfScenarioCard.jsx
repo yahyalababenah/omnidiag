@@ -91,11 +91,7 @@ export default function WhatIfScenarioCard({
     (bestAchievable || prediction === 1);
   if (noCrossing) {
     const best = bestAchievable ? normaliseScenario(bestAchievable, 0, patientData) : null;
-    const after = best
-      ? (typeof best.new_probability_corrected === 'number' ? best.new_probability_corrected
-        : typeof best.new_probability === 'number' ? best.new_probability
-        : best.probability)
-      : null;
+    const after = best && typeof best.probability === 'number' ? best.probability : null;
     // A "best achievable" that does not lower the estimate is not an
     // improvement; showing "49.4% → 50.4%" under "best achievable" was wrong.
     const improves =
@@ -192,42 +188,22 @@ export default function WhatIfScenarioCard({
      ════════════════════════════════════════ */
   const scenarios = counterfactuals.map((s, i) => normaliseScenario(s, i, patientData));
 
-  /**
-   * Post-intervention probability, on the scale the API returned it.
-   *
-   * The diabetes endpoint names this field `new_probability_corrected`
-   * (with `new_probability` kept as its original alias); the heart endpoint
-   * names it `probability`. Reading only `probability` used to make every
-   * diabetes scenario render as "-0%".
-   */
-  const getScenarioProbability = (s) => {
-    if (typeof s.new_probability_corrected === 'number') return s.new_probability_corrected;
-    if (typeof s.new_probability === 'number') return s.new_probability;
-    if (typeof s.probability === 'number') return s.probability;
-    return null;
-  };
+  /** Post-intervention probability, as both live modules name it. */
+  const getScenarioProbability = (s) => (typeof s.probability === 'number' ? s.probability : null);
 
   /**
    * Risk reduction, relative — "this intervention removes N% of the patient's
    * risk", not "N percentage points".
    *
-   * The backend already computes this from the two corrected probabilities
-   * and ships it as `risk_reduction_relative_pct`, so it is used as-is. It is
-   * NOT recomputed locally: subtracting two corrected probabilities gives
+   * The backend ships it as `risk_reduction_relative_pct` on a best-achievable
+   * scenario, and it is used as-is: subtracting two probabilities gives
    * percentage points, a different and much smaller number (0.4795 -> 0.0395
    * is 92% relative but 44 points), and the card is labelled as the former.
-   *
-   * - Backend (preferred): s.risk_reduction_relative_pct
-   * - Backend (legacy string): s.risk_reduction, e.g. "92%"
-   * - Heart: derived, since that endpoint sends no precomputed reduction
+   * A crossing scenario carries none, so it is derived from the probability.
    */
   const getReductionPct = (s) => {
     if (typeof s.risk_reduction_relative_pct === 'number') {
       return Math.round(s.risk_reduction_relative_pct);
-    }
-    if (typeof s.risk_reduction === 'string') {
-      const parsed = parseFloat(s.risk_reduction);
-      if (!Number.isNaN(parsed)) return Math.round(parsed);
     }
     const prob = getScenarioProbability(s);
     if (prob !== null && typeof baselineProbability === 'number' && baselineProbability > 0) {
@@ -309,11 +285,6 @@ export default function WhatIfScenarioCard({
                     <p className="text-xs text-gray-500 mt-1">
                       Post-intervention probability:{' '}
                       <strong>{(getScenarioProbability(s) * 100).toFixed(1)}%</strong>
-                      {s.probability_scale === 'corrected' && (
-                        <span className="text-gray-400">
-                          {' '}(calibrated to real-world prevalence)
-                        </span>
-                      )}
                     </p>
                   )}
                 </div>

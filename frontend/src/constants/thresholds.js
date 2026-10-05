@@ -6,18 +6,11 @@
  * which one to show. Never write a threshold literal anywhere else — read
  * it from here (or, better, from the API response) instead.
  *
- * ── Diabetes ────────────────────────────────────────────────────────────
- * The backend (`EnsembleModelLoader.predict()`, backend/ensemble_loader.py)
- * returns a live `inference_threshold` field on every /api/v4/diabetes/predict
- * response, sourced from configs/diabetes.yaml → model.inference_threshold
- * (tuned for a 2x false-negative cost). That value is read straight from
- * the API response below — nothing for diabetes is hardcoded here.
- *
- * Diabetes probabilities are prevalence-corrected on the backend: both
- * `result.confidence` and `result.inference_threshold` are stated on the
- * deployment prevalence (~14%), so comparing them here is like-for-like.
- * The raw model output is in `result.probability_raw` /
- * `result.inference_threshold_raw` for auditing — do not mix the two scales.
+ * ── Modules with a threshold ────────────────────────────────────────────
+ * A module that decides by a cut-point returns a live `inference_threshold`
+ * on every /predict response; it is read from there and nothing is hardcoded
+ * here. (The retired BRFSS diabetes module was the last such module, with its
+ * prevalence-corrected scale; no live module corrects its probabilities.)
  *
  * ── Modules that decide without a threshold ─────────────────────────────
  * A module whose response carries `output_type: 'conformal_decision'` does

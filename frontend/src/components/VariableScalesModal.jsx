@@ -19,20 +19,14 @@ import { lookupMedicalTerm } from '../utils/medicalDictionary';
 /**
  * Where each module's variables and their coding actually come from.
  *
- * The footer used to state "Data source: CDC BRFSS 2015 Health Indicators"
- * on every page, including the heart module — whose variables come from the
- * UCI heart-disease cohort and have nothing to do with BRFSS. A judge
- * reading the scales drawer on the heart page was told the wrong provenance
- * for every row in front of them.
+ * The footer used to state one survey's provenance on every page, including
+ * the heart module, whose variables come from the UCI heart-disease cohort.
+ * A module not listed here says its scales come from its own schema.
  */
 const DISEASE_SCALE_SOURCES = {
   heart_disease: {
     source: 'UCI Heart Disease (Cleveland, Hungarian, Long Beach VA, Switzerland — 920 patients)',
     note: 'Values are direct clinical measurements; Age is in years.',
-  },
-  diabetes: {
-    source: 'CDC BRFSS 2015 Diabetes Health Indicators',
-    note: 'Self-reported survey variables. Age is a BRFSS 5-year band (1 = 18–24 … 13 = 80+), not years; GenHlth is 1 (excellent) to 5 (poor).',
   },
 };
 

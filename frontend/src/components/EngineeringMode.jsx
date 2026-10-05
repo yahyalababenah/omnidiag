@@ -75,9 +75,8 @@ export default function EngineeringMode() {
       setError(err.message || 'Inference failed. Is the backend running?');
     }
 
-    // Counterfactuals: only supported by ensemble diseases (e.g. diabetes).
-    // Skip entirely for single-model diseases (e.g. heart_disease) to avoid a
-    // noisy 501 error in the browser console.
+    // Counterfactuals: only for a module that declares support for them, to
+    // avoid a noisy 501 error in the browser console.
     if (currentDiseaseInfo?.supports_counterfactuals) {
       try {
         const cfResponse = await api.counterfactuals(selectedDisease, formData);

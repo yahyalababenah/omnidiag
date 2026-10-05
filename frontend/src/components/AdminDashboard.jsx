@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { API_BASE } from '../api'
+import { responseError } from '../utils/apiError'
 
 const BASE = API_BASE
 const API_V4 = `${API_BASE}/api/v4`
@@ -346,15 +347,18 @@ function AnnotationQueueTable({ token }) {
     try {
       const isSkip = label === 'skip'
       const note = (notes[itemId] ?? '').trim()
-      await fetch(`${API_V4}/review/${itemId}/${isSkip ? 'skip' : 'annotate'}`, {
+      const res = await fetch(`${API_V4}/review/${itemId}/${isSkip ? 'skip' : 'annotate'}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         ...(isSkip ? {} : { body: JSON.stringify({ label, notes: note || null }) }),
       })
-      setNotes(n => { const next = { ...n }; delete next[itemId]; return next })
-      load(page)
-    } catch {
-      // silently retry on next refresh
+      // A refusal (e.g. 410 for a retired module) used to be dropped silently.
+      const failure = res.ok ? '' : await responseError(res)
+      if (res.ok) setNotes(n => { const next = { ...n }; delete next[itemId]; return next })
+      await load(page)
+      if (failure) setError(failure)
+    } catch (e) {
+      setError(e.message)
     } finally {
       setAnnotating(a => { const n = { ...a }; delete n[itemId]; return n })
     }
@@ -384,6 +388,9 @@ function AnnotationQueueTable({ token }) {
               className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
                 statusTab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {t}{stats?.[t] != null ? ` (${stats[t]})` : ''}
+              {/* Retired modules' pending items are listed but counted apart. */}
+              {t === 'pending' && typeof stats?.retired_pending === 'number' && stats.retired_pending > 0
+                ? ` + ${stats.retired_pending} archived` : ''}
             </button>
           ))}
         </div>
@@ -425,7 +432,12 @@ function AnnotationQueueTable({ token }) {
                   const busy = annotating[item.id] !== undefined
                   return (
                     <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-2 font-medium capitalize">{pred.disease ?? '—'}</td>
+                      <td className="py-2 px-2 font-medium capitalize">
+                        {pred.disease ?? '—'}
+                        {item.retired === true && (
+                          <span className="ml-1.5 normal-case px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-semibold">archived module</span>
+                        )}
+                      </td>
                       <td className="py-2 px-2">
                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                           pred.diagnosis === 'Positive' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
@@ -462,7 +474,9 @@ function AnnotationQueueTable({ token }) {
                         <span className="ml-2 text-[10px] text-gray-400">
                           {item.reviewer ?? '—'}{item.reviewed_at ? ` · ${new Date(item.reviewed_at).toLocaleString()}` : ''}
                         </span>
-                      </td></>) : (<>
+                      </td></>) : item.retired === true ? (<>
+                      {/* A retired module's item: readable, not labellable (410). */}
+                      <td className="py-2 px-2 text-gray-400 text-xs" colSpan={2}>Read only — this module is retired</td></>) : (<>
                       <td className="py-2 px-2">
                         {/* Optional. Saved with the label, not instead of it. */}
                         <input

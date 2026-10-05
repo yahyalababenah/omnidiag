@@ -292,15 +292,6 @@ export default function PDFReport({
                 {confidence}%
                 {threshold != null && ` (decision threshold ${(threshold * 100).toFixed(1)}%)`}
               </Text>
-              {/* A printed report leaves the screen. Without the threshold on
-                  the page, a reader sees "Positive" beside 11% and assumes a
-                  mistake: diabetes probabilities are calibrated to real-world
-                  prevalence, so they are small by construction. */}
-              {result?.prevalence_correction_applied && (
-                <Text style={[styles.confLabel, { marginTop: 1 }]}>
-                  Calibrated to real-world prevalence
-                </Text>
-              )}
             </View>
           </View>
           {shapText && (
