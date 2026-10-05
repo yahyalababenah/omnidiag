@@ -73,10 +73,26 @@ EDGE = {
 }
 
 
+DISEASES = ("heart_disease", "diabetes")
+
+
+def _patients(disease):
+    return {**DEMO[disease], **EDGE.get(disease, {})}
+
+
 def _cases():
-    for disease in ("heart_disease", "diabetes"):
-        for name, patient in {**DEMO[disease], **EDGE.get(disease, {})}.items():
+    for disease in DISEASES:
+        for name, patient in _patients(disease).items():
             yield disease, name, patient
+
+
+def _marks(disease):
+    # BRFSS cases need the retired module's model files; heart cases must not.
+    return [pytest.mark.brfss] if disease == "diabetes" else []
+
+
+CASE_PARAMS = [pytest.param(d, n, p, id=f"{d}-{n}", marks=_marks(d)) for d, n, p in _cases()]
+DISEASE_PARAMS = [pytest.param(d, id=d, marks=_marks(d)) for d in DISEASES]
 
 
 def _as_pairs(scenario, patient):
@@ -115,12 +131,29 @@ def real_router():
     return _RealOmniDiagRouter(configs_dir=_CONFIGS_DIR)
 
 
+class PerDiseaseResults(dict):
+    """{disease: {case name: /counterfactuals result}}, one disease at a time.
+
+    A disease is computed the first time a test asks for it, so a heart test
+    never loads another disease's model: when one module's files are absent
+    (the BRFSS weights are not in a clean clone), only its own tests fail.
+    """
+
+    def __init__(self, router):
+        super().__init__()
+        self._router = router
+
+    def __missing__(self, disease):
+        self[disease] = {
+            name: self._router.counterfactuals(disease, _validated(disease, patient))
+            for name, patient in _patients(disease).items()
+        }
+        return self[disease]
+
+
 @pytest.fixture(scope="module")
 def cf_results(real_router):
-    return {
-        (disease, name): real_router.counterfactuals(disease, _validated(disease, patient))
-        for disease, name, patient in _cases()
-    }
+    return PerDiseaseResults(real_router)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -128,23 +161,24 @@ def cf_results(real_router):
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestPolicyOnDemoPatients:
-    @pytest.mark.parametrize("disease,name,patient", list(_cases()), ids=[f"{d}-{n}" for d, n, _ in _cases()])
+    @pytest.mark.parametrize("disease,name,patient", CASE_PARAMS)
     def test_every_scenario_respects_the_policy(self, cf_results, disease, name, patient):
-        result = cf_results[(disease, name)]
+        result = cf_results[disease][name]
         patient = _validated(disease, patient)
         for scenario in result["counterfactuals"]:
             assert_allowed(disease, scenario, patient)
         if result.get("best_achievable"):
             assert_allowed(disease, result["best_achievable"], patient)
 
-    def test_the_cases_exercise_scenarios_and_fallbacks(self, cf_results):
+    @pytest.mark.parametrize("disease", DISEASE_PARAMS)
+    def test_the_cases_exercise_scenarios_and_fallbacks(self, cf_results, disease):
         # Guards section A against passing trivially on empty results.
-        with_scenarios = [k for k, r in cf_results.items() if r["counterfactuals"]]
-        with_fallback = [k for k, r in cf_results.items() if r.get("best_achievable")]
-        assert {d for d, _ in with_scenarios} == {"heart_disease", "diabetes"}
-        assert {d for d, _ in with_fallback} == {"heart_disease", "diabetes"}
+        results = cf_results[disease].values()
+        assert any(r["counterfactuals"] for r in results), f"{disease}: no case yields a scenario"
+        assert any(r.get("best_achievable") for r in results), f"{disease}: no case yields a fallback"
 
-    def test_crossing_scenarios_really_cross(self, real_router, cf_results):
+    @pytest.mark.parametrize("disease", DISEASE_PARAMS)
+    def test_crossing_scenarios_really_cross(self, real_router, cf_results, disease):
         """A "crossing" scenario must actually reach a negative decision.
 
         Read the disease's decision rule from its config rather than assuming
@@ -154,17 +188,15 @@ class TestPolicyOnDemoPatients:
         are the same assertion — the scenario really crosses — stated in the
         terms the module actually decides in.
         """
-        for (disease, name), result in cf_results.items():
-            threshold = real_router.get_disease_info(disease)["inference_threshold"]
+        threshold = real_router.get_disease_info(disease)["inference_threshold"]
+        for name, result in cf_results[disease].items():
             for scenario in result["counterfactuals"]:
                 assert scenario["crosses_threshold"] is True
                 prob = scenario.get("new_probability_corrected", scenario.get("probability"))
                 if threshold is not None:
                     assert prob < threshold + 1e-4, (disease, name, prob)
                 else:
-                    patient = _validated(
-                        disease, {**DEMO[disease], **EDGE.get(disease, {})}[name]
-                    )
+                    patient = _validated(disease, _patients(disease)[name])
                     moved = {**patient, **{
                         c["feature"]: c["counterfactual_value"] for c in scenario["changes"]
                     }}
@@ -173,11 +205,12 @@ class TestPolicyOnDemoPatients:
                     )
 
 
-    def test_reported_changes_fully_explain_the_probability(self, real_router, cf_results):
+    @pytest.mark.parametrize("disease", DISEASE_PARAMS)
+    def test_reported_changes_fully_explain_the_probability(self, real_router, cf_results, disease):
         # Re-predict from the patient plus ONLY the reported changes: a hidden
         # change to any other feature would show up as a mismatch here.
-        for (disease, name), result in cf_results.items():
-            patient = _validated(disease, {**DEMO[disease], **EDGE.get(disease, {})}[name])
+        for name, result in cf_results[disease].items():
+            patient = _validated(disease, _patients(disease)[name])
             scenarios = result["counterfactuals"] + (
                 [result["best_achievable"]] if result.get("best_achievable") else []
             )
@@ -190,6 +223,7 @@ class TestPolicyOnDemoPatients:
                 assert prob == pytest.approx(reported, abs=1e-4), (disease, name)
 
 
+@pytest.mark.brfss
 class TestPolicyViolationsFunction:
     def test_rejects_immutable_wrong_direction_and_floor(self):
         from backend.counterfactual_generator import DIABETES_POLICY, policy_violations
@@ -221,6 +255,7 @@ class TestPolicyViolationsFunction:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestFinalFilter:
+    @pytest.mark.brfss
     def test_diabetes_generator_never_emits_injected_violations(self, real_router, monkeypatch):
         from backend import counterfactual_generator as cg
 
@@ -264,7 +299,7 @@ class TestFinalFilter:
 
 class TestBestAchievable:
     def test_heart_p002_reports_best_achievable(self, cf_results):
-        result = cf_results[("heart_disease", "P-002")]
+        result = cf_results["heart_disease"]["P-002"]
         assert result["counterfactuals"] == []
         assert result["crosses_threshold"] is False
         best = result["best_achievable"]
@@ -274,8 +309,9 @@ class TestBestAchievable:
         assert best["risk_reduction_relative_pct"] > 0
         assert "Referral is recommended" in result["message"]
 
+    @pytest.mark.brfss
     def test_diabetes_d003_reports_best_achievable(self, cf_results):
-        result = cf_results[("diabetes", "D-003")]
+        result = cf_results["diabetes"]["D-003"]
         assert result["counterfactuals"] == []
         assert result["crosses_threshold"] is False
         best = result["best_achievable"]
@@ -283,8 +319,9 @@ class TestBestAchievable:
         assert best["changes"] == {"BMI": 18.5, "Fruits": 1.0, "PhysActivity": 1.0, "Veggies": 1.0}
         assert best["new_probability_corrected"] < best["baseline_probability_corrected"]
 
+    @pytest.mark.brfss
     def test_crossing_patient_has_no_fallback(self, cf_results):
-        result = cf_results[("diabetes", "D-002")]
+        result = cf_results["diabetes"]["D-002"]
         assert result["crosses_threshold"] is True
         assert result["best_achievable"] is None
         assert 1 <= len(result["counterfactuals"]) <= 3
@@ -313,12 +350,13 @@ print(json.dumps(out, sort_keys=True))
 
 
 class TestDeterminism:
-    def test_identical_scenarios_under_different_hash_seeds(self):
+    @pytest.mark.parametrize("disease", DISEASE_PARAMS)
+    def test_identical_scenarios_under_different_hash_seeds(self, disease):
         runs = []
         for seed in ("1", "4242"):
             env = {**os.environ, "PYTHONHASHSEED": seed}
             proc = subprocess.run(
-                [sys.executable, "-c", _PROBE, _ROOT, json.dumps(DEMO)],
+                [sys.executable, "-c", _PROBE, _ROOT, json.dumps({disease: DEMO[disease]})],
                 capture_output=True, text=True, env=env, timeout=900,
             )
             assert proc.returncode == 0, proc.stderr[-2000:]

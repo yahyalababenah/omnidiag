@@ -321,6 +321,7 @@ async def _post_predict(client, disease, payload):
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestDiabetesPredictApi:
+    @pytest.mark.brfss
     @pytest.mark.parametrize("payload", [DIABETES_LOW, DIABETES_HIGH], ids=["low", "high"])
     async def test_response_carries_audit_fields(self, live_client, payload):
         resp = await _post_predict(live_client, "diabetes", payload)
@@ -336,6 +337,7 @@ class TestDiabetesPredictApi:
         # The number the UI shows is the corrected one.
         assert data["confidence"] == data["probability_corrected"]
 
+    @pytest.mark.brfss
     @pytest.mark.parametrize("payload", [DIABETES_LOW, DIABETES_HIGH], ids=["low", "high"])
     async def test_corrected_is_formula_of_raw_and_lower(self, live_client, payload):
         data = (await _post_predict(live_client, "diabetes", payload)).json()
@@ -344,6 +346,7 @@ class TestDiabetesPredictApi:
         assert cor < raw
         assert cor == pytest.approx(correct(raw), abs=1e-12)
 
+    @pytest.mark.brfss
     @pytest.mark.parametrize(
         "payload", [DIABETES_LOW, DIABETES_HIGH, DIABETES_MIN, DIABETES_MAX],
         ids=["low", "high", "min", "max"],
@@ -356,6 +359,7 @@ class TestDiabetesPredictApi:
         # ... and the raw pair gives the same decision.
         assert expected == int(data["probability_raw"] >= data["inference_threshold_raw"])
 
+    @pytest.mark.brfss
     async def test_risk_bands_are_returned_on_the_displayed_scale(self, live_client):
         # The UI colours the badge with these; they must be on the same scale as
         # `confidence`, i.e. corrected, or a Positive patient reads LOW.
@@ -366,6 +370,7 @@ class TestDiabetesPredictApi:
             assert data["risk_bands"][band] < raw_value
         assert data["risk_bands"]["moderate"] < data["risk_bands"]["high"]
 
+    @pytest.mark.brfss
     async def test_band_membership_is_unchanged_by_the_correction(self, live_client):
         # Same patient, same band before and after: the correction rescales.
         for payload in (DIABETES_LOW, DIABETES_HIGH, DIABETES_MIN, DIABETES_MAX):
@@ -381,6 +386,7 @@ class TestDiabetesPredictApi:
         diabetes_bands = real_router.get_disease_info("diabetes")["risk_bands"]
         assert diabetes_bands["high"] == pytest.approx(correct(RISK_BANDS_RAW["high"]))
 
+    @pytest.mark.brfss
     async def test_fixtures_exercise_both_decisions(self, live_client):
         # Guards the test above against passing trivially on one class only.
         low = (await _post_predict(live_client, "diabetes", DIABETES_LOW)).json()
@@ -606,6 +612,7 @@ class TestHeartNonRegression:
 # E. Extreme and malformed input
 # ═════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.brfss
 class TestDiabetesEdgeInputs:
     @pytest.mark.parametrize("payload", [DIABETES_MIN, DIABETES_MAX], ids=["min", "max"])
     def test_schema_bounds_do_not_raise(self, diabetes_loader, payload):

@@ -247,6 +247,7 @@ class TestBuiltinFamiliesInterface:
         assert caps.supports_vectorized_batch
         assert caps.explainer == "linear" and not caps.supports_tree_shap
 
+    @pytest.mark.brfss
     def test_diabetes_capabilities(self, real_router):
         caps = real_router._get_loader("diabetes").capabilities
         assert caps.supports_tree_shap and not caps.supports_vectorized_batch
@@ -274,6 +275,7 @@ class TestBuiltinFamiliesInterface:
         assert [by_name[f] for f in sr.feature_names] == sr.values.tolist()
         assert sr.base_value == explained["base_value"]
 
+    @pytest.mark.brfss
     def test_diabetes_predict_proba_is_the_raw_scale(self, real_router):
         backend = real_router._get_loader("diabetes")
         out = real_router.predict("diabetes", dict(DIABETES_PATIENT))
@@ -281,6 +283,7 @@ class TestBuiltinFamiliesInterface:
         assert float(proba[0]) == out["probability_raw"]
         assert len(backend.feature_names) == 21
 
+    @pytest.mark.brfss
     def test_diabetes_shap_values_match_explain(self, real_router):
         backend = real_router._get_loader("diabetes")
         sr = backend.shap_values(pd.DataFrame([DIABETES_PATIENT]))
@@ -351,6 +354,14 @@ class TestDemoLogregThroughRealApp:
         assert info["demo_logreg"]["available"] is True
         assert info["demo_logreg"]["supports_counterfactuals"] is False
         assert info["heart_disease"]["supports_counterfactuals"] is True
+
+    @pytest.mark.brfss
+    async def test_brfss_listed_by_diseases_endpoint(self, demo_client):
+        # Split out of the test above: /diseases omits a module whose model
+        # files are absent, so this half needs the BRFSS weights.
+        resp = await demo_client.get("/api/v4/diseases")
+        assert resp.status_code == 200, resp.text
+        info = {d["name"]: d["info"] for d in resp.json()["diseases"]}
         assert info["diabetes"]["supports_counterfactuals"] is True
 
 

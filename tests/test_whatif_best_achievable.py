@@ -17,9 +17,11 @@ from backend.counterfactual_generator import (
 )
 from tests.test_whatif_policy import (
     DEMO,
+    DISEASES,
     EDGE,
     _CONFIGS_DIR,
     _RealOmniDiagRouter,
+    _marks,
     _validated,
 )
 
@@ -76,19 +78,34 @@ EXTRA = {
 }
 
 
-def _all_cases():
-    for disease in ("heart_disease", "diabetes"):
-        cases = {**DEMO[disease], **EDGE.get(disease, {}), **EXTRA.get(disease, {})}
-        for name, patient in cases.items():
-            yield disease, name, patient
+def _patients(disease):
+    return {**DEMO[disease], **EDGE.get(disease, {}), **EXTRA.get(disease, {})}
+
+
+CASE_PARAMS = [
+    pytest.param(d, n, p, id=f"{d}-{n}", marks=_marks(d))
+    for d in DISEASES for n, p in _patients(d).items()
+]
+
+
+class _PerDisease(dict):
+    # Same idea as test_whatif_policy.PerDiseaseResults: a disease is computed
+    # on first use, so a heart case never loads the BRFSS model.
+    def __init__(self, router):
+        super().__init__()
+        self._router = router
+
+    def __missing__(self, disease):
+        self[disease] = {
+            n: self._router.counterfactuals(disease, _validated(disease, p))
+            for n, p in _patients(disease).items()
+        }
+        return self[disease]
 
 
 @pytest.fixture(scope="module")
 def results():
-    router = _RealOmniDiagRouter(configs_dir=_CONFIGS_DIR)
-    return {
-        (d, n): router.counterfactuals(d, _validated(d, p)) for d, n, p in _all_cases()
-    }
+    return _PerDisease(_RealOmniDiagRouter(configs_dir=_CONFIGS_DIR))
 
 
 def _prob(scenario):
@@ -98,10 +115,9 @@ def _prob(scenario):
     raise AssertionError(f"no probability in {scenario}")
 
 
-@pytest.mark.parametrize("disease,name,patient", list(_all_cases()),
-                         ids=[f"{d}-{n}" for d, n, _ in _all_cases()])
+@pytest.mark.parametrize("disease,name,patient", CASE_PARAMS)
 def test_best_achievable_is_below_baseline(results, disease, name, patient):
-    r = results[(disease, name)]
+    r = results[disease][name]
     best = r.get("best_achievable")
     if best is None:
         return
@@ -111,10 +127,9 @@ def test_best_achievable_is_below_baseline(results, disease, name, patient):
     assert best["risk_reduction_absolute_pp"] > 0
 
 
-@pytest.mark.parametrize("disease,name,patient", list(_all_cases()),
-                         ids=[f"{d}-{n}" for d, n, _ in _all_cases()])
+@pytest.mark.parametrize("disease,name,patient", CASE_PARAMS)
 def test_no_best_is_explained(results, disease, name, patient):
-    r = results[(disease, name)]
+    r = results[disease][name]
     if r.get("counterfactuals") or r.get("best_achievable") or r.get("status") == "not_applicable":
         return
     # Flagged, nothing crosses, nothing lowers: the message must say which.
