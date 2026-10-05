@@ -90,12 +90,13 @@ const MEDICAL_DICTIONARY = {
   'Difficulty Walking':
     'Difficulty Walking — Self-reported serious difficulty walking or climbing stairs. '
     + 'Scale: 0 = No difficulty, 1 = Serious difficulty.',
+  // One entry serves heart's field name and NHANES's label ("Sex" for RIAGENDR),
+  // and the two code it differently, so it states both.
   Sex:
-    'Biological sex assigned at birth — used as a demographic covariate in risk models. '
-    + 'Scale: 0 = Female, 1 = Male.',
+    'Recorded sex — used as a demographic covariate in the risk model. '
+    + 'Coding: M / F in the heart module; 1 = male, 0 = female in the NHANES module.',
   Age:
-    'Patient age category — a primary risk factor for cardiovascular and metabolic disease. '
-    + 'BRFSS categories: 1=18–24, 2=25–29, 3=30–34, 4=35–39, 5=40–44, 6=45–49, 7=50–54, 8=55–59, 9=60–64, 10=65–69, 11=70–74, 12=75–79, 13=80+.',
+    'Patient age in years — a primary risk factor for coronary artery disease.',
   Education:
     'Education Level — Highest level of educational attainment. '
     + 'Scale: 1=None/Kindergarten, 2=Grades 1–8, 3=Grades 9–11, 4=HS Grad/GED, 5=Some College, 6=College Grad.',
