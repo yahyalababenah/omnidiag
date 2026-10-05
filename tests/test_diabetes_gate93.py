@@ -276,13 +276,6 @@ def test_report_glossary_describes_every_nhanes_feature(backend):
         assert feature in _FEATURE_GLOSSARY, f"{feature} would appear unexplained in a report"
 
 
-def test_glossary_still_describes_the_legacy_features():
-    from backend.llm.report_generator import _FEATURE_GLOSSARY
-
-    for feature in ("Cholesterol", "ChestPainType", "HighBP", "GenHlth"):
-        assert feature in _FEATURE_GLOSSARY
-
-
 def test_report_does_not_call_a_platt_interval_venn_abers():
     """Naming the wrong method in a clinical report is a factual error about how
     the number was produced."""

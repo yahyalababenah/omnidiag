@@ -81,8 +81,10 @@ class TestRuleBasedFallback:
         # Top feature by |SHAP| is Age
         assert "Age" in result["report"]
 
-    async def test_low_probability_fallback_includes_low_actions(self):
-        """L-2d: Low-probability rule-based report includes low-priority guidance."""
+    async def test_a_module_without_bands_gets_no_band_advice(self):
+        """L-2d (since gate B5): no module configures bands, so the fallback
+        neither invents one nor gives band-keyed advice such as 'rescreen in
+        12 months'."""
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
                 disease_display="Diabetes",
@@ -92,9 +94,11 @@ class TestRuleBasedFallback:
                 shap_values=_SHAP_VALUES,
                 features=_FEATURES,
             )
-        # LOW band → "Routine follow-up" or "preventive"
-        report_lower = result["report"].lower()
-        assert any(term in report_lower for term in ("routine", "preventive", "rescreen", "low"))
+        assert result["risk_band"] is None
+        report = result["report"]
+        for banned in ("Rescreen in 12 months", "priority", "Risk Band", "HIGH", "MODERATE"):
+            assert banned not in report
+        assert "no decision threshold and no risk band" in report
 
 
 class TestMockedAPICall:
@@ -191,61 +195,25 @@ class TestFormatShap:
         assert "Diabetes" in result
 
 
-# ── Corrected-scale bands (diabetes) ──────────────────────────────────────────
-# Diabetes probabilities are on the deployment prior (23.7%, Jordan's actual
-# diabetes prevalence -- was ~14%, a US/BRFSS placeholder, until 2026-09-21),
-# so its bands are the corrected twins of the raw 0.70 / 0.40 cut-points.
-# Literal 0.70 / 0.40 made HIGH unreachable and filed thousands of Positive
-# patients under LOW.
-_DIABETES_BANDS = {"high": 0.4202127659574468, "moderate": 0.1715526601520087}
+# ── No bands since gate B5 ────────────────────────────────────────────────────
+# The corrected-scale bands belonged to the retired BRFSS module. A config that
+# declares bands is refused at load now, and the report never computes one.
 
 
-class TestCorrectedScaleBands:
-    async def test_diabetes_positive_is_high_on_corrected_bands(self):
-        """L-5a: 0.64 corrected (raw 0.85) is HIGH, not MODERATE."""
+class TestNoBandsSinceB5:
+    async def test_caller_bands_and_band_are_ignored(self):
         with patch.object(rg, "_get_api_key", lambda: ""):
             result = await generate_report(
-                disease_display="Diabetes",
-                probability_corrected=0.6377,
-                label="Positive",
-                shap_values=_SHAP_VALUES,
-                features=_FEATURES,
-                risk_bands=_DIABETES_BANDS,
-                decision_threshold=0.108184,
-            )
-        assert result["risk_band"] == "HIGH"
-        assert "Urgent specialist referral" in result["report"]
-
-    async def test_diabetes_moderate_band(self):
-        """L-5b: 0.193 corrected (raw 0.435) is MODERATE, not LOW."""
-        with patch.object(rg, "_get_api_key", lambda: ""):
-            result = await generate_report(
-                disease_display="Diabetes",
-                probability_corrected=0.1930,
-                label="Positive",
-                risk_bands=_DIABETES_BANDS,
-            )
-        assert result["risk_band"] == "MODERATE"
-
-    async def test_caller_band_is_advisory(self):
-        """L-5c: a contradicting caller-supplied band is discarded."""
-        with patch.object(rg, "_get_api_key", lambda: ""):
-            result = await generate_report(
-                disease_display="Diabetes",
+                disease_display="Any module",
                 probability_corrected=0.6377,
                 label="Positive",
                 confidence_band="LOW",
-                risk_bands=_DIABETES_BANDS,
+                risk_bands={"high": 0.42, "moderate": 0.17},
+                decision_threshold=0.108184,
             )
-        assert result["risk_band"] == "HIGH"
-
-    async def test_heart_default_bands_unchanged(self):
-        """L-5d: no bands supplied -> the historical 0.70 / 0.40 cut-points."""
-        with patch.object(rg, "_get_api_key", lambda: ""):
-            result = await generate_report(
-                disease_display="Heart", probability_corrected=0.55, label="Positive",
-            )
-        assert result["risk_band"] == "MODERATE"
+        assert result["risk_band"] is None
+        assert "Urgent specialist referral" not in result["report"]
+        assert "decision threshold is 0.1082" in result["report"]
 
     async def test_legacy_probability_keyword_is_gone(self):
         """L-5e: the scaleless `probability=` alias no longer exists internally."""

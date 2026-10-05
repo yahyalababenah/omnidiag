@@ -13,7 +13,10 @@ both a probability and its decision threshold leaves every decision unchanged:
     p >= t   <=>   correct(p) >= correct(t)
 It changes what the number means, not who is flagged.
 
-The inverse is the same map with the two priors swapped.
+Since gate B5 no module is corrected (that was BRFSS diabetes, retired). The one
+remaining use is the active-learning sampler, which uses the map with
+(train = t, deploy = 0.5) to centre a decision threshold t on 0.5.
+
 """
 
 from typing import Union
@@ -54,10 +57,3 @@ def apply_prevalence_correction(
     # so it is >= min(1, R) > 0 for every p in [0, 1]: no division by zero.
     out = (r * arr) / ((1.0 - arr) + r * arr)
     return float(out) if np.ndim(out) == 0 else out
-
-
-def invert_prevalence_correction(
-    p_corrected: ArrayLike, prevalence_train: float, prevalence_deploy: float
-) -> ArrayLike:
-    """Map a deployment-prior probability back to the training prior."""
-    return apply_prevalence_correction(p_corrected, prevalence_deploy, prevalence_train)

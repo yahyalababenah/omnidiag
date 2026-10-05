@@ -62,7 +62,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.router import OmniDiagRouter
-from backend.retired_diseases import display_name as retired_display_name, reject_if_retired
+from backend.retired_diseases import is_retired, reject_if_retired
 from backend.schemas import get_schema_for_disease, ExplainResponse, PredictResponse
 from backend.auth.routes import router as auth_router
 from backend.admin.routes import router as admin_router
@@ -1080,12 +1080,22 @@ async def generate_clinical_report(
     body: ReportRequest,
     _user: Optional[User] = Depends(get_optional_user),
 ) -> Dict[str, Any]:
+    # A retired module's stored row: a read, so allowed, but it never reaches the
+    # LLM. The archived report restates the stored result under a banner naming
+    # the module that replaced it (gate B5).
+    if is_retired(body.disease):
+        from backend.llm.report_generator import archived_report
+        return {
+            "disease": body.disease,
+            "report": archived_report(
+                body.disease, body.resolved_probability_corrected, body.label, body.shap_values,
+            ),
+            "source": "archived",
+            "archived": True,
+            "risk_band": None,
+        }
     disease_info = router.get_disease_info(body.disease)
-    # A retired module has no config, but a report rendered from one of its
-    # stored rows is a read and stays allowed; it names the module as retired.
-    disease_display = (disease_info or {}).get(
-        "display_name", retired_display_name(body.disease)
-    )
+    disease_display = (disease_info or {}).get("display_name", body.disease)
     probability_corrected = body.resolved_probability_corrected
 
     # Bands come from the disease itself, already on the same scale as the

@@ -5,45 +5,27 @@ Generates structured clinical narrative reports from prediction results
 using the DeepSeek API (OpenAI-compatible). Falls back to a rule-based
 template when the API key is unavailable (e.g. in offline/demo environments).
 
-── Probability scale ──────────────────────────────────────────────────────
-`probability_corrected` is on the deployment scale — the same scale as the
-diagnosis label and as `risk_bands`, both taken from the /predict response.
-For diabetes that means a Positive patient can read 11%, because the decision
-threshold there is 5.98%, not 50%.
+── Decisions, not bands ───────────────────────────────────────────────────
+Every live module (heart, NHANES) reports a conformal decision: there is no
+risk band and no decision threshold, and the report says so instead of
+inventing either. The threshold-and-band wording that the retired BRFSS
+diabetes module needed was removed in gate B5, together with its bands.
 
-Bands therefore come from `risk_bands` and never from a literal. Reading
-HIGH/MODERATE off hardcoded 0.70/0.40 put every corrected-scale patient in
-LOW: on the 14,139-row test split that was 6,576 Positive patients being told
-"routine follow-up, rescreen in 12 months", and HIGH became unreachable.
-
-The band shown in the report, the band used to pick the recommended actions
-and the band sent to the LLM are all the same value, computed once here.
+A report rendered from a stored row of a RETIRED module (backend/
+retired_diseases.py) never reaches the LLM: `archived_report()` restates the
+stored result under an "archived module" banner, rule-based, with no band, no
+threshold and no recommended actions.
 """
 
 import os
 import logging
 from typing import Any, Dict, List, Mapping, Optional
 
-from backend.probability_scale import classify_band
+from backend.retired_diseases import RETIRED_DISEASES
 
 log = logging.getLogger("omnidiag.llm")
 
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-
-# Fallback display bands for a THRESHOLD module that configures none.
-#
-# It is no longer heart's fallback, and must never become one again. Heart
-# configures `risk_bands: null` deliberately (D-32): Gate 6 measured that the
-# probability's meaning does not transport between hospitals, so a HIGH /
-# MODERATE / LOW badge on it claims a precision the model does not have. Until
-# Gate 8.4 this constant was silently supplying that badge anyway -- and the
-# comment here justified it with the ARCHIVED model's threshold (0.3695,
-# heart_full_tuned.pkl), a model that has not shipped since Gate 8.1.
-#
-# A module whose output_type is 'conformal_decision' gets NO band at all; it
-# reports its decision and its Venn-Abers interval instead. Missing bands are
-# not 0.7/0.4, and a missing threshold is not 0.5. The absence is information.
-DEFAULT_RISK_BANDS: Dict[str, float] = {"high": 0.7, "moderate": 0.4}
 
 #: Recommended-action blocks keyed on a CONFORMAL DECISION rather than a band.
 #: A conformal module has no band to key on, and "uncertain" is a real third
@@ -157,21 +139,14 @@ def forbidden_content(text: str) -> list:
 # (heart has no threshold), and it was given a HIGH/MODERATE/LOW band heart
 # configures none of. Five false premises, before the model wrote a word -- in
 # the text a reviewer reads.
-_THRESHOLD_DECISION_BLOCK = """Risk Probability: {probability:.1%}  (calibrated to real-world prevalence)
+#: How a module that is NOT conformal decided. No live module takes this path;
+#: it exists so one never gets a band it does not have.
+_PLAIN_DECISION_BLOCK = """Estimated Probability: {probability:.1%}
 Decision Threshold: {threshold_note}
-Risk Label: {label}
-Risk Band: {band}
+Label: {label}
 
-Note: this probability is stated on the deployment population's prevalence, so
-it is NOT comparable to a 50% cut-off. Judge it against the decision threshold
-and the risk band above, never against 50%.
-
-The label and the band answer different questions and do not contradict each
-other: the LABEL says which side of the decision threshold this patient falls
-(whether to act at all), the BAND says how urgently among those flagged. A
-Positive patient in the MODERATE band is above the threshold and warrants
-follow-up; do not describe such a patient as low risk, and do not describe a
-Negative patient as flagged."""
+This module configures no risk band. Do not invent one, and do not describe the
+probability as high, moderate or low risk."""
 
 _CONFORMAL_DECISION_BLOCK = """Estimated Probability: {probability:.1%}{interval_note}
 Decision: {decision_text}
@@ -193,8 +168,8 @@ def _decision_block(
 ) -> str:
     """The prompt's description of how this module decided, per module."""
     if output_type != "conformal_decision":
-        return _THRESHOLD_DECISION_BLOCK.format(
-            probability=probability, threshold_note=threshold_note, label=label, band=band,
+        return _PLAIN_DECISION_BLOCK.format(
+            probability=probability, threshold_note=threshold_note, label=label,
         )
 
     # The interval's NAME follows the module's calibration layer. Calling a Platt
@@ -295,26 +270,6 @@ _FEATURE_GLOSSARY: Dict[str, str] = {
     "ExerciseAngina": "exercise-induced angina (yes/no)",
     "Oldpeak": "ST depression induced by exercise relative to rest",
     "ST_Slope": "slope of the peak exercise ST segment",
-    # diabetes (BRFSS self-report)
-    "HighBP": "self-reported history of high blood pressure (yes/no)",
-    "HighChol": "self-reported history of high cholesterol (yes/no)",
-    "CholCheck": "cholesterol checked in the last 5 years (yes/no)",
-    "BMI": "body mass index",
-    "Smoker": "smoked at least 100 cigarettes in their lifetime (yes/no)",
-    "Stroke": "self-reported history of stroke (yes/no)",
-    "HeartDiseaseorAttack": "self-reported coronary heart disease or myocardial infarction (yes/no)",
-    "PhysActivity": "any physical activity in the past 30 days (yes/no)",
-    "Fruits": "eats fruit at least once a day (yes/no)",
-    "Veggies": "eats vegetables at least once a day (yes/no)",
-    "HvyAlcoholConsump": "heavy alcohol consumption (yes/no)",
-    "AnyHealthcare": "has any health coverage (yes/no)",
-    "NoDocbcCost": "could not see a doctor because of cost in the past year (yes/no)",
-    "GenHlth": "self-rated general health, 1 (excellent) to 5 (poor)",
-    "MentHlth": "days of poor mental health in the past 30",
-    "PhysHlth": "days of poor physical health in the past 30",
-    "DiffWalk": "serious difficulty walking or climbing stairs (yes/no)",
-    "Education": "education level band",
-    "Income": "income band",
     # diabetes_nhanes (NHANES, measured — not self-reported). Added in Gate 9.3.
     # These are clinical measurements and lab analytes, so naming the wrong one
     # is a factual error about the patient, exactly as with `Cholesterol` above.
@@ -363,33 +318,40 @@ def _format_glossary(shap_values: List[Dict[str, Any]], top_n: int = 5) -> str:
     return "\n".join(lines) or "  - No factors available"
 
 
-def band_for_report(
-    probability_corrected: float,
-    risk_bands: Mapping[str, float],
-    decision_threshold: Optional[float] = None,
+#: The banner every report on a retired module's row starts with.
+ARCHIVED_BANNER = "ARCHIVED MODULE — replaced by {replacement}"
+
+
+def archived_report(
+    disease: str,
+    probability: float,
+    label: str,
+    shap_values: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """
-    Display band, floored so it cannot contradict the screening decision.
+    The report for a stored row of a retired module: what was recorded, under a
+    banner that says the module is archived and what replaced it.
 
-    classify_band() alone produced "Positive" beside "LOW" — D-004 sits at
-    14.4% with a 10.8% decision threshold and a 17.2% moderate cut-point, so
-    the patient was flagged for follow-up and simultaneously told "routine
-    follow-up, rescreen in 12 months". The two numbers answer different
-    questions (which side of the threshold vs how urgent among the flagged),
-    but LOW is not an available answer to the second question for a patient
-    who is above the threshold: being flagged IS the floor.
-
-    A patient at or above the decision threshold is therefore never LOW. The
-    bands are otherwise untouched, and a Negative patient is unaffected.
+    Rule-based on purpose -- an LLM is not asked to interpret the output of a
+    model that is no longer maintained. No band, no threshold and no
+    recommended actions: those belonged to the retired module and are not
+    maintained either. Patient feature values are not an input at all.
     """
-    band = classify_band(probability_corrected, risk_bands)
-    if (
-        decision_threshold is not None
-        and probability_corrected >= decision_threshold
-        and band == "LOW"
-    ):
-        return "MODERATE"
-    return band
+    info = RETIRED_DISEASES[disease]
+    top = sorted(shap_values or [], key=lambda x: abs(x.get("shap_value", 0)), reverse=True)[:3]
+    names = ", ".join(s["feature"] for s in top if "feature" in s) or "not recorded"
+    return (
+        f"**{ARCHIVED_BANNER.format(replacement=info['replaced_by_display'])}**\n"
+        f"{info['display_name']} was retired on {info['retired_on']} and replaced by "
+        f"the {info['replaced_by_display']} ({info['replaced_by']}). This report restates "
+        f"the result exactly as it was stored. It is not a current assessment, and the "
+        f"retired module's thresholds and bands are no longer maintained.\n\n"
+        f"**Stored Result**\n"
+        f"Estimate as recorded: {float(probability):.1%} ({label}).\n"
+        f"Factors recorded as most influential: {names}.\n\n"
+        f"**For a Current Assessment**\n"
+        f"Screen the patient again with the {info['replaced_by_display']}."
+    )
 
 
 def _rule_based_report(
@@ -420,11 +382,6 @@ def _rule_based_report(
     features = features or {}
     top = sorted(shap_values, key=lambda x: abs(x.get("shap_value", 0)), reverse=True)[:3]
     top_names = [s["feature"] for s in top]
-    actions = {
-        "HIGH": "- Urgent specialist referral recommended\n- Order confirmatory investigations\n- Review the current care plan with the treating clinician",
-        "MODERATE": "- Schedule follow-up within 4 weeks\n- Lifestyle modification counselling\n- Monitor key biomarkers",
-        "LOW": "- Routine follow-up\n- Reinforce preventive measures\n- Rescreen in 12 months",
-    }
     drivers = "\n".join(f"- {s['feature']} (SHAP {s['shap_value']:+.3f})" for s in top)
 
     if output_type == "conformal_decision":
@@ -463,8 +420,11 @@ def _rule_based_report(
             f"**Decision Note**\n{stratification}"
         )
 
-    band = band_for_report(
-        probability_corrected, risk_bands or DEFAULT_RISK_BANDS, decision_threshold
+    # Not conformal (no live module): the probability and the label, and no band.
+    decision_note = (
+        f"The module's decision threshold is {decision_threshold:.4f}; this result is {label}."
+        if decision_threshold is not None
+        else "This module configures no decision threshold and no risk band, and none is invented here."
     )
     return (
         f"**Clinical Summary**\n"
@@ -472,11 +432,7 @@ def _rule_based_report(
         f"Model probability: {probability_corrected:.1%} ({label}). "
         f"Top contributing factors: {', '.join(top_names)}.\n\n"
         f"**Key Risk Drivers**\n{drivers}\n\n"
-        f"**Recommended Actions**\n{actions.get(band, actions['MODERATE'])}\n\n"
-        f"**Risk Stratification Note**\n"
-        f"This assessment is {band.lower()} priority: a {probability_corrected:.1%} "
-        f"probability on this population's prevalence, classified against the "
-        f"module's own risk bands."
+        f"**Decision Note**\n{decision_note}"
     )
 
 
@@ -502,11 +458,11 @@ async def generate_report(
     `output_type` decides how the report talks about the decision, and it comes
     from the disease config -- never from the disease name. 'conformal_decision'
     means there is no threshold and no band: the report states the decision and
-    the Venn-Abers interval, and says so. Anything else keeps the
-    threshold-and-band wording, which is what diabetes needs.
+    the Venn-Abers interval, and says so. Anything else gets the probability,
+    the label and the threshold if it has one -- never a band.
 
-    `probability_corrected` and `risk_bands` must be on the same scale — both
-    come straight from the /predict response for this disease.
+    `risk_bands` is accepted for existing callers and ignored: no module
+    configures bands since gate B5.
 
     `confidence_band` is accepted for backwards compatibility but is NOT
     trusted: the band is recomputed here from the probability and the bands,
@@ -542,19 +498,14 @@ async def generate_report(
     # between hospitals (D-32), so no band is computed here at all: computing one
     # and then dropping it would still log a "discarding caller band" line that
     # implies a correct band exists.
-    is_conformal = output_type == "conformal_decision"
-    bands = None if is_conformal else (risk_bands or DEFAULT_RISK_BANDS)
-    band = None if is_conformal else band_for_report(
-        probability_corrected, bands, decision_threshold
-    )
-    if confidence_band and not is_conformal and confidence_band != band:
+    # No module configures risk bands any more (gate B5; a config declaring
+    # them is refused at load), so no band is computed and a caller's is
+    # discarded. `risk_band` stays in the result, always None, for clients.
+    bands = None
+    band = None
+    if confidence_band:
         log.info(
-            "Discarding caller-supplied confidence_band=%r; %.4f against bands %r is %r",
-            confidence_band, probability_corrected, dict(bands), band,
-        )
-    elif confidence_band and is_conformal:
-        log.info(
-            "Discarding caller-supplied confidence_band=%r: %s reports a decision, not a band",
+            "Discarding caller-supplied confidence_band=%r: %s reports no band",
             confidence_band, disease_display,
         )
     threshold_note = (

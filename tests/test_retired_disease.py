@@ -217,16 +217,47 @@ async def test_visits_of_a_retired_disease_stay_readable(c, doctor_token, record
     assert [v["disease"] for v in resp.json()["visits"]] == [RETIRED]
 
 
-async def test_a_report_renders_from_a_stored_retired_row(c, monkeypatch, records):
-    import backend.main as main_module
-
-    monkeypatch.setattr(main_module, "_generate_report", None)  # rule-based, no LLM
+async def test_a_report_renders_from_a_stored_retired_row(c, records):
     resp = await c.post("/api/v4/generate-report", json={
         "disease": RETIRED, "label": "Positive", "probability_corrected": 0.41,
         "shap_values": [{"feature": "BMI", "shap_value": 0.12}], "features": BRFSS_ROW,
     })
     assert resp.status_code == 200, resp.text
-    assert resp.json()["report"]
+    body = resp.json()
+    assert body["source"] == "archived" and body["archived"] is True
+    assert body["risk_band"] is None
+    assert body["report"].startswith("**ARCHIVED MODULE — replaced by NHANES dysglycaemia module**")
+    assert "41.0%" in body["report"]
+
+
+async def test_a_retired_row_never_reaches_the_llm(c, monkeypatch, records):
+    """Even with an API key configured, a retired module's row is rendered by
+    the rule-based archived template; no model is asked about it."""
+    import backend.llm.report_generator as rg
+    import backend.main as main_module
+
+    async def boom(**kwargs):
+        raise AssertionError("a retired row reached the LLM path")
+
+    monkeypatch.setattr(rg, "_get_api_key", lambda: "test-key")
+    monkeypatch.setattr(main_module, "_generate_report", boom)
+    resp = await c.post("/api/v4/generate-report", json={
+        "disease": RETIRED, "label": "Negative", "probability_corrected": 0.08,
+        "shap_values": [], "features": BRFSS_ROW,
+    })
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["source"] == "archived"
+
+
+async def test_export_marks_a_retired_row_as_archived(c, doctor_token, records):
+    rows = (await c.get(f"/api/v4/patients/{records['pt']}/export",
+                        headers=_auth(doctor_token))).json()["predictions"]
+    assert [r["disease"] for r in rows] == [RETIRED]
+    note = rows[0]["archived_note"]
+    assert note.startswith("Archived module, replaced by the NHANES dysglycaemia module")
+    heart = (await c.get(f"/api/v4/patients/{records['hpt']}/export",
+                         headers=_auth(doctor_token))).json()["predictions"]
+    assert heart and all(r["archived_note"] is None for r in heart)
 
 
 # ── New writes for a retired disease: 410 ────────────────────────────────────

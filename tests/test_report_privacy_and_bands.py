@@ -42,8 +42,7 @@ def build_prompt(features=RAW_FEATURES, shap=SHAP, output_type=None,
 
     Since Gate 8.4 the how-it-decided part of the prompt is a block chosen by
     the module's output_type, so this builds it the same way generate_report
-    does. The default arguments keep the threshold wording, which is what the
-    privacy tests below were written against.
+    does. The default arguments give the non-conformal (plain) block.
     """
     return rg._USER_PROMPT_TEMPLATE.format(
         disease_display="Coronary Artery Disease Risk",
@@ -126,49 +125,51 @@ class TestLabMislabelGuard:
         assert rg.forbidden_content(text) == []
 
 
-class TestBandNeverContradictsTheLabel:
-    def test_a_flagged_patient_is_not_low_risk(self):
-        """D-004: 14.4% Positive, moderate cut-point 17.2%."""
-        band = rg.band_for_report(0.1438, DIABETES_BANDS, DIABETES_THRESHOLD)
-        assert band != "LOW", (
-            "a patient above the decision threshold was reported as LOW risk, "
-            "which is the Positive/LOW contradiction (14)"
-        )
-        assert band == "MODERATE"
+class TestArchivedReport:
+    """
+    A stored row of a retired module renders through archived_report() (gate
+    B5). The privacy and contradiction checks that used to guard the BRFSS band
+    report now guard this one.
+    """
 
-    def test_a_patient_below_the_threshold_is_still_low(self):
-        band = rg.band_for_report(0.03, DIABETES_BANDS, DIABETES_THRESHOLD)
-        assert band == "LOW"
+    def report(self, probability=0.1438, label="Positive"):
+        return rg.archived_report("diabetes", probability, label, SHAP)
 
-    def test_high_is_untouched(self):
-        assert rg.band_for_report(0.63, DIABETES_BANDS, DIABETES_THRESHOLD) == "HIGH"
+    def test_it_opens_with_the_archived_banner(self):
+        first = self.report().splitlines()[0]
+        assert "ARCHIVED MODULE" in first
+        assert "replaced by NHANES dysglycaemia module" in first
 
-    def test_exactly_at_the_threshold_counts_as_flagged(self):
-        band = rg.band_for_report(DIABETES_THRESHOLD, DIABETES_BANDS, DIABETES_THRESHOLD)
-        assert band != "LOW"
+    def test_it_names_the_replacement_and_says_it_is_not_current(self):
+        report = self.report()
+        assert "diabetes_nhanes" in report
+        assert "not a current assessment" in report
 
-    def test_without_a_threshold_the_bands_are_unchanged(self):
-        assert rg.band_for_report(0.1438, DIABETES_BANDS, None) == "LOW"
+    def test_it_restates_the_stored_result(self):
+        report = self.report()
+        assert "14.4%" in report and "(Positive)" in report
+        assert "Cholesterol" in report  # the top stored factor, by name
 
-    def test_the_rule_based_report_does_not_tell_a_flagged_patient_to_wait_a_year(self):
-        report = rg._rule_based_report(
-            "Diabetes Risk Assessment", 0.1438, "Positive", SHAP, RAW_FEATURES,
-            DIABETES_BANDS, DIABETES_THRESHOLD,
-        )
+    def test_it_does_not_tell_a_flagged_patient_to_wait_a_year(self):
+        report = self.report()
         assert "Rescreen in 12 months" not in report
-        assert "follow-up within 4 weeks" in report
+        assert "Recommended Actions" not in report  # no advice from a retired model
 
-    def test_the_rule_based_report_does_not_echo_raw_values_either(self):
-        report = rg._rule_based_report(
-            "Diabetes Risk Assessment", 0.1438, "Positive", SHAP, RAW_FEATURES,
-            DIABETES_BANDS, DIABETES_THRESHOLD,
-        )
+    def test_it_reports_no_band_and_no_threshold(self):
+        report = self.report()
+        for banned in ("HIGH", "MODERATE", "LOW", "Risk Band", "priority", "threshold is"):
+            assert banned not in report
+
+    def test_it_does_not_echo_raw_values(self):
+        # archived_report takes no patient features at all; the stored SHAP
+        # carries names and contributions only.
+        report = self.report()
         for value in ("187", "341", "62"):
             assert value not in report
 
 
 @pytest.mark.asyncio
-class TestEveryFallbackPathUsesTheFlooredBand:
+class TestEveryFallbackPathGivesTheSameBandFreeReport:
     """
     generate_report() has three rule-based fallbacks (no key, guard
     violation, API error). One of them was left passing no decision
@@ -195,9 +196,10 @@ class TestEveryFallbackPathUsesTheFlooredBand:
         monkeypatch.setattr(rg, "_get_api_key", lambda: "")
         result = await self._report(monkeypatch)
         assert result["source"] == "rule_based"
-        assert result["risk_band"] == "MODERATE"
+        assert result["risk_band"] is None
         assert "Rescreen in 12 months" not in result["report"]
-        assert "low priority" not in result["report"]
+        assert "priority" not in result["report"]
+        assert "decision threshold is 0.1082" in result["report"]
 
     async def test_guard_violation_path(self, monkeypatch):
         """The path that actually fired against the live API."""
@@ -226,10 +228,10 @@ class TestEveryFallbackPathUsesTheFlooredBand:
         result = await self._report(monkeypatch)
         assert result["source"] == "rule_based"
         assert "fallback_reason" in result
-        assert result["risk_band"] == "MODERATE"
-        assert "Rescreen in 12 months" not in result["report"], (
-            "the guard-violation fallback dropped the decision threshold and "
-            "reported a flagged patient as low priority"
+        assert result["risk_band"] is None
+        assert "Rescreen in 12 months" not in result["report"]
+        assert "decision threshold is 0.1082" in result["report"], (
+            "the guard-violation fallback dropped the decision threshold"
         )
 
     async def test_api_error_path(self, monkeypatch):
@@ -244,8 +246,9 @@ class TestEveryFallbackPathUsesTheFlooredBand:
 
         result = await self._report(monkeypatch)
         assert result["source"] == "rule_based"
-        assert result["risk_band"] == "MODERATE"
+        assert result["risk_band"] is None
         assert "Rescreen in 12 months" not in result["report"]
+        assert "decision threshold is 0.1082" in result["report"]
 
 
 class TestConformalModuleReportSaysWhatTheModelActuallyDid:
@@ -317,8 +320,10 @@ class TestConformalModuleReportSaysWhatTheModelActuallyDid:
         assert "Decision Threshold:" not in prompt
         assert "calibrated to real-world prevalence" not in prompt
 
-    def test_a_threshold_module_keeps_its_wording(self):
-        """Diabetes must be untouched: its prompt still names both."""
+    def test_a_non_conformal_module_gets_its_threshold_but_no_band(self):
+        """No live module takes this path (gate B5); one that did must not be
+        handed a band it does not configure."""
         prompt = build_prompt()
         assert "Decision Threshold:" in prompt
-        assert "Risk Band: HIGH" in prompt
+        assert "Risk Band" not in prompt
+        assert "calibrated to real-world prevalence" not in prompt

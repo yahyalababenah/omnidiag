@@ -7,7 +7,7 @@ Request/response models for /api/v4/patients/* endpoints.
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── Requests ─────────────────────────────────────────────────────────────────
@@ -77,8 +77,30 @@ class PredictionPage(BaseModel):
     items: List[PredictionOut]
 
 
+class ExportedPrediction(PredictionOut):
+    """A prediction in the export bundle. A row of a retired module says so in
+    `archived_note`, so an exported record cannot be mistaken for a current
+    assessment (gate B5). None for every live module."""
+
+    archived_note: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _note_retired_module(self) -> "ExportedPrediction":
+        from backend.retired_diseases import RETIRED_DISEASES
+
+        info = RETIRED_DISEASES.get(self.disease)
+        if info is not None:
+            self.archived_note = (
+                f"Archived module, replaced by the {info['replaced_by_display']} "
+                f"({info['replaced_by']}): {info['display_name']} was retired on "
+                f"{info['retired_on']}. This is the result as it was stored, not a "
+                f"current assessment."
+            )
+        return self
+
+
 class PatientExportBundle(BaseModel):
     exported_at: datetime
     patient: PatientOut
-    predictions: List[PredictionOut]
+    predictions: List[ExportedPrediction]
     total_predictions: int

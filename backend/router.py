@@ -28,6 +28,7 @@ import yaml
 from typing import Dict, List, Optional, Any
 from fastapi import HTTPException
 from backend.retired_diseases import reject_if_retired
+from backend.probability_scale import PrevalenceCorrectionUnsupported, scale_of_disease_config
 from backend.model_backends import ModelBackend, UnknownModelFamilyError, get_backend
 
 log = logging.getLogger("omnidiag.router")
@@ -94,16 +95,8 @@ class OmniDiagRouter:
         # (heart, deliberately -- D-32) reports None, and since Gate 8.4 the UI
         # shows NO badge for it rather than substituting its own 0.7/0.4.
         model_cfg = config.get("model", {})
+        # Always None now: a config declaring bands is refused at load (gate B5).
         risk_bands = model_cfg.get("risk_bands") or None
-        if risk_bands and {"prevalence_train", "prevalence_deploy"} <= set(model_cfg):
-            from backend.prevalence_correction import apply_prevalence_correction
-
-            risk_bands = {
-                band: float(apply_prevalence_correction(
-                    value, model_cfg["prevalence_train"], model_cfg["prevalence_deploy"]
-                ))
-                for band, value in risk_bands.items()
-            }
 
         return {
             "name": config.get("disease", {}).get("name"),
@@ -250,6 +243,8 @@ class OmniDiagRouter:
                         log.warning("Skipping %s: missing 'disease.name' field.", filename)
                         continue
 
+                    # Refuses a config that declares priors or bands (gate B5).
+                    scale_of_disease_config(config)
                     self.disease_configs[disease_name] = config
                     self.model_loaders[disease_name] = self._create_loader(config)
                     self._register_schema(disease_name, config)
@@ -262,6 +257,10 @@ class OmniDiagRouter:
                     # Fail fast: a disease whose family has no backend would
                     # otherwise sit registered and 404 on every request.
                     raise UnknownModelFamilyError(f"{filename}: {e}") from e
+                except PrevalenceCorrectionUnsupported as e:
+                    # Fail fast too: served, it would carry a scale label no code
+                    # honours (see backend/probability_scale.py).
+                    raise PrevalenceCorrectionUnsupported(f"{filename}: {e}") from e
                 except Exception as e:
                     log.error("Error loading %s: %s", filename, e)
 

@@ -28,6 +28,7 @@ RETIRED_DISEASES: Dict[str, Dict[str, Any]] = {
         "display_name": "Diabetes Risk Assessment (BRFSS 2015, retired)",
         "retired_on": "2026-10-05",
         "replaced_by": "diabetes_nhanes",
+        "replaced_by_display": "NHANES dysglycaemia module",
         "reason": (
             "The BRFSS 2015 diabetes module has been retired and replaced by the "
             "NHANES dysglycaemia module (diabetes_nhanes). Existing records remain "
@@ -59,7 +60,3 @@ def retired_error(disease: str) -> HTTPException:
 def reject_if_retired(disease: Any) -> None:
     if is_retired(disease):
         raise retired_error(disease)
-
-
-def display_name(disease: str) -> str:
-    return RETIRED_DISEASES[disease]["display_name"] if is_retired(disease) else disease

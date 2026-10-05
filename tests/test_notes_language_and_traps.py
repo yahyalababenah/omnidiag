@@ -42,6 +42,16 @@ def mapped(note_id):
     )
 
 
+def fields(note_id):
+    """What a note yields: the heart mapping for heart notes; for the D-* notes,
+    whose BRFSS map was removed (gate B5), the generic extraction -- language
+    detection and negation do not depend on which disease the note is for."""
+    note = NOTES[note_id]
+    if note["disease"] == "heart_disease":
+        return mapped(note_id)
+    return parse_clinical_note(note["text"], use_bert=False)
+
+
 class TestScriptDetection:
     @pytest.mark.parametrize("note_id", ["H-AR-1", "H-AR-3", "D-AR-1", "D-AR-3"])
     def test_pure_arabic_is_detected(self, note_id):
@@ -67,7 +77,7 @@ class TestLanguageIsReportedHonestly:
         support = language_support(NOTES[note_id]["text"])
         assert support["supported"] is False
         assert "English" in support["message"]
-        assert mapped(note_id) == {}, (
+        assert fields(note_id) == {}, (
             "an Arabic note produced fields — the message would then be wrong"
         )
 
@@ -82,7 +92,7 @@ class TestLanguageIsReportedHonestly:
         support = language_support(NOTES[note_id]["text"])
         assert support["supported"] is False
         assert support["script"] == "mixed"
-        assert mapped(note_id), "this note should still yield its English tokens"
+        assert fields(note_id), "this note should still yield its English tokens"
 
     @pytest.mark.parametrize("note_id", ["H-EN-1", "D-EN-2"])
     def test_english_notes_are_supported(self, note_id):
@@ -125,32 +135,32 @@ class TestTheFourSystematicErrors:
         """
         D-EN-2: "non-smoker. No history of hypertension. Denies stroke, no
         heart disease." Every one of these used to extract as 1 and flipped
-        the screening result.
+        the screening result. Checked on the shared extraction now that the
+        BRFSS field map is gone (gate B5).
         """
-        result = mapped("D-EN-2")
-        assert result["Smoker"] == 0
-        assert result["HighBP"] == 0
-        assert result["Stroke"] == 0
-        assert result["HeartDiseaseorAttack"] == 0
+        result = parse_clinical_note(NOTES["D-EN-2"]["text"], use_bert=False)
+        assert result["smoking_flag"] == 0
+        assert result["hypertension"] == 0
+        assert result["stroke_flag"] == 0
+        assert result["heart_disease_flag"] == 0
 
     def test_affirmative_history_still_yields_one(self):
         """The negation fix must not have zeroed everything."""
-        result = mapped("D-EN-1")
-        assert result["HighBP"] == 1
-        assert result["Smoker"] == 1
-        assert result["HeartDiseaseorAttack"] == 1
+        result = parse_clinical_note(NOTES["D-EN-1"]["text"], use_bert=False)
+        assert result["hypertension"] == 1
+        assert result["smoking_flag"] == 1
+        assert result["heart_disease_flag"] == 1
 
-
-class TestBrfssAgeBuckets:
-    """BRFSS codes 5-year bands from 2 (25-29); the note states a real age."""
-
-    @pytest.mark.parametrize("note_id,age,bucket", [
-        ("D-EN-1", 52, 7),   # 50-54
-        ("D-EN-2", 47, 6),   # 45-49
-        ("D-EN-3", 42, 5),   # 40-44
+    @pytest.mark.parametrize("text,expected", [
+        ("No exercise-induced angina on the treadmill test.", "N"),
+        ("Denies exertional angina.", "N"),
+        ("Exercise-induced angina on the treadmill test.", "Y"),
+        ("Exertional angina reported during stress testing.", "Y"),
     ])
-    def test_stated_age_maps_to_the_right_band(self, note_id, age, bucket):
-        assert mapped(note_id)["Age"] == bucket
+    def test_negation_reaches_a_heart_field(self, text, expected):
+        """The same negation, through the heart mapping into a model input."""
+        extracted = parse_clinical_note(text, use_bert=False)
+        assert map_to_disease_schema(extracted, "heart_disease")["ExerciseAngina"] == expected
 
 
 class TestTheWholeSetStillRuns:
@@ -160,4 +170,4 @@ class TestTheWholeSetStillRuns:
 
     def test_no_english_note_comes_back_empty(self):
         for note_id in ("H-EN-1", "H-EN-2", "H-EN-3", "D-EN-1", "D-EN-2", "D-EN-3"):
-            assert mapped(note_id), f"{note_id} extracted nothing"
+            assert fields(note_id), f"{note_id} extracted nothing"

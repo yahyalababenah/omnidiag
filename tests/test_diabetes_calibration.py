@@ -29,7 +29,6 @@ import yaml
 
 from backend.prevalence_correction import (
     apply_prevalence_correction,
-    invert_prevalence_correction,
     prior_odds_ratio,
 )
 # Captured at import time, before conftest's `app` fixture patches the class.
@@ -46,6 +45,12 @@ _ARCHIVED_DIABETES_CFG = os.path.join(_ROOT, "archive", "post_expo_2026-10", "co
 PI_TRAIN = 0.5
 PI_DEPLOY = 0.237
 THRESHOLD_DEPLOYED = 0.108184
+
+
+def invert_prevalence_correction(p_corrected, prevalence_train, prevalence_deploy):
+    # The library's inverse went with ScaledProbability (gate B5). It was this
+    # identity -- the same map with the priors swapped -- which still holds.
+    return apply_prevalence_correction(p_corrected, prevalence_deploy, prevalence_train)
 
 
 def correct(p, pi_train=PI_TRAIN, pi_deploy=PI_DEPLOY):

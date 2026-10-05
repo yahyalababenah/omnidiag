@@ -6,12 +6,15 @@ negation handling and the mapping fixes, 10 extracted values were WRONG
 (e.g. "No stroke, no heart disease. Non-smoker." became Stroke = Heart
 disease = Smoker = 1 and flipped the patient to Positive). The rule tested
 here: the parser may MISS a field, but it must never extract a wrong one.
+
+The six BRFSS diabetes notes (D-*) left with that module's field map in gate
+B5; their negation cases are covered on the shared extraction below and in
+tests/test_notes_language_and_traps.py.
 """
 
 import pytest
 
 from backend.nlp.notes_parser import (
-    _brfss_age_bucket,
     bert_status,
     map_to_disease_schema,
     parse_clinical_note,
@@ -35,24 +38,6 @@ NOTES = [
      {"RestingBP": 132, "Cholesterol": 230, "MaxHR": None, "FastingBS": None}),
     ("H-AR-3", "heart_disease",
      "شاب عمره 41 عاماً، غير مدخن، حضر لفحص ما قبل التوظيف. ينفي وجود ألم في الصدر. ضغط الدم 118/76، الكوليسترول 185، النبض 72 أثناء الراحة.",
-     {}),
-    ("D-EN-1", "diabetes",
-     "62-year-old man, BMI 33.5, known hypertension and hyperlipidemia (cholesterol 245). Current smoker, 1 pack/day. Sedentary, rarely eats fruit or vegetables. Reports his general health as poor. Difficulty walking up stairs. History of MI in 2019.",
-     {"Age": 9, "Sex": 1, "BMI": 33.5, "HighBP": 1, "HighChol": 1, "Smoker": 1, "HeartDiseaseorAttack": 1, "Stroke": None}),
-    ("D-EN-2", "diabetes",
-     "Female, 45 years old, BMI 27. BP 124/80, no history of hypertension. Cholesterol checked last year: 190. Non-smoker. Walks 30 minutes daily. No stroke, no heart disease. Good general health.",
-     {"Age": 6, "Sex": 0, "BMI": 27, "HighBP": 0, "HighChol": 0, "Smoker": 0, "Stroke": 0, "HeartDiseaseorAttack": 0}),
-    ("D-EN-3", "diabetes",
-     "34 yo woman with a history of gestational diabetes. BMI 22.1, BP 110/70, total cholesterol 170. Had a TIA at age 30. Drinks socially. Exercises regularly.",
-     {"Age": 3, "Sex": 0, "BMI": 22.1, "HighBP": 0, "HighChol": 0, "Stroke": 1}),
-    ("D-AR-1", "diabetes",
-     "رجل عمره 62 سنة، مؤشر كتلة الجسم 33.5، مصاب بارتفاع ضغط الدم وارتفاع الكوليسترول (245). مدخن حالي علبة يومياً.",
-     {}),
-    ("D-AR-2", "diabetes",
-     "مريضة عمرها 45 سنة، BMI 27، BP 124/80، لا يوجد تاريخ لارتفاع الضغط. غير مدخنة.",
-     {"BMI": 27, "HighBP": 0}),
-    ("D-AR-3", "diabetes",
-     "امرأة عمرها 34 سنة، لديها سكري حملي سابق، مؤشر كتلة الجسم 22.1، ضغط الدم 110/70.",
      {}),
 ]
 
@@ -99,10 +84,6 @@ def test_english_notes_recall(nid, disease, text, truth):
 ])
 def test_negation(text, field, value):
     assert parse_clinical_note(text, use_bert=False).get(field) == value
-
-
-def test_brfss_age_buckets():
-    assert [_brfss_age_bucket(a) for a in (18, 24, 25, 34, 45, 62, 79, 80, 95)] == [1, 1, 2, 3, 6, 9, 12, 13, 13]
 
 
 def test_bert_status_reports_why():

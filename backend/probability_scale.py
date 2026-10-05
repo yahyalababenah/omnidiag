@@ -1,141 +1,72 @@
 """
 OmniDiag — Probability scale contract
 =====================================
-Every probability the diabetes module produces exists on exactly one of two
-scales, and the two are NOT interchangeable:
+Every stored probability says which scale it is on, in the `probability_scale`
+column of predictions and the `uncertainty_scale` column of the review queue:
 
-    raw        the ensemble's own output, on the training prior (50/50 resample)
-    corrected  the same quantity mapped to the deployment prior (~14% BRFSS),
-               via backend/prevalence_correction.py
+    raw        the model's own output, on the scale it was calibrated to
+    corrected  a prior-shift (prevalence) corrected probability
 
-The governing rule for this codebase:
+Every live module reports RAW: heart (`ivap_calibrated_training_mix`) and the
+NHANES dysglycaemia module (`platt_calibrated_nhanes_2015_2016`). CORRECTED is
+kept as a legal value because rows written by the retired BRFSS diabetes module
+carry it; they are read back as stored strings and never re-scaled.
 
-    *Every probability leaving EnsembleModelLoader.predict() is CORRECTED by
-    default. A raw value must carry an explicit `_raw` suffix everywhere it
-    travels — variable, JSON field, database column, function name.*
-
-A bare `float` cannot carry that information, so the critical internal paths
-pass a `ScaledProbability` instead. It is a tuple subclass on purpose: it has
-no `__float__` and no ordering against numbers, so
-
-    p >= 0.5                      # TypeError
-    should_queue_for_review(p)    # TypeError inside, unless .corrected is used
-
-fail loudly rather than silently comparing two different scales. Call sites
-must name the scale they want: `p.corrected` or `p.raw`.
-
-This module is deliberately dependency-light (only prevalence_correction) so
-it can be imported from loaders, routes and tests alike.
+Prevalence correction itself was removed with that module (gate B5): the router
+no longer maps a config's risk bands onto a deployment prior, and nothing
+corrects a probability before it is returned. So a module that *declared*
+priors or bands would be labelled CORRECTED while nothing corrected it -- a
+silent mislabel across the API, the database and the report. Instead such a
+config is refused when it is loaded (`PrevalenceCorrectionUnsupported`), and a
+result that claims a correction was applied is refused when it is stamped.
 """
 
 from enum import Enum
-from typing import Mapping, NamedTuple
-
-from backend.prevalence_correction import (
-    apply_prevalence_correction,
-    invert_prevalence_correction,
-)
+from typing import Mapping
 
 
 class Scale(str, Enum):
-    """The two probability scales in the system. Values match the DB enum."""
+    """The two probability scales. Values match the DB column values."""
 
     RAW = "raw"
     CORRECTED = "corrected"
 
 
-class ScaledProbability(NamedTuple):
-    """
-    One probability, known on both scales, with the priors that relate them.
-
-    Built through `from_raw` / `from_corrected` so the pair can never drift
-    apart. Read with `.raw` / `.corrected`, or `.on(scale)` when the scale is
-    itself a variable.
-    """
-
-    raw: float
-    corrected: float
-    prevalence_train: float
-    prevalence_deploy: float
-
-    # ── constructors ────────────────────────────────────────────────────
-    @classmethod
-    def from_raw(
-        cls, raw: float, prevalence_train: float, prevalence_deploy: float
-    ) -> "ScaledProbability":
-        corrected = float(
-            apply_prevalence_correction(raw, prevalence_train, prevalence_deploy)
-        )
-        return cls(float(raw), corrected, float(prevalence_train), float(prevalence_deploy))
-
-    @classmethod
-    def from_corrected(
-        cls, corrected: float, prevalence_train: float, prevalence_deploy: float
-    ) -> "ScaledProbability":
-        raw = float(
-            invert_prevalence_correction(corrected, prevalence_train, prevalence_deploy)
-        )
-        return cls(raw, float(corrected), float(prevalence_train), float(prevalence_deploy))
-
-    # ── accessors ───────────────────────────────────────────────────────
-    def on(self, scale: Scale) -> float:
-        """Return the value on `scale`. Raises on anything that is not a Scale."""
-        if scale is Scale.RAW:
-            return self.raw
-        if scale is Scale.CORRECTED:
-            return self.corrected
-        raise TypeError(f"expected a Scale, got {scale!r}")
-
-    def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return (
-            f"ScaledProbability(raw={self.raw:.6f}, corrected={self.corrected:.6f}, "
-            f"pi={self.prevalence_train}->{self.prevalence_deploy})"
-        )
+class PrevalenceCorrectionUnsupported(ValueError):
+    """A config or a result asks for a prevalence correction, which no longer exists."""
 
 
-def classify_band(probability_corrected: float, risk_bands: Mapping[str, float]) -> str:
-    """
-    Display band (HIGH / MODERATE / LOW) for a CORRECTED probability.
+UNSUPPORTED_MESSAGE = "prevalence correction is not supported (removed in B5)"
 
-    `risk_bands` must already be on the corrected scale — that is what
-    `EnsembleModelLoader.predict()` returns in `risk_bands` and what
-    `GET /api/v4/diseases` returns in `info.risk_bands`. This is the backend
-    twin of `classifyRisk()` in frontend/src/constants/thresholds.js; the two
-    must stay in step.
-
-    Bands are optional: a disease that configures none gets MODERATE-free
-    behaviour driven purely by whatever caller-supplied cut-points exist.
-    """
-    high = risk_bands.get("high")
-    moderate = risk_bands.get("moderate")
-    if high is not None and probability_corrected >= high:
-        return "HIGH"
-    if moderate is not None and probability_corrected >= moderate:
-        return "MODERATE"
-    return "LOW"
+#: Config keys that only meant something together with the correction.
+_CORRECTION_KEYS = ("prevalence_train", "prevalence_deploy", "risk_bands")
 
 
 def scale_of_result(result: Mapping) -> Scale:
     """
-    The scale a loader's predict()/explain() result is stated on.
+    The scale a module's predict()/explain() result is stated on: RAW.
 
-    A module that applied the prevalence correction says so with
-    `prevalence_correction_applied: True`; its probabilities are CORRECTED.
-    A module that did not (heart_disease) reports the model's own output,
-    which is RAW by definition — there is no other scale for it to be on.
-    Stamping heart rows as "corrected" would claim a correction that never
-    happened.
+    A result claiming `prevalence_correction_applied: True` is refused rather
+    than stamped CORRECTED -- no code path can produce one any more, so it
+    would be a mislabel.
     """
-    return Scale.CORRECTED if result.get("prevalence_correction_applied") is True else Scale.RAW
+    if result.get("prevalence_correction_applied") is True:
+        raise PrevalenceCorrectionUnsupported(UNSUPPORTED_MESSAGE)
+    return Scale.RAW
 
 
 def scale_of_disease_config(disease_config: Mapping | None) -> Scale:
     """
-    The scale a disease reports, read from its config: CORRECTED when both
-    prevalence priors are declared (EnsembleModelLoader then refuses to run
-    without applying the correction), RAW otherwise.
+    The scale a disease reports, read from its config: RAW.
+
+    Called when the router loads a config, so a config declaring prevalence
+    priors or risk bands fails at load instead of being served with a scale
+    label nothing honours. `risk_bands: null` (heart, NHANES) declares none.
     """
     model_cfg = (disease_config or {}).get("model", {}) or {}
-    if {"prevalence_train", "prevalence_deploy"} <= set(model_cfg):
-        return Scale.CORRECTED
+    declared = [k for k in _CORRECTION_KEYS if model_cfg.get(k) is not None]
+    if declared:
+        raise PrevalenceCorrectionUnsupported(
+            f"{UNSUPPORTED_MESSAGE}: model.{', model.'.join(declared)} declared"
+        )
     return Scale.RAW

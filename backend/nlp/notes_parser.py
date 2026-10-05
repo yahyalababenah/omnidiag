@@ -495,14 +495,6 @@ def _bert_extract(text: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _brfss_age_bucket(age: float) -> int:
-    """BRFSS _AGEG5YR: 1 = 18-24, 2 = 25-29, ... 12 = 75-79, 13 = 80+."""
-    age = int(age)
-    if age < 25:
-        return 1
-    return min(13, (age - 25) // 5 + 2)
-
-
 _HEART_DISEASE_MAP = {
     "age": ("Age", lambda v: int(v)),
     "sex": ("Sex", lambda v: "M" if str(v).lower().startswith("m") else "F"),
@@ -516,26 +508,11 @@ _HEART_DISEASE_MAP = {
     "exercise_angina": ("ExerciseAngina", lambda v: "Y" if int(v) else "N"),
 }
 
-# Order matters: a later key overwrites an earlier one mapped to the same
-# field, so a stated hypertension history wins over a single BP reading.
-_DIABETES_MAP = {
-    "age": ("Age", _brfss_age_bucket),
-    "bmi": ("BMI", lambda v: float(v)),
-    "bp_systolic": ("HighBP", lambda v: 1 if int(v) >= 130 else 0),
-    "cholesterol": ("HighChol", lambda v: 1 if int(v) >= 200 else 0),
-    "sex": ("Sex", lambda v: 1 if str(v).lower().startswith("m") else 0),
-    "hypertension": ("HighBP", lambda v: int(v)),
-    "heart_disease_flag": ("HeartDiseaseorAttack", lambda v: int(v)),
-    "stroke_flag": ("Stroke", lambda v: int(v)),
-    "smoking_flag": ("Smoker", lambda v: int(v)),
-}
-
-
 def map_to_disease_schema(extracted: Dict[str, Any], disease: str) -> Dict[str, Any]:
     """Map generic NLP-extracted fields to disease-specific schema field names."""
-    mapping = {"heart_disease": _HEART_DISEASE_MAP, "diabetes": _DIABETES_MAP}.get(
-        disease, {}
-    )
+    # Heart only. The BRFSS diabetes map and its age-band feature went with that
+    # module (gate B5); the NHANES module has no notes map.
+    mapping = {"heart_disease": _HEART_DISEASE_MAP}.get(disease, {})
     result: Dict[str, Any] = {}
     for generic_key, (schema_key, transform) in mapping.items():
         if generic_key in extracted:

@@ -28,9 +28,9 @@ from typing import List, NamedTuple
 import pytest
 
 from backend.probability_scale import (
+    UNSUPPORTED_MESSAGE,
+    PrevalenceCorrectionUnsupported,
     Scale,
-    ScaledProbability,
-    classify_band,
     scale_of_disease_config,
     scale_of_result,
 )
@@ -69,7 +69,6 @@ SCALE_SENSITIVE_FUNCS = {
     "should_queue_for_review",
     "prediction_entropy",
     "uncertainty_band",
-    "classify_band",
 }
 
 # Dict keys that hold a probability.
@@ -318,87 +317,79 @@ class TestScaleContractGuard:
 # ---------------------------------------------------------------------------
 # The carrier type itself
 # ---------------------------------------------------------------------------
-PI_TRAIN, PI_DEPLOY = 0.50, 0.14
-
-
-class TestScaledProbability:
-    def test_from_raw_round_trips(self):
-        p = ScaledProbability.from_raw(0.8, PI_TRAIN, PI_DEPLOY)
-        back = ScaledProbability.from_corrected(p.corrected, PI_TRAIN, PI_DEPLOY)
-        assert back.raw == pytest.approx(0.8, abs=1e-12)
-
-    def test_corrected_is_below_raw_when_deploy_prior_is_lower(self):
-        p = ScaledProbability.from_raw(0.5, PI_TRAIN, PI_DEPLOY)
-        assert p.corrected < p.raw
-        assert p.corrected == pytest.approx(0.14, abs=1e-12)
-
-    def test_fixed_points_are_preserved(self):
-        for edge in (0.0, 1.0):
-            p = ScaledProbability.from_raw(edge, PI_TRAIN, PI_DEPLOY)
-            assert p.corrected == pytest.approx(edge, abs=1e-12)
-
-    def test_on_requires_a_real_scale(self):
-        p = ScaledProbability.from_raw(0.3, PI_TRAIN, PI_DEPLOY)
-        assert p.on(Scale.RAW) == pytest.approx(0.3)
-        assert p.on(Scale.CORRECTED) == pytest.approx(p.corrected)
-        with pytest.raises(TypeError):
-            p.on("corrected")
-
-    def test_cannot_be_compared_to_a_bare_float(self):
-        """The whole point: a scaleless comparison must not silently succeed."""
-        p = ScaledProbability.from_raw(0.9, PI_TRAIN, PI_DEPLOY)
-        with pytest.raises(TypeError):
-            _ = p >= 0.5
-
+class TestScaleValues:
     def test_scale_enum_values_match_db_column(self):
+        # CORRECTED stays a legal value: rows written by the retired BRFSS
+        # module carry it, and they are read back as stored.
         assert Scale.RAW.value == "raw"
         assert Scale.CORRECTED.value == "corrected"
 
 
-class TestClassifyBand:
-    BANDS = {"high": 0.2745, "moderate": 0.1176}  # corrected twins of 0.70 / 0.40
-
-    def test_bands_are_ordered(self):
-        assert classify_band(0.30, self.BANDS) == "HIGH"
-        assert classify_band(0.15, self.BANDS) == "MODERATE"
-        assert classify_band(0.05, self.BANDS) == "LOW"
-
-    def test_boundaries_are_inclusive(self):
-        assert classify_band(0.2745, self.BANDS) == "HIGH"
-        assert classify_band(0.1176, self.BANDS) == "MODERATE"
-
-    def test_missing_bands_fall_back_to_low(self):
-        assert classify_band(0.99, {}) == "LOW"
-
-
 class TestScaleOfResult:
-    """Stored rows must be stamped with the scale that was actually used."""
-
-    def test_diabetes_result_is_corrected(self):
-        assert scale_of_result({"confidence": 0.1, "prevalence_correction_applied": True}) is Scale.CORRECTED
+    """Every live module reports RAW; a claimed correction is refused (gate B5)."""
 
     def test_heart_result_is_raw(self):
         # Heart applies no correction; calling its output "corrected" would
         # claim a transformation that never happened.
         assert scale_of_result({"confidence": 0.36, "prediction": 0, "diagnosis": "Negative"}) is Scale.RAW
 
-    def test_truthy_but_not_true_is_not_enough(self):
+    def test_a_result_claiming_a_correction_is_refused(self):
+        with pytest.raises(PrevalenceCorrectionUnsupported, match="removed in B5"):
+            scale_of_result({"confidence": 0.1, "prevalence_correction_applied": True})
+
+    def test_truthy_but_not_true_is_not_a_claim(self):
         assert scale_of_result({"prevalence_correction_applied": "yes"}) is Scale.RAW
 
-    def test_config_with_both_priors_is_corrected(self):
-        cfg = {"model": {"prevalence_train": 0.5, "prevalence_deploy": 0.14}}
-        assert scale_of_disease_config(cfg) is Scale.CORRECTED
 
-    def test_config_without_priors_is_raw(self):
+class TestConfigsDeclaringACorrectionAreRefused:
+    """
+    The router no longer maps bands onto a deployment prior and nothing
+    corrects a probability, so a config declaring priors or bands would be
+    labelled with a correction no code applies. It is refused at load instead.
+    """
+
+    @pytest.mark.parametrize("model", [
+        {"prevalence_train": 0.5, "prevalence_deploy": 0.14},
+        {"prevalence_train": 0.5},
+        {"prevalence_deploy": 0.237},
+        {"risk_bands": {"high": 0.7, "moderate": 0.4}},
+    ], ids=["both-priors", "train-prior", "deploy-prior", "bands"])
+    def test_scale_of_disease_config_refuses(self, model):
+        with pytest.raises(PrevalenceCorrectionUnsupported) as err:
+            scale_of_disease_config({"model": model})
+        assert UNSUPPORTED_MESSAGE == "prevalence correction is not supported (removed in B5)"
+        assert UNSUPPORTED_MESSAGE in str(err.value)
+
+    def test_null_bands_and_no_priors_are_raw(self):
+        # heart and NHANES both state `risk_bands: null`
+        assert scale_of_disease_config({"model": {"risk_bands": None}}) is Scale.RAW
         assert scale_of_disease_config({"model": {}}) is Scale.RAW
         assert scale_of_disease_config(None) is Scale.RAW
 
-    def test_shipped_configs(self):
+    def test_shipped_configs_are_raw(self):
         import yaml
-        # BRFSS, the only module on the corrected scale, is retired (gate B3);
-        # every module still shipped reports on its own model's scale.
         for name in ("heart_disease.yaml", "diabetes_nhanes.yaml"):
             with open(os.path.join(ROOT, "configs", name)) as f:
                 assert scale_of_disease_config(yaml.safe_load(f)) is Scale.RAW, name
+
+    def test_the_archived_brfss_config_would_be_refused(self):
+        import yaml
         with open(os.path.join(ROOT, "archive", "post_expo_2026-10", "configs", "diabetes.yaml")) as f:
-            assert scale_of_disease_config(yaml.safe_load(f)) is Scale.CORRECTED
+            with pytest.raises(PrevalenceCorrectionUnsupported):
+                scale_of_disease_config(yaml.safe_load(f))
+
+    def test_the_router_fails_at_load(self, tmp_path):
+        import shutil
+
+        import yaml
+
+        from backend.router import OmniDiagRouter
+
+        shutil.copy(os.path.join(ROOT, "configs", "heart_disease.yaml"), tmp_path)
+        cfg = yaml.safe_load(open(os.path.join(ROOT, "configs", "heart_disease.yaml")))
+        cfg["disease"]["name"] = "declares_priors"
+        cfg["model"]["prevalence_train"], cfg["model"]["prevalence_deploy"] = 0.5, 0.2
+        with open(tmp_path / "declares_priors.yaml", "w") as f:
+            yaml.safe_dump(cfg, f)
+        with pytest.raises(PrevalenceCorrectionUnsupported, match="declares_priors.yaml.*removed in B5"):
+            OmniDiagRouter(configs_dir=str(tmp_path))

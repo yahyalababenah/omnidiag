@@ -198,17 +198,22 @@ class PredictResponse(BaseModel):
       (D-32) -- a consumer must not substitute 0.5 or 0.7/0.4 for it.
       `confidence` is Venn-Abers calibrated to the TRAINING hospitals' mix,
       bracketed by probability_lower / probability_upper.
-    * diabetes additionally returns the prevalence-correction audit fields.
-      Its `confidence` is on the DEPLOYMENT prior and must be compared with
-      `inference_threshold` (same scale), never with 0.5.
+    * diabetes_nhanes returns a conformal decision in the same shape, with a
+      Platt-calibrated `confidence`.
+
+    The prevalence-correction fields below (`probability_raw`,
+    `probability_corrected`, `prevalence_*`, `*_raw`) are set by no live module:
+    the correction was removed in gate B5, and a config that declares priors or
+    bands is refused at load. They remain only so the schema still describes
+    rows written before then.
 
     The route uses response_model_exclude_unset=True, so a field a module
     does not send is absent from the JSON rather than present as null —
     heart's response stays exactly the three keys it has always had.
 
     Naming contract (backend/probability_scale.py): an unsuffixed probability
-    or threshold is on the scale the module reports (corrected for diabetes);
-    a `_raw` suffix means the model's own training-prior scale.
+    or threshold is on the scale the module reports; every live module reports
+    its own model's scale (RAW).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -217,8 +222,8 @@ class PredictResponse(BaseModel):
     confidence: float = Field(
         ...,
         description=(
-            "Probability of the positive class on the reported scale — "
-            "prevalence-corrected for diabetes. Same value as probability_corrected."
+            "Probability of the positive class on the scale this module "
+            "reports (see probability_scale)."
         ),
         ge=0.0,
         le=1.0,
@@ -267,7 +272,7 @@ class PredictResponse(BaseModel):
     )
 
     probability_raw: Optional[float] = Field(
-        None, description="Ensemble output on the training prior (50/50 resample)", ge=0.0, le=1.0
+        None, description="Pre-correction probability. Set by no live module (correction removed in gate B5)", ge=0.0, le=1.0
     )
     probability_corrected: Optional[float] = Field(
         None, description="Bayes prior-shift corrected probability; equals confidence", ge=0.0, le=1.0
@@ -304,10 +309,10 @@ class ExplainResponse(BaseModel):
     """
     Response model for the SHAP explanation endpoint.
 
-    Scale note: for a module with a prevalence correction (diabetes) both
-    `confidence` and `base_value` are on the DEPLOYMENT scale. The per-feature
-    SHAP values are unchanged by the correction — it is a constant additive
-    term in log-odds, absorbed entirely into `base_value`.
+    Scale note: `confidence` and `base_value` are on the scale the module
+    reports, its own model's scale for every live module. The `*_raw` and
+    `*_corrected` fields belonged to the prevalence correction removed in
+    gate B5 and are set by no live module.
     """
     prediction: Optional[int] = Field(
         None,
@@ -317,9 +322,8 @@ class ExplainResponse(BaseModel):
         None,
         description=(
             "Probability of the positive class, on the scale this module "
-            "reports — prevalence-corrected for diabetes, the model's own "
-            "scale for heart. Compare it against inference_threshold, never "
-            "against 0.5."
+            "reports (its own model's scale). A conformal module decides by "
+            "its decision field, not by comparing this against 0.5."
         ),
         ge=0.0,
         le=1.0
@@ -366,10 +370,8 @@ class ExplainResponse(BaseModel):
     shap_additivity_gap: Optional[float] = Field(
         None,
         description=(
-            "|reconstruction - confidence|. Non-zero by construction for a "
-            "stacking ensemble: the SHAP values are averaged over the base "
-            "models while the probability comes from the meta-learner above "
-            "them. Reported rather than hidden."
+            "|reconstruction - confidence|: how far the probability implied by "
+            "the SHAP sum alone is from the reported one. Set by no live module."
         ),
         ge=0.0
     )
