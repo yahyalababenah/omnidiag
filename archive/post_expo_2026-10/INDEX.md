@@ -15,7 +15,7 @@ shipped code: several describe models that are no longer served.
 | Original path | Why archived |
 |---|---|
 | `AUDIT_REPORT.md` | Pre-evaluation technical audit (2026-09-15); a point-in-time snapshot |
-| `WEAKNESS_REGISTER.md` | Pre-expo work list; the HM-*/P-* IDs cited in code comments resolve here |
+| `WEAKNESS_REGISTER.md` | Pre-expo work list; the HM-*/P-* IDs cited in code comments resolve here. One entry was added after archiving (PART 11, NM-1, 2026-10-05). **Current findings are recorded in `docs/phase9/FINDINGS_REGISTER.md`** |
 | `omnidiag_v2_roadmap.md` | June 2026 roadmap describing XGBoost + Flower |
 | `plans/OMNIDIAG_TECHNICAL_DOCS.md` | Describes heart_full_tuned.pkl / XGBoost; the source of audit findings C-3, C-4, C-5 |
 | `plans/omnidiag_architecture_overview.md` | "Validation Accuracy 88.98%" is wrong (audit C-5) |

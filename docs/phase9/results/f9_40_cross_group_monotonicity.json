@@ -1,0 +1,363 @@
+{
+ "n_test": 4099,
+ "label": "HbA1c >= 5.7 (dysglycaemia)",
+ "cycle": "2017-2018 held out",
+ "bundle_sha256_prefix": "fcceeb37",
+ "empty_sets": 0,
+ "mandatory_fields": [
+  "ADIPOSITY_BAND",
+  "BMXBMI",
+  "LBDHDD",
+  "PAQ650",
+  "PAQ665",
+  "RIDAGEYR"
+ ],
+ "n_complete_mandatory": 3832,
+ "backend_crosscheck": {
+  "sample": 300,
+  "decision_agree": 300,
+  "max_abs_p_diff": 0.0
+ },
+ "cutpoints_by_age_band": {
+  "20-39": {
+   "n": 1412,
+   "raw_cleared_below": 0.0729,
+   "raw_referral_above": 0.165,
+   "p_cleared_below": 0.0914,
+   "p_referral_above": 0.2037,
+   "empirical_p_range_and_n": {
+    "no_referral": {
+     "p_range": [
+      0.018909327240273242,
+      0.0912738453056471
+     ],
+     "n": 483
+    },
+    "uncertain": {
+     "p_range": [
+      0.09147138896424338,
+      0.20358817893489403
+     ],
+     "n": 514
+    },
+    "referral": {
+     "p_range": [
+      0.20481414505965456,
+      0.7031077617674807
+     ],
+     "n": 415
+    }
+   }
+  },
+  "40-59": {
+   "n": 1351,
+   "raw_cleared_below": 0.256,
+   "raw_referral_above": 0.4018,
+   "p_cleared_below": 0.3099,
+   "p_referral_above": 0.4694,
+   "empirical_p_range_and_n": {
+    "no_referral": {
+     "p_range": [
+      0.04785926355688646,
+      0.3098486799638217
+     ],
+     "n": 411
+    },
+    "uncertain": {
+     "p_range": [
+      0.31056928947214596,
+      0.4693715498597497
+     ],
+     "n": 469
+    },
+    "referral": {
+     "p_range": [
+      0.47038905139386256,
+      0.8566004808365648
+     ],
+     "n": 471
+    }
+   }
+  },
+  "60+": {
+   "n": 1336,
+   "raw_cleared_below": 0.3737,
+   "raw_referral_above": 0.5387,
+   "p_cleared_below": 0.4397,
+   "p_referral_above": 0.6079,
+   "empirical_p_range_and_n": {
+    "no_referral": {
+     "p_range": [
+      0.14678612414792253,
+      0.439362177210406
+     ],
+     "n": 247
+    },
+    "uncertain": {
+     "p_range": [
+      0.43971961076618704,
+      0.6077510906201348
+     ],
+     "n": 587
+    },
+    "referral": {
+     "p_range": [
+      0.607921583199752,
+      0.9301243065704508
+     ],
+     "n": 502
+    }
+   }
+  }
+ },
+ "discordance": {
+  "all_test": {
+   "overall": {
+    "3-level": {
+     "pairs_with_higher_p": 8398851,
+     "discordant": 914653,
+     "fraction": 0.10890215816425365
+    },
+    "binary": {
+     "pairs_with_higher_p": 8398851,
+     "discordant": 454613,
+     "fraction": 0.054127999175125265
+    }
+   },
+   "by_band_pair": {
+    "higher-p in 20-39 vs lower-p in 20-39": {
+     "3-level": {
+      "pairs_with_higher_p": 996166,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 996166,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 20-39 vs lower-p in 40-59": {
+     "3-level": {
+      "pairs_with_higher_p": 226482,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 226482,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 20-39 vs lower-p in 60+": {
+     "3-level": {
+      "pairs_with_higher_p": 46118,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 46118,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 40-59 vs lower-p in 20-39": {
+     "3-level": {
+      "pairs_with_higher_p": 1681130,
+      "discordant": 358101,
+      "fraction": 0.21301208115969616
+     },
+     "binary": {
+      "pairs_with_higher_p": 1681130,
+      "discordant": 210003,
+      "fraction": 0.12491776364707072
+     }
+    },
+    "higher-p in 40-59 vs lower-p in 40-59": {
+     "3-level": {
+      "pairs_with_higher_p": 911925,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 911925,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 40-59 vs lower-p in 60+": {
+     "3-level": {
+      "pairs_with_higher_p": 436660,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 436660,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 60+ vs lower-p in 20-39": {
+     "3-level": {
+      "pairs_with_higher_p": 1840314,
+      "discordant": 427617,
+      "fraction": 0.23236089058714982
+     },
+     "binary": {
+      "pairs_with_higher_p": 1840314,
+      "discordant": 198514,
+      "fraction": 0.10786963529049934
+     }
+    },
+    "higher-p in 60+ vs lower-p in 40-59": {
+     "3-level": {
+      "pairs_with_higher_p": 1368276,
+      "discordant": 128935,
+      "fraction": 0.0942317193314799
+     },
+     "binary": {
+      "pairs_with_higher_p": 1368276,
+      "discordant": 46096,
+      "fraction": 0.033689109507146216
+     }
+    },
+    "higher-p in 60+ vs lower-p in 60+": {
+     "3-level": {
+      "pairs_with_higher_p": 891780,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 891780,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    }
+   }
+  },
+  "complete_mandatory": {
+   "overall": {
+    "3-level": {
+     "pairs_with_higher_p": 7340196,
+     "discordant": 801542,
+     "fraction": 0.10919899141657798
+    },
+    "binary": {
+     "pairs_with_higher_p": 7340196,
+     "discordant": 401513,
+     "fraction": 0.05470058292721339
+    }
+   },
+   "by_band_pair": {
+    "higher-p in 20-39 vs lower-p in 20-39": {
+     "3-level": {
+      "pairs_with_higher_p": 903840,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 903840,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 20-39 vs lower-p in 40-59": {
+     "3-level": {
+      "pairs_with_higher_p": 205296,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 205296,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 20-39 vs lower-p in 60+": {
+     "3-level": {
+      "pairs_with_higher_p": 40559,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 40559,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 40-59 vs lower-p in 20-39": {
+     "3-level": {
+      "pairs_with_higher_p": 1510924,
+      "discordant": 320445,
+      "fraction": 0.21208545234571693
+     },
+     "binary": {
+      "pairs_with_higher_p": 1510924,
+      "discordant": 186866,
+      "fraction": 0.12367663760718607
+     }
+    },
+    "higher-p in 40-59 vs lower-p in 40-59": {
+     "3-level": {
+      "pairs_with_higher_p": 813450,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 813450,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 40-59 vs lower-p in 60+": {
+     "3-level": {
+      "pairs_with_higher_p": 376804,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 376804,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    },
+    "higher-p in 60+ vs lower-p in 20-39": {
+     "3-level": {
+      "pairs_with_higher_p": 1588236,
+      "discordant": 370532,
+      "fraction": 0.23329782223800494
+     },
+     "binary": {
+      "pairs_with_higher_p": 1588236,
+      "discordant": 174514,
+      "fraction": 0.10987913635001348
+     }
+    },
+    "higher-p in 60+ vs lower-p in 40-59": {
+     "3-level": {
+      "pairs_with_higher_p": 1168432,
+      "discordant": 110565,
+      "fraction": 0.09462681610911033
+     },
+     "binary": {
+      "pairs_with_higher_p": 1168432,
+      "discordant": 40133,
+      "fraction": 0.03434774124638832
+     }
+    },
+    "higher-p in 60+ vs lower-p in 60+": {
+     "3-level": {
+      "pairs_with_higher_p": 732655,
+      "discordant": 0,
+      "fraction": 0.0
+     },
+     "binary": {
+      "pairs_with_higher_p": 732655,
+      "discordant": 0,
+      "fraction": 0.0
+     }
+    }
+   }
+  }
+ }
+}

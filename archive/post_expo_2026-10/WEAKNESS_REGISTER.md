@@ -590,3 +590,15 @@ decision — not `heart_full_tuned.pkl`. Consequences for entries above:
 
 Full detail, with the measurements, is in the research repository's gate reports
 (`gate_8_1.md` … `gate_8_8.md`) and decision log (D-30 … D-50).
+
+---
+
+# PART 11 — NHANES DIABETES MODULE (added 2026-10-05, after this register was archived)
+
+This register is archived (`archive/post_expo_2026-10/`). New findings are recorded in
+`docs/phase9/FINDINGS_REGISTER.md`. This entry is added here only because code comments
+still cite this file by ID.
+
+| ID | Finding | Evidence | Severity | Status |
+|---|---|---|---|---|
+| **NM-1** | **The NHANES decision is not monotone in probability across age bands.** A higher-p patient gets a *less* conservative decision in 10.9% of cross-patient pairs (5.4% when only tested-vs-cleared counts), always with the **older** patient being cleared. The cause is the per-age-band conformal cut-points (D9-05). Among cleared patients, the share who are dysglycaemic is 4.6% at 20-39 and 40.9% at 60+. | `docs/phase9/FINDINGS_REGISTER.md` **F9-40**, held-out 2017-2018 cycle, n = 4,099, shipped bundle `fcceeb37…`; `docs/phase9/results/f9_40_*` | HIGH (how the decision is read, not a coverage failure) | OPEN — observation only, by decision. No model or decision change. Backlog: explain group-conditional decisions in the UI; evaluate monotone alternatives |

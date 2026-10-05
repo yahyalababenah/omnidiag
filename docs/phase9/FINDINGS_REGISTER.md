@@ -1306,3 +1306,88 @@ the movement is the population changing rather than an assay fault.
 ## Status
 
 **802 tests passing, zero failures.**
+
+# 2026-10-05 — post-expo observation
+
+## F9-40 — HIGH — The decision is not monotone in probability across age bands
+
+**Recorded as an observation. The model and the decision logic are deliberately unchanged.**
+
+### What happens
+
+A patient with a higher estimated probability can receive a *less* conservative decision
+than a patient with a lower one, when the two are in different age bands. Within one band
+this never happens. Across bands it always runs the same way: the **older** patient, with
+the **higher** probability, is the one cleared.
+
+### Cause
+
+The conformal layer is group-conditional (D9-05, `alpha = 0.2`):
+`DiabetesEbmConformalBackend._decide` compares the raw EBM score with a separate
+calibration quantile for each age band x class (`bundle["conformal"]["q_group"]`). Each
+band therefore gets its own cut-points. Older patients without dysglycaemia score higher
+than younger ones, so the score at which an older patient is cleared is higher too. This is
+what Mondrian (per-group) conformal prediction is for: ~80% coverage per class *within
+each band*. A single ranking by probability across bands is not something it promises.
+
+### Numbers — held-out 2017-2018 cycle, shipped bundle (sha256 `fcceeb37…`)
+
+n = 4,099 (3,832 with all six mandatory fields; the figures for that subset agree to
+within 0.002). Probabilities are the displayed Platt `confidence`. A sample of 300 test
+patients was re-scored through the production backend: 300/300 identical decisions,
+probability difference 0.0.
+
+Probability ranges that map to each decision:
+
+| Age band | n | `no_referral` | `uncertain` | `referral` |
+|---|---|---|---|---|
+| 20-39 | 1,412 | p < 0.091 | 0.091 – 0.204 | p > 0.204 |
+| 40-59 | 1,351 | p < 0.310 | 0.310 – 0.469 | p > 0.469 |
+| 60+ | 1,336 | p < 0.440 | 0.440 – 0.608 | p > 0.608 |
+
+Pairs of patients where the higher-p patient gets the *less* conservative decision, among
+all pairs with different p (8,398,851). The 3-level order is referral > uncertain >
+no_referral. "Binary" counts only tested (referral or uncertain) vs cleared, which is what
+changes what happens to the patient:
+
+| Higher-p patient in … vs lower-p patient in … | 3-level | Binary |
+|---|---|---|
+| **All pairs** | **10.9%** | **5.4%** |
+| 40-59 vs 20-39 | 21.3% | 12.5% |
+| 60+ vs 20-39 | 23.2% | 10.8% |
+| 60+ vs 40-59 | 9.4% | 3.4% |
+| Same band (each of the three) | 0% | 0% |
+| Younger band vs older band (each) | 0% | 0% |
+
+### Clinical implication
+
+Equal sensitivity per band is bought with very different risk among the patients who are
+cleared:
+
+| Age band | Prevalence | Share cleared | Dysglycaemic among the cleared | Share of the band's dysglycaemic patients cleared |
+|---|---|---|---|---|
+| 20-39 | 15.9% | 34.2% | **4.6%** | 9.8% |
+| 40-59 | 39.8% | 30.4% | **20.7%** | 15.8% |
+| 60+ | 52.9% | 18.5% | **40.9%** | 14.3% |
+
+Among patients aged 60+ shown `no_referral`, 4 in 10 have an HbA1c ≥ 5.7 in this cohort,
+and a 60+ patient can be cleared at p = 0.43. A 30-year-old with p = 0.10 is sent for a test. Each is correct under the
+module's stated guarantee, but a clinician who reads `no_referral` as "low risk", or who
+compares two patients by their probability, is misled. Severity is HIGH because of that
+reading risk, not because of a coverage failure: the per-band miss rate stays below the
+20% the module was built for.
+
+### Follow-up (backlog, not implemented)
+
+- Explain group-conditional decisions in the UI: show the patient's age band and that
+  band's cut-points next to the decision, and stop presenting `no_referral` as "low risk"
+  for the 60+ band.
+- Evaluate monotone alternatives against the current per-band coverage: a marginal
+  (single-quantile) conformal layer, cut-points constrained to be non-decreasing across
+  bands, or an explicit risk cap on clearing. Each has to be weighed against equal
+  sensitivity per age band, which is the property the current design keeps.
+
+Reproduce: `docs/phase9/results/f9_40_cross_group_monotonicity.py`. It needs the research
+data directory, rebuilds the cohort exactly as the training script does, and uses the
+backend's own `_platt` and `_decide`. Outputs: `docs/phase9/results/f9_40_cross_group_monotonicity.json`
+and `f9_40_clinical_readout.json`.
