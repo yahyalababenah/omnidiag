@@ -762,7 +762,7 @@ def _run_batch_predictions(
     run_in_threadpool so it never occupies the event loop (X-3).
 
     One vectorized model call for every validated row when the model family
-    declares a vectorised predict_batch (heart's — see WEAKNESS_REGISTER.md
+    declares a vectorised predict_batch (heart's — see archive/post_expo_2026-10/WEAKNESS_REGISTER.md
     HM-2; IterativeImputer inside the Pipeline is ~300x slower called once
     per row than once on the whole batch). Otherwise one predict() call per
     row (diabetes'), so a failing row only fails itself.

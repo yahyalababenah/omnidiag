@@ -12,7 +12,7 @@
  * only the correction target did). configs/diabetes.yaml as committed:
  * inference_threshold 0.108184 on the deployment prior (raw equivalent
  * 0.280854), prevalence_train 0.50 → prevalence_deploy 0.237 (Jordan's
- * diabetes prevalence, per docs/OmniDiag_Proposal_Defense.md — was ~0.14,
+ * diabetes prevalence, per archive/post_expo_2026-10/docs/OmniDiag_Proposal_Defense.md — was ~0.14,
  * a US/BRFSS placeholder, until 2026-09-21). If prevalence_deploy changes
  * again, every "shown" value below changes with it; the raw values and
  * every Positive/Negative decision do not — confirmed on the full 14,139-row

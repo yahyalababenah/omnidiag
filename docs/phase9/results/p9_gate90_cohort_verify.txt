@@ -1,0 +1,35 @@
+# Gate 9.0 — cohort + leak guard re-verification
+date: 2026-09-28T04:48:13+03:00
+env: ~/Desktop/بيانات سكر جديدة/venv (py3.13, interpret_core 0.7.8, numpy 2.5.3, pandas 3.0.6, sklearn 1.9.1, xgboost 3.4.1)
+method: lines 59-175 of 'omnidiag_nhanes_research (1).py' executed verbatim (data build, both leak guards, temporal split); all 6 cycles from nhanes_raw/
+
+n            = 26904        (results.md: 26904)
+prevalence   = 0.3288       (results.md: 0.329)
+n_features   = 87           (results.md: 87)
+splits       = train 18508 / val 2148 / cal 2149 / test 4099   (results.md: identical)
+leak guard 1 = PASS (assert a < 0.85 did not fire for any of 87 features)
+leak guard 2 = R2 0.150 (results.md: 0.150), PASS (< 0.60)
+               top contributors: RIDAGEYR 0.011, BPXPLS 0.007, LBXSCLSI 0.003, LBXSATSI 0.003, RIAGENDR 0.003
+
+per-cycle positive rate:
+  2007-2008 n=4632 pos=0.317
+  2009-2010 n=4974 pos=0.339
+  2011-2012 n=4292 pos=0.330
+  2013-2014 n=4610 pos=0.296
+  2015-2016 n=4297 pos=0.336
+  2017-2018 n=4099 pos=0.359
+
+excluded as glycemic: LBXGH LBXSGL LBDSGLSI LBXGLU LBDGLUSI LBXIN LBDINSI LBXSOSSI
+excluded otherwise:   SEQN WTMEC2YR w RIDSTATR RIDEXPRG y cycle DIQ010 DIQ050 DIQ070 RIDRETH3 VAI LAP
+
+FEATS (87, verified):
+BMXARMC BMXARML BMXBMI BMXHT BMXLEG BMXWAIST BMXWT BPQ020 BPQ080 BPXDI1 BPXDI2 BPXDI3
+BPXPLS BPXSY1 BPXSY2 BPXSY3 CVD_ANY DBP LBDBANO LBDEONO LBDHDD LBDLYMNO LBDMONO LBDNENO
+LBDSALSI LBDSBUSI LBDSCASI LBDSCHSI LBDSCRSI LBDSGBSI LBDSIRSI LBDSPHSI LBDSTBSI LBDSTPSI
+LBDSTRSI LBDSUASI LBXBAPCT LBXEOPCT LBXHCT LBXHGB LBXLYPCT LBXMC LBXMCHSI LBXMCVSI LBXMOPCT
+LBXMPSI LBXNEPCT LBXPLTSI LBXRBCSI LBXRDW LBXSAL LBXSAPSI LBXSASSI LBXSATSI LBXSBU LBXSC3SI
+LBXSCA LBXSCH LBXSCK LBXSCLSI LBXSCR LBXSGB LBXSGTSI LBXSIR LBXSKSI LBXSLDSI LBXSNASI LBXSPH
+LBXSTB LBXSTP LBXSTR LBXSUA LBXWBCSI MCQ160B MCQ160C MCQ160E MCQ160F MCQ300C PAQ650 PAQ665
+RIAGENDR RIDAGEYR SBP SMQ020 TG_HDL URDACT WHtR
+
+NOT verified: no model artifact exists to reproduce (F9-01). No model fit was run.

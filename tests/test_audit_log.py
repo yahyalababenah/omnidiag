@@ -5,7 +5,7 @@ Verifies that every API request is recorded in the audit_logs table.
 The AuditMiddleware used to open AsyncSessionLocal from backend.database directly,
 which bypassed the get_db override and wrote to the real database, so this module
 patched it locally. Every OTHER test module was left writing to omnidiag_dev.db
-(WEAKNESS_REGISTER.md P-13). The middleware now resolves its session through
+(archive/post_expo_2026-10/WEAKNESS_REGISTER.md P-13). The middleware now resolves its session through
 backend.database.app_session, which honours app.dependency_overrides[get_db], so
 no patch is needed and every module is isolated the same way.
 """

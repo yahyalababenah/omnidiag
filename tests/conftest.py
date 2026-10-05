@@ -19,7 +19,7 @@ import os
 # that file on every test run. Setting the variable here first wins, because
 # load_dotenv() does not override an existing value. This is the second line
 # of defence; the first is backend.database.app_session honouring the get_db
-# override. See WEAKNESS_REGISTER.md P-13.
+# override. See archive/post_expo_2026-10/WEAKNESS_REGISTER.md P-13.
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 import asyncio

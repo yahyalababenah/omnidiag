@@ -31,7 +31,7 @@ Exit code is 0 only when every request succeeded.
 The demo patients are read from frontend/src/mockPatients.js, the same file
 the UI renders, so the warmed inputs cannot drift from the ones on screen.
 Requires node on PATH to read that file (the same dependency
-scratch/golden_master.py already has).
+scripts/golden_master.py already has).
 """
 
 import argparse

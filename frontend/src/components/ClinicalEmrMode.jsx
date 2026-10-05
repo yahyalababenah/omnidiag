@@ -653,7 +653,7 @@ export default function ClinicalEmrMode() {
                 {result && !error && (
                   <div className="space-y-6">
                     {/* Data completeness warning -- a high-impact input (see
-                        WEAKNESS_REGISTER.md HM-5) was missing and the model
+                        archive/post_expo_2026-10/WEAKNESS_REGISTER.md HM-5) was missing and the model
                         imputed it instead of using the patient's real value.
                         Must be visible here, not just logged: the clinician
                         reading this result is the one who needs to know. */}

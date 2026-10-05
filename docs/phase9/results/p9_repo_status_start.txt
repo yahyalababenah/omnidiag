@@ -1,0 +1,111 @@
+# Phase 9 — repo status at start
+date: 2026-09-28T04:45:13+03:00
+
+## Branch
+created:       phase9/diabetes-nhanes-ebm
+branched from: d621637ec67835d5b38a454da8e6b902cd242174  (d621637 'merge: phase8 heart fixes, monitoring, diabetes drift source tracked')
+NOT checked out — working tree left on fix/heart-retrain-candidate with Yahya's uncommitted heart-candidate work.
+
+## Branch positions at start
+agents/mermaid-er-diagram-db-models 5881e0b
+deploy/v2-platform d621637
+feat/model-family-registry 053280c
+feature/diabetes-module-integration e9aeaf2
+feature/omni-platform-final da4e432
+feature/ui-ux-polish fdf9f3b
+fix/demo-blockers c51fead
+fix/diabetes-model-mismatch 5594f80
+fix/feature-verification 7d01d63
+fix/heart-retrain-candidate d621637
+fix/shap-sign-inversion 1793f16
+fix/whatif-clinical-validity 586d972
+hf-deploy-clean 8fc65cb
+hf-deploy f4d35fe
+hf-flat 0c9a1e2
+hf-flat2 4a96f26
+hf/main 4a96f26
+hf-push-temp d621637
+hf-snapshot-20260923 3610ba0
+main1 1601e41
+origin 8018ec5
+origin/deploy/v2-platform d621637
+origin/feature/diabetes-module-integration e9aeaf2
+origin/feature/omni-platform-final 779db95
+origin/fix/demo-blockers c21fb50
+origin/fix/feature-verification 7d01d63
+origin/main1 8018ec5
+origin/main 52a1ab7
+origin/production-final-v3 401cf5d
+origin/V2-advanced-model 25c16dc
+origin/V3-advanced-DL 16318c7
+phase8/heart-fixes-and-monitoring d0b7892
+phase9/diabetes-nhanes-ebm d621637
+production-final-v3 5442b53
+V3-advanced-DL 909c46d
+
+## git status
+ M .gitignore
+ M backend/active_learning/retrain.py
+ M backend/heart_glm/stack.py
+ M backend/monitoring/mlflow_tracker.py
+ M scripts/retrain.py
+ M tests/test_mlflow_state_is_stated.py
+?? backend/heart_glm/candidate.py
+?? logs/
+?? omnidiag_dev.db.before-annotations
+?? scripts/render_candidate_report.py
+?? tests/test_heart_candidate_retrain.py
+
+## sha256 of files Phase 9 may touch (baseline)
+2b3d5447ef0ec92e56e1b7948c78fbf7e4c3f44db799225274cc05980a02a080  backend/main.py
+655e56014be41deb7b363f7e406564487f97c6ea29d2040f24d850a8c5ae46b5  backend/router.py
+f7b480de70dd6d40bb098dcf19dd450b83c90031be317cc25804067e816897ca  backend/schemas.py
+fef6f4bdc9ceecffa9e82beb53882be72f68ec49b9d8aadc7d3a052bf7a54c32  backend/cache.py
+f5218b520af36d9611598abb2f59e88695407491aa5080ead3e80ac3e94fa81b  backend/model_loader.py
+dbd09dd87f2f8d1e429b7fd30a59e1723f9fd3d4992c917c368ef59bb82595a0  backend/ensemble_loader.py
+5d167594c32baaa7d845c29904d949c610adba5bb6817680d7cd02c40673f226  backend/prevalence_correction.py
+5e6043d7f737db371f07f30dc6872b4a4a3128e534794e300cd4395aaf471542  backend/probability_scale.py
+b3ebbb67a6c50b37fe0dee968920b5342c81e8ca7267ec76de56b9ea7e4a175a  backend/shap_service.py
+035d5a8165009668a4dc5a9494d3dc58fd054da5016db3a4916d0b12b3fbcc99  backend/counterfactual_generator.py
+337e4397d930f5cfbd2baa795fc00fbbf9ef5422c389e1c3e14d64c9e209b961  backend/demo_patients.json
+6b265dcb2818cb41c3644405a1e11e5acfb6a6de56689de0efc03adc8e73de0d  backend/demo_seed.py
+ee58a8c6acbdcc4af4bb7a84cc6d6435b2556e4e3b5010228661681f2320d45e  backend/model_backends/__init__.py
+364230aeafc07949f7ea42a0545f482f4fe4d81bae87bf0f6215ce76185ba58f  backend/model_backends/base.py
+f966b342c7af703d74b010cd90a30c32957a813ab4cb9e98e1035b863c76dd17  backend/model_backends/stacking_ensemble.py
+dfe4978f70e5e9b24c95e7f5eefd9c4cd5f200beecda33fdc3bcf9373bf76689  backend/model_backends/sklearn_pipeline.py
+3192518479ee8bcee6b3cf0d8fd7da4cf898bbcadf86ce2c679c6cd1c7a519f0  backend/model_backends/sklearn_generic.py
+1ae36c910df9ed27fe8b85379afed1ec2f659a173ff5a183b66100641d508ac4  backend/model_backends/heart_glm_conformal.py
+06500fedb5e8c123d9d9184ceea13b8f90d5b980e14fba32afee8b6dc4733bf2  backend/llm/report_generator.py
+95f106494bf7a78dd30bcfa3aceb57ee4d91bbe3df1d7bf6cee81f74ba03480a  backend/monitoring/metrics.py
+fbaa5df402ccb2fab093910fd9a4ad7538acd55b4a40b777c1442a4c2f9cc173  backend/monitoring/drift.py
+6d4e1d0b45f602bd93b06649df6043b63e4b0fcbe891f617de2b0e7620fc6fe6  backend/monitoring/mlflow_tracker.py
+a3ca5259cc7fa37c94923033bd30c739b32f53c2b4e5ee104a85efb0e8f3a4da  backend/db_models/prediction.py
+4b41608d27420422a98e7aa33fc02e527a4cca26e411a476d1f221ed25ccf137  backend/db_models/review_queue.py
+cdeab0f652f0f94f23a48ee3326e89e7a4504158b3a43c02a72f04c5c599c6d4  backend/nlp/notes_parser.py
+7900134138ac64614277b4dc4ccdc5aa39698bd304ce756a72cfab1c27a6cd0e  backend/active_learning/retrain.py
+533e7c1a01ac432b49407b5a7c53fd30d0510b2f7a3041c581ffb53b8edffc27  backend/active_learning/sampler.py
+bfd8e5846ab7ef46c458720b8b7296bc754cf9eb624a42ecde6bb392ac42de35  configs/diabetes.yaml
+03259029dc65d993c626b223d5e8a09dae23045c44d7016a9529d556b801dbdc  configs/heart_disease.yaml
+1ac0d17d0043dc26a0c3d5a092e68b4f9638139fa5b8a5af1eb7c349f6829861  configs/config_loader.py
+f6e87ccdafd6abaa9d844120a0ea4e3df7a585bf69bdbce02de73a911a3ad4b3  features/diabetes_features.py
+d4f27dcb0419d66e004510c7718e35055d0193b1f3911ac2f8ab672e3d061ef6  requirements.txt
+743663a57c85d49eff1765b848137b3bbd00426a79d53a146fbe073178de5838  README.md
+45cc9e423bee94dc876891fe13692ef15376590e82b14ac45289ad8e3ef83386  AUDIT_REPORT.md
+b7185d318a3a9b119956b9493532eb935f670ea80905fcab91e1c353050841ca  WEAKNESS_REGISTER.md
+d628f9624097103593660e904707bec0abc27d815a2b4bcd8d54bba836062eab  frontend/src/App.jsx
+9143c7a65b0ca8414ec09cdbe71115825e803716bd9ded8b26258a5ffb12f55e  frontend/src/mockPatients.js
+41c31af6cca62dee3f9231c96dd741bee7515f240ea67ac5221c8ab68f905ad7  frontend/src/constants/thresholds.js
+4593ea3f4e0b855d6e31c690a99032c00117763ff4ca8192eb53aa31040048c1  frontend/src/components/PDFReport.jsx
+1b5237bf603a86745469f659e12726e1b46f48b8d2fd63945b8901aabea56da9  frontend/src/components/WhatIfScenarioCard.jsx
+9949a324fa70ab0f5df7b3446284ccca606603675ee082ff43d3aa03cb21a3cf  frontend/src/components/ThresholdBar.jsx
+908eac7cc517cb98a97066a817d4444417131dbff61151b4b7fa6b805f842121  frontend/src/components/DiseaseSelector.jsx
+69ee6d3004d69c7b0f506d3e342c883d0aa6eb1a34c6101e837d83c393f911d9  frontend/src/hooks/useDiseaseForm.js
+91bf8ed3f1fbf9214ee79e59ff8d51ea24a09c7ff3ece231d98d90986fa3593f  frontend/src/hooks/useDiseaseSchema.js
+4f5a110eaef45f1ea6730a0adf2d3bff7121af4bf80abe5c4563cf6fff0603dc  frontend/src/utils/counterfactuals.js
+
+## sha256 of heart files that must stay byte-identical
+1ae36c910df9ed27fe8b85379afed1ec2f659a173ff5a183b66100641d508ac4  backend/model_backends/heart_glm_conformal.py
+03259029dc65d993c626b223d5e8a09dae23045c44d7016a9529d556b801dbdc  configs/heart_disease.yaml
+a926cc23308a984b6dbf5876703390c7a9a5cc4a3358af2a5ae0f6e7822129ca  backend/heart_glm/candidate.py
+a8fe0e9fec7abafdba1334d17e64ed867e7b0ce77b7ce0718143b539d8646347  backend/heart_glm/__init__.py
+9e8187928bc213545b59c0eafa74e4df8c14734f199be810930f40570151ff94  backend/heart_glm/stack.py

@@ -62,7 +62,7 @@ class HeartDiseaseInput(BaseModel):
     # UCI-site data (e.g. Hungarian rows are commonly missing several of
     # these), so pydantic requiring them outright rejected real, usable
     # patient records before they ever reached the model. See
-    # WEAKNESS_REGISTER.md HM-5. A missing value among these that also ranks
+    # archive/post_expo_2026-10/WEAKNESS_REGISTER.md HM-5. A missing value among these that also ranks
     # high in SHAP importance (Oldpeak, Cholesterol) surfaces as
     # data_completeness_warning in the prediction response instead of being
     # silently imputed — see ModelLoader._completeness_warning().
@@ -303,7 +303,7 @@ class PredictResponse(BaseModel):
             "Present only when a high-SHAP-importance input feature was missing and the "
             "model imputed it automatically instead of using the patient's actual value. "
             "Names the missing feature(s); the prediction should be treated with extra "
-            "caution. See WEAKNESS_REGISTER.md HM-5."
+            "caution. See archive/post_expo_2026-10/WEAKNESS_REGISTER.md HM-5."
         ),
     )
 

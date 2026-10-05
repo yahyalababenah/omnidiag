@@ -5,7 +5,7 @@
 # were validated in (backend/.venv, Python 3.13). Unpinned, the HF Space
 # resolved scikit-learn 1.7.2 and served different diabetes probabilities
 # from the same pickles (Case C 63.7% local vs 49.4% live). Change these only
-# together with a re-run of scratch/verify_live.py. Everything else keeps a
+# together with a re-run of scripts/verify_live.py. Everything else keeps a
 # minimum version (>=).
 # =============================================================================
 

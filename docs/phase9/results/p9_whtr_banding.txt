@@ -1,0 +1,74 @@
+# Gate 9.0b pre-work — is a CATEGORICAL central-adiposity band as good as a measured waist?
+date: 2026-09-28
+question from Yahya: the clinician will not tape-measure waist and height at a first visit; they
+judge central adiposity by eye. Would bands be better than a continuous ratio?
+method: same cohort (n=26904) and temporal split. DATA LAYER ONLY — no EBM fitted.
+        Univariate AUC = max(AUC, 1-AUC) for dysglycaemia, computed on the full cohort.
+cut-points: PUBLISHED WHtR boundaries 0.5 / 0.6 (external, not selected on our data).
+            The FasterRisk train-selected 0.58 / 0.64 is reported alongside for comparison.
+
+## Univariate signal, one feature at a time
+| representation | univar AUC | n |
+|---|---|---|
+| BMXBMI (kg/m2, continuous)                      | 0.6246 | 26612 |
+| BMXWAIST (cm, continuous)   <- curated-20 as approved | 0.6500 | 25693 |
+| WHtR (continuous)                               | 0.6686 | 25664 |
+| WHtR 3 bands  <0.5 / 0.5-0.6 / >=0.6            | 0.6442 | 25664 |
+| WHtR 4 bands  <0.4 / 0.4-0.5 / 0.5-0.6 / >=0.6  | 0.6444 | 25664 |
+| WHtR 3 bands  <0.58 / 0.58-0.64 / >=0.64 (train-selected) | 0.6420 | 25664 |
+
+Readings:
+ - banding continuous WHtR costs 0.0244 univariate AUC (0.6686 -> 0.6442)
+ - a 3-band WHtR still beats continuous BMI (0.6442 vs 0.6246)
+ - a 3-band WHtR is slightly BELOW continuous waist in cm (0.6442 vs 0.6500)
+ - 4 bands buys nothing over 3 (0.6444 vs 0.6442): the <0.40 band holds 127 people (0.5%)
+ - the train-selected cut-points are no better than the published ones (0.6420 vs 0.6442),
+   so use the published ones -- externally defensible at no measured cost.
+
+## Distribution and observed prevalence per band (published 3 bands)
+| band | WHtR | n | share | observed prevalence |
+|---|---|---|---|---|
+| normal    | < 0.50      | 4767  | 0.177 | 0.143 |
+| increased | 0.50 - 0.60 | 10408 | 0.387 | 0.279 |
+| high      | >= 0.60     | 10489 | 0.390 | 0.456 |
+| MISSING   | height or waist absent | 1240 | 0.046 | 0.389 |
+
+Prevalence is cleanly monotone across the three bands (0.143 / 0.279 / 0.456) -- the band is
+clinically communicable and the EBM monotone-increasing constraint applies to it directly.
+
+*** F9-25: the MISSING group has prevalence 0.389 -- higher than 'increased' (0.279) and close to
+'high' (0.456). Un-measured adiposity is NOT missing-at-random; it tracks high risk. An EBM will
+therefore learn "adiposity field blank -> elevated risk". A clinician who skips the field because
+they could not be bothered gets a risk increase they did not intend. This is the HF-11/HF-12
+pattern, measured. Consequence: the band must be a REQUIRED input with no silent blank. ***
+
+## Eyeball error: clinician misplaces the band by +/-1 (3-band version, 20 reps per p)
+| p(misclassified) | univar AUC | delta vs perfect |
+|---|---|---|
+| 0.00 | 0.6442 | -      |
+| 0.10 | 0.6361 +/- 0.0011 | -0.008 |
+| 0.20 | 0.6275 +/- 0.0012 | -0.017 |
+| 0.35 | 0.6152 +/- 0.0023 | -0.029 |
+| 0.50 | 0.6030 +/- 0.0026 | -0.041 |
+
+So eyeball error at a plausible 20% costs about as much again as the banding itself. Worst realistic
+total, continuous WHtR -> eyeballed 3-band at 20% error: 0.6686 -> 0.6275, i.e. -0.041 on this
+feature ALONE, univariately.
+
+## Why the model-level cost will be much smaller than -0.041
+| | bmi | waist | whtr | height |
+|---|---|---|---|---|
+| bmi | 1.000 | 0.904 | 0.911 | -0.019 |
+| waist | 0.904 | 1.000 | 0.928 | 0.181 |
+| whtr | 0.911 | 0.928 | 1.000 | -0.193 |
+| height | -0.019 | 0.181 | -0.193 | 1.000 |
+
+BMXBMI stays in the feature set and correlates 0.911 with WHtR, so most of the banded feature's
+lost information is still present through BMI. The MODEL-level cost cannot be read off these
+univariate numbers and must be measured by fitting. That is Gate 9.0b.
+
+## Field availability (argues against the intuition that height is the hard field)
+height (BMXHT) non-missing = 0.990
+waist (BMXWAIST) non-missing = 0.955
+=> height is the EASIER field. Waist is the one that goes unmeasured.
+   Replacing waist with an eyeballed band removes BOTH tape-measure fields at once.

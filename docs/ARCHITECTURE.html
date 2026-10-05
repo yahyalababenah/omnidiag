@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniDiag Architecture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: right-to-left reading column, sticky section index, one diagram per section */
+:root{--bg:#f6f7f9;--surface:#ffffff;--fg:#14202b;--muted:#566574;--line:#d9dee4;--accent:#0b6e6e;--accent-soft:#e0f0ef;--warn:#9a5b00;--warn-soft:#fbf0dc;
+--font-body:'IBM Plex Sans Arabic',system-ui,sans-serif;--font-mono:'IBM Plex Mono',ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f161c;--surface:#16202a;--fg:#e6edf3;--muted:#9bacba;--line:#26333f;--accent:#4fc3c0;--accent-soft:#12302f;--warn:#e0a84a;--warn-soft:#2c2412;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f161c;--surface:#16202a;--fg:#e6edf3;--muted:#9bacba;--line:#26333f;--accent:#4fc3c0;--accent-soft:#12302f;--warn:#e0a84a;--warn-soft:#2c2412;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.7;padding-inline:16px;padding-block:0}
+.wrap{max-width:1180px;margin-inline:auto}
+header{padding-block:32px 20px}
+h1{font-size:clamp(1.6rem,4vw,2.3rem);line-height:1.25;margin:0 0 8px;text-wrap:balance}
+.sub{color:var(--muted);margin:0;max-width:70ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-block:20px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+.fact b{display:block;font-size:.8rem;color:var(--muted);font-weight:500;letter-spacing:.02em}
+.fact span{font-family:var(--font-mono);font-size:.9rem;overflow-wrap:anywhere}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-block:1px solid var(--line);display:flex;gap:6px;overflow-x:auto;padding-block:8px;margin-block:8px 24px}
+nav a{white-space:nowrap;font-size:.85rem;color:var(--fg);text-decoration:none;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface)}
+nav a:hover,nav a:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+section{margin-block:0 40px;scroll-margin-top:64px}
+h2{font-size:1.3rem;margin:0 0 6px;text-wrap:balance}
+.cap{color:var(--muted);margin:0 0 12px;max-width:80ch}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;min-width:0}
+pre.mermaid{margin:0;text-align:center;background:transparent}
+.note{background:var(--warn-soft);border:1px solid var(--line);border-inline-start:4px solid var(--warn);border-radius:6px;padding:10px 14px;margin-block:12px;color:var(--fg);font-size:.95rem}
+footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>هيكلية OmniDiag: منصة تشخيص سريري متعددة الأمراض</h1>
+<p class="sub">Modular Monolith بعملية FastAPI واحدة وواجهة React. ١٣ مخططاً تغطي المعمارية، تدفق الطلب، النماذج، الإنسان في الحلقة، NLP والـ LLM، الأمن، المراقبة، قاعدة البيانات، الواجهة، النشر، والتعلّم الاتحادي.</p>
+<div class="facts">
+<div class="fact"><b>Backend</b><span>FastAPI, SQLAlchemy async, Alembic</span></div>
+<div class="fact"><b>Frontend</b><span>React, Vite, Tailwind, PWA</span></div>
+<div class="fact"><b>Diseases</b><span>heart_disease, diabetes (BRFSS), diabetes_nhanes</span></div>
+<div class="fact"><b>State</b><span>SQLite dev / PostgreSQL, Redis, MLflow</span></div>
+<div class="fact"><b>Ops</b><span>Docker, HF Space, Vercel, k8s, Helm, Prometheus, Grafana</span></div>
+<div class="fact"><b>Tests</b><span>about 60 pytest files</span></div>
+</div>
+<div class="note">الحالة الصادقة: التعلّم الاتحادي ليس جزءاً من المنتج المشغَّل (القسم ١٣)، وترقية النموذج المرشَّح بعد إعادة التدريب قرار بشري لا يوجد كود يفعله تلقائياً (القسم ٦).</div>
+</header>
+<nav aria-label="فهرس الأقسام"><a href="#overview">الصورة الكبرى: Modular Monolith</a><a href="#modules">خريطة الوحدات (Package Map)</a><a href="#predict">رحلة طلب التنبؤ (Predict Request)</a><a href="#registry">الإضافة بالإعدادات: Config-driven Registry</a><a href="#heart">نموذج القلب: Spline-GLM + Venn-Abers + Conformal</a><a href="#hitl">الإنسان في الحلقة والتعلّم النشط (HITL + Active Learning)</a><a href="#nlpllm">معالجة اللغة (NLP) والتقرير بالـ LLM</a><a href="#security">الأمن والصلاحيات والتدقيق</a><a href="#monitor">المراقبة والـ Drift و MLflow</a><a href="#er">نموذج البيانات (Database)</a><a href="#frontend">الواجهة الأمامية (React SPA)</a><a href="#deploy">النشر والبنية التحتية (Deployment / CI)</a><a href="#fl">التعلّم الاتحادي (Federated Learning): الحالة الفعلية</a></nav>
+<section id="overview"><h2>١. الصورة الكبرى: Modular Monolith</h2><p class="cap">عملية FastAPI واحدة (deployable واحد) مقسّمة داخلياً إلى وحدات (modules) بحدود واضحة؛ الأمراض تُضاف بملف YAML دون لمس باقي الكود.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart TB
+  subgraph CL[&quot;Clients&quot;]
+    SPA[&quot;React SPA - Vite, Tailwind, PWA&lt;br/&gt;(Vercel)&quot;]
+    EMR[&quot;EMR / API clients&lt;br/&gt;JWT cookie or X-API-Key&quot;]
+  end
+  subgraph MW[&quot;Cross-cutting middleware (order of wrapping)&quot;]
+    direction LR
+    CORS[&quot;CORS&quot;] --&gt; SEC[&quot;SecurityHeaders&lt;br/&gt;HTTPS enforce&quot;] --&gt; AUD[&quot;AuditMiddleware&lt;br/&gt;writes audit_logs&quot;] --&gt; MET[&quot;MetricsMiddleware&lt;br/&gt;Prometheus&quot;] --&gt; RL[&quot;slowapi rate limit&lt;br/&gt;per-endpoint&quot;]
+  end
+  subgraph APP[&quot;FastAPI process = the monolith (backend/main.py)&quot;]
+    subgraph MODS[&quot;Feature modules (APIRouter each)&quot;]
+      AUTH[&quot;auth&lt;br/&gt;/auth&quot;]
+      ADM[&quot;admin&lt;br/&gt;/admin&quot;]
+      PAT[&quot;patients&lt;br/&gt;/api/v4/patients&quot;]
+      CLIN[&quot;clinical diagnosis&lt;br/&gt;/api/v4/{disease}/...&quot;]
+      AL[&quot;active_learning (HITL)&lt;br/&gt;/api/v4/review&quot;]
+      MON[&quot;monitoring&lt;br/&gt;/api/v4/admin/drift, mlflow&quot;]
+      NLP[&quot;nlp&lt;br/&gt;notes_parser&quot;]
+      LLM[&quot;llm&lt;br/&gt;report_generator&quot;]
+      FED[&quot;federated&lt;br/&gt;SUPERSEDED prototype&quot;]
+    end
+    subgraph CORE[&quot;Shared core services&quot;]
+      ROUTER[&quot;OmniDiagRouter&lt;br/&gt;scans configs/*.yaml&quot;]
+      PS[&quot;probability_scale +&lt;br/&gt;prevalence_correction&quot;]
+      SHAP[&quot;shap_service&quot;]
+      CF[&quot;counterfactual_generator +&lt;br/&gt;diabetes_what_if_levers&quot;]
+      CACHE[&quot;cache.py&lt;br/&gt;Redis or in-memory&quot;]
+    end
+    subgraph REG[&quot;Model-family registry (backend/model_backends)&quot;]
+      B1[&quot;glm_ivap_conformal&lt;br/&gt;HEART&quot;]
+      B2[&quot;stacking_ensemble&lt;br/&gt;DIABETES BRFSS&quot;]
+      B3[&quot;ebm_platt_conformal&lt;br/&gt;DIABETES NHANES&quot;]
+      B4[&quot;sklearn_pipeline /&lt;br/&gt;sklearn_generic&quot;]
+    end
+  end
+  subgraph DATA[&quot;State and artifacts&quot;]
+    DB[(&quot;SQL DB&lt;br/&gt;SQLite dev / PostgreSQL prod&lt;br/&gt;SQLAlchemy async + Alembic&quot;)]
+    RED[(&quot;Redis cache&quot;)]
+    ART[(&quot;models/ bundles&lt;br/&gt;built at image build&quot;)]
+    MLF[(&quot;MLflow&lt;br/&gt;runs and registry&quot;)]
+    CFG[&quot;configs/*.yaml&lt;br/&gt;single source of truth per disease&quot;]
+  end
+  subgraph OBS[&quot;Observability&quot;]
+    PROM[&quot;Prometheus&quot;] --&gt; GRAF[&quot;Grafana&quot;]
+  end
+  subgraph EXT[&quot;External&quot;]
+    DS[&quot;DeepSeek API&lt;br/&gt;(OpenAI-compatible)&quot;]
+    BERT[&quot;BioBERT NER&lt;br/&gt;HuggingFace, optional&quot;]
+  end
+  CL --&gt; MW --&gt; MODS
+  CLIN --&gt; ROUTER --&gt; REG
+  CLIN --&gt; PS
+  CLIN --&gt; SHAP
+  CLIN --&gt; CF
+  CLIN --&gt; CACHE
+  CACHE -.-&gt; RED
+  CFG --&gt; ROUTER
+  REG --&gt; ART
+  AUTH --&gt; DB
+  PAT --&gt; DB
+  ADM --&gt; DB
+  AL --&gt; DB
+  AUD -.-&gt; DB
+  MON --&gt; MLF
+  AL --&gt; MLF
+  MET --&gt; PROM
+  LLM -.-&gt; DS
+  NLP -.-&gt; BERT</pre></div></section>
+<section id="modules"><h2>٢. خريطة الوحدات (Package Map)</h2><p class="cap">كل مجلد = وحدة بمسؤولية واحدة. الوحدات تتحدث عبر استدعاءات داخلية (in-process) لا عبر شبكة، وهذا ما يجعله Monolith، والحدود النظيفة بينها هي ما يجعله Modular.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart LR
+  ROOT([&quot;OmniDiag repo&quot;])
+  ROOT --&gt; BE[&quot;backend/&quot;]
+  ROOT --&gt; FE[&quot;frontend/src&quot;]
+  ROOT --&gt; CF[&quot;configs/ + features/&quot;]
+  ROOT --&gt; SC[&quot;scripts/ + models/ + experiment_files/&quot;]
+  ROOT --&gt; OPS[&quot;Dockerfile, docker-compose, k8s, helm, deploy, .github&quot;]
+  ROOT --&gt; TST[&quot;tests/ (about 60 files)&quot;]
+  ROOT --&gt; DOC[&quot;docs/, evaluation_evidence/, alembic/&quot;]
+  BE --&gt; m1[&quot;main.py - app wiring, lifespan,&lt;br/&gt;predict/explain/batch/report/parse-notes&quot;]
+  BE --&gt; m2[&quot;router.py - disease dispatcher&quot;]
+  BE --&gt; m3[&quot;model_backends/ - 5 families,&lt;br/&gt;auto-registered by file&quot;]
+  BE --&gt; m4[&quot;heart_glm/ - stack.py, candidate.py,&lt;br/&gt;reference_scores.json&quot;]
+  BE --&gt; m5[&quot;auth/ - jwt, hashing, rbac, api_key&quot;]
+  BE --&gt; m6[&quot;admin/ - users, audit, cache flush,&lt;br/&gt;api-keys, stats, retrain&quot;]
+  BE --&gt; m7[&quot;patients/ - EMR: patients, visits,&lt;br/&gt;predictions, export, notes&quot;]
+  BE --&gt; m8[&quot;active_learning/ - sampler, routes,&lt;br/&gt;retrain, nhanes candidate&quot;]
+  BE --&gt; m9[&quot;monitoring/ - drift, drift_stats,&lt;br/&gt;metrics, mlflow_tracker&quot;]
+  BE --&gt; m10[&quot;nlp/ + llm/&quot;]
+  BE --&gt; m11[&quot;middleware/ - audit, security&quot;]
+  BE --&gt; m12[&quot;db_models/ - 8 ORM tables&quot;]
+  BE --&gt; m13[&quot;federated/ - superseded&quot;]
+  CF --&gt; c1[&quot;heart_disease.yaml&lt;br/&gt;diabetes.yaml&lt;br/&gt;diabetes_nhanes.yaml&quot;]
+  CF --&gt; c2[&quot;heart_disease_features.py&lt;br/&gt;diabetes_features.py&quot;]
+  SC --&gt; s1[&quot;train_heart_glm.py&lt;br/&gt;build_drift_reference.py&lt;br/&gt;retrain.py, seed_db.py&quot;]</pre></div></section>
+<section id="predict"><h2>٣. رحلة طلب التنبؤ (Predict Request)</h2><p class="cap">ما يحدث من الضغط على Predict حتى ظهور النتيجة: المصادقة، الكاش، النموذج، التسجيل، وإضافة الحالات غير المؤكدة لطابور المراجعة البشرية.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">sequenceDiagram
+  autonumber
+  participant U as Clinician (React)
+  participant MW as Middleware
+  participant API as POST /api/v4/{disease}/predict
+  participant AU as Auth + RBAC
+  participant C as Cache (Redis or memory)
+  participant R as OmniDiagRouter
+  participant B as ModelBackend (per family)
+  participant DB as SQL DB
+  participant AL as Active-learning sampler
+  U-&gt;&gt;MW: JSON features
+  MW-&gt;&gt;API: rate limit, security headers, start timer
+  API-&gt;&gt;AU: JWT cookie or API key
+  AU--&gt;&gt;API: user, roles must be doctor, nurse or super_admin
+  API-&gt;&gt;API: validate against schema from YAML
+  API-&gt;&gt;C: get(hash of disease + features)
+  alt cache hit
+    C--&gt;&gt;API: stored result (scale checked)
+  else cache miss
+    API-&gt;&gt;R: predict in threadpool
+    R-&gt;&gt;B: engineer features, model, calibrate
+    B--&gt;&gt;R: probability, decision, bounds
+    R--&gt;&gt;API: result
+    API-&gt;&gt;C: set(result, ttl)
+  end
+  API-&gt;&gt;API: record Prometheus counters (hit or miss)
+  API-&gt;&gt;DB: INSERT predictions (scale and threshold stored)
+  API-&gt;&gt;AL: uncertain?
+  alt conformal decision is uncertain, or entropy near threshold
+    AL-&gt;&gt;DB: INSERT review_queue (pending)
+  end
+  API--&gt;&gt;MW: PredictResponse + Cache-Hit header
+  MW-&gt;&gt;DB: INSERT audit_logs (user, endpoint, status, ms)
+  MW--&gt;&gt;U: result, SHAP available via /explain</pre></div></section>
+<section id="registry"><h2>٤. الإضافة بالإعدادات: Config-driven Registry</h2><p class="cap">إضافة مرض = ملف YAML + ملف features. الـ Router لا يعرف أسماء الأمراض ولا العائلات. كل عائلة نموذج تسجّل نفسها بمجرد وجود ملفها في model_backends.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart LR
+  subgraph FS[&quot;Filesystem&quot;]
+    Y1[&quot;configs/heart_disease.yaml&lt;br/&gt;family: glm_ivap_conformal&quot;]
+    Y2[&quot;configs/diabetes.yaml&lt;br/&gt;family: stacking_ensemble&quot;]
+    Y3[&quot;configs/diabetes_nhanes.yaml&lt;br/&gt;family: ebm_platt_conformal&quot;]
+    FT[&quot;features/*_features.py&quot;]
+  end
+  subgraph STARTUP[&quot;At startup&quot;]
+    SCAN[&quot;OmniDiagRouter._load_all_configs()&lt;br/&gt;one entry per YAML&quot;]
+    IMP[&quot;model_backends/__init__.py&lt;br/&gt;pkgutil imports every module&quot;]
+    REGI[(&quot;registry&lt;br/&gt;@register_backend(&#x27;name&#x27;)&quot;)]
+    IMP --&gt; REGI
+  end
+  Y1 --&gt; SCAN
+  Y2 --&gt; SCAN
+  Y3 --&gt; SCAN
+  SCAN --&gt;|&quot;family key&quot;| GET[&quot;get_backend(family)&quot;]
+  REGI --&gt; GET
+  GET --&gt;|&quot;unknown family fails at startup,&lt;br/&gt;names the registered ones&quot;| ERR[&quot;UnknownModelFamilyError&quot;]
+  GET --&gt; L1[&quot;HeartGlmConformal&quot;]
+  GET --&gt; L2[&quot;StackingEnsemble&quot;]
+  GET --&gt; L3[&quot;EbmPlattConformal&quot;]
+  GET -.-&gt; L4[&quot;sklearn_pipeline / sklearn_generic&quot;]
+  L1 -.-&gt;|&quot;lazy load on first request&quot;| W1[(&quot;heart_l3_glm_stack.pkl&quot;)]
+  L2 -.-&gt; W2[(&quot;rf, xgb, lgb + meta_learner&quot;)]
+  L3 -.-&gt; W3[(&quot;diabetes_nhanes_ebm.joblib&quot;)]
+  FT --&gt; L1
+  FT --&gt; L2
+  subgraph IFACE[&quot;ModelBackend interface&quot;]
+    I1[&quot;predict_proba, feature_names, shap_values&quot;]
+    I2[&quot;predict, predict_batch, explain&quot;]
+    I3[&quot;BackendCapabilities:&lt;br/&gt;tree_shap, vectorized_batch,&lt;br/&gt;counterfactuals, explainer&quot;]
+  end
+  L1 --- IFACE</pre></div></section>
+<section id="heart"><h2>٥. نموذج القلب: Spline-GLM + Venn-Abers + Conformal</h2><p class="cap">القرار ليس احتمالاً مقابل عتبة واحدة، بل مجموعة conformal تعطي referral / no_referral / uncertain، مع فاصل [p_lower, p_upper]. 7 مدخلات فقط، مدرَّب على 920 مريضاً من 4 مستشفيات.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart LR
+  IN[&quot;7 inputs (L3)&lt;br/&gt;Age, Sex, ChestPainType, RestingBP,&lt;br/&gt;Cholesterol, FastingBS, RestingECG&quot;]
+  PRE[&quot;Frozen preprocessing&lt;br/&gt;IterativeImputer, scaler,&lt;br/&gt;SplineTransformer, one-hot&quot;]
+  GLM[&quot;Spline-GLM&lt;br/&gt;logistic, ridge&quot;]
+  S[&quot;raw score&lt;br/&gt;(log-odds, exact additive SHAP)&quot;]
+  IVAP[&quot;IVAP&lt;br/&gt;inductive Venn-Abers&quot;]
+  P[&quot;calibrated p&lt;br/&gt;+ interval [p_lower, p_upper]&quot;]
+  MC[&quot;Mondrian conformal&lt;br/&gt;groups: Sex x class&lt;br/&gt;alpha = 0.10&quot;]
+  DEC{&quot;decision&quot;}
+  R1[&quot;referral&quot;]
+  R2[&quot;no_referral&quot;]
+  R3[&quot;uncertain&quot;]
+  Q[&quot;review_queue&lt;br/&gt;(human in the loop)&quot;]
+  IN --&gt; PRE --&gt; GLM --&gt; S
+  S --&gt; IVAP --&gt; P
+  S --&gt; MC --&gt; DEC
+  DEC --&gt; R1
+  DEC --&gt; R2
+  DEC --&gt; R3 --&gt; Q
+  subgraph LIM[&quot;Declared limits shown in config&quot;]
+    L1[&quot;Scope: patients already referred for catheterisation&quot;]
+    L2[&quot;No HIGH/MODERATE/LOW bands (risk_bands: null)&quot;]
+    L3[&quot;LOHO AUC 0.802, calibration does not transport between hospitals&quot;]
+  end
+  DEC -.-&gt; LIM</pre></div></section>
+<section id="hitl"><h2>٦. الإنسان في الحلقة والتعلّم النشط (HITL + Active Learning)</h2><p class="cap">النظام لا يتعلّم من نفسه تلقائياً: الحالات غير المؤكدة تذهب لطبيب، تسميته تُخزَّن، والإعادة التدريبية تنتج مرشَّحاً (candidate) يقرّر إنسان ترقيته.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart TB
+  P[&quot;Prediction&quot;] --&gt; Q1{&quot;module type&quot;}
+  Q1 --&gt;|&quot;conformal (heart, NHANES)&quot;| C1[&quot;decision == uncertain&quot;]
+  Q1 --&gt;|&quot;threshold (diabetes BRFSS)&quot;| C2[&quot;threshold-centred entropy &gt;= 0.88&lt;br/&gt;(prior-shift map sends threshold to 0.5)&quot;]
+  C1 --&gt; QUEUE
+  C2 --&gt; QUEUE
+  QUEUE[(&quot;review_queue&lt;br/&gt;status = pending&lt;br/&gt;uncertainty_score, scale, threshold&quot;)]
+  QUEUE --&gt; UI[&quot;ReviewQueuePanel (doctor)&lt;br/&gt;GET /api/v4/review/queue&quot;]
+  UI --&gt; ACT{&quot;doctor action&quot;}
+  ACT --&gt;|&quot;annotate: label 0/1 + notes&quot;| REV[&quot;status = reviewed&quot;]
+  ACT --&gt;|&quot;skip&quot;| SKP[&quot;status = skipped&quot;]
+  REV --&gt; RT[&quot;super_admin: POST /admin/retrain&lt;br/&gt;min-samples gate&quot;]
+  RT --&gt; FAM{&quot;model.family&quot;}
+  FAM --&gt;|&quot;heart: glm_ivap_conformal&quot;| H1[&quot;build_bundle() on 920 UCI rows&lt;br/&gt;+ reviewed rows&lt;br/&gt;(same code as shipped build)&quot;]
+  H1 --&gt; H2[&quot;models/heart_disease/candidates/RUN_ID&quot;]
+  H2 --&gt; H3[&quot;compare to SHIPPED model:&lt;br/&gt;conformal coverage +&lt;br/&gt;decision transition matrix&quot;]
+  H3 --&gt; H4[&quot;log to MLflow&quot;]
+  H4 --&gt; H5{{&quot;HUMAN decides promotion&lt;br/&gt;(no code path promotes)&quot;}}
+  FAM --&gt;|&quot;diabetes legacy path&quot;| D1[&quot;incremental XGBoost refit&quot;]
+  D1 --&gt; D2[&quot;save and reload ModelLoader&quot;]
+  D2 --&gt; D3[&quot;log to MLflow&quot;]
+  FAM --&gt;|&quot;NHANES&quot;| N1[&quot;candidate only, never promoted&lt;br/&gt;row admitted only with lab provenance (HbA1c)&quot;]
+  SKP -.-&gt; STATS[&quot;GET /review/stats&quot;]
+  REV -.-&gt; STATS</pre></div></section>
+<section id="nlpllm"><h2>٧. معالجة اللغة (NLP) والتقرير بالـ LLM</h2><p class="cap">ملاحظة سريرية نصية تتحول إلى حقول جاهزة للنموذج؛ وبعد التنبؤ يُولَّد تقرير سريري بالـ LLM مع حارس يمنع المحتوى الممنوع وبديل قاعدي عند الفشل.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart TB
+  subgraph NLPX[&quot;NLP: POST /api/v4/parse-notes (20/min, no auth) or /patients/ID/notes&quot;]
+    N0[&quot;free-text note&quot;] --&gt; N1{&quot;detect_script&quot;}
+    N1 --&gt;|&quot;Arabic&quot;| N1a[&quot;language_support warning:&lt;br/&gt;patterns are English only&quot;]
+    N1 --&gt;|&quot;Latin&quot;| N2[&quot;1. Regex baseline&lt;br/&gt;spelled numbers to digits, negation&quot;]
+    N2 --&gt; N3[&quot;2. spaCy dependency parse&lt;br/&gt;numeric mentions, linking words,&lt;br/&gt;overrides regex (optional dep)&quot;]
+    N3 --&gt; N4[&quot;3. BioBERT NER via HuggingFace&lt;br/&gt;lazy load, overrides on overlap&quot;]
+    N4 --&gt; N5[&quot;map_to_disease_schema&lt;br/&gt;e.g. BRFSS age bucket&quot;]
+    N5 --&gt; N6[&quot;pre-filled form&lt;br/&gt;missing fields omitted, user confirms&quot;]
+  end
+  N6 --&gt; PRED[&quot;/predict&quot;]
+  subgraph LLMX[&quot;LLM: POST /api/v4/generate-report (10/min)&quot;]
+    PRED --&gt; L0[&quot;result: probability, decision, bounds, SHAP top 5&quot;]
+    L0 --&gt; L1[&quot;band_for_report&lt;br/&gt;one band value used everywhere&quot;]
+    L1 --&gt; L2{&quot;DEEPSEEK_API_KEY set?&quot;}
+    L2 --&gt;|&quot;yes&quot;| L3[&quot;DeepSeek chat via OpenAI SDK&quot;]
+    L3 --&gt; L4{&quot;forbidden_content(text)?&quot;}
+    L4 --&gt;|&quot;clean&quot;| L5[&quot;source = llm&quot;]
+    L4 --&gt;|&quot;violations&quot;| L6[&quot;rule-based template&lt;br/&gt;fallback_reason recorded&quot;]
+    L2 --&gt;|&quot;no&quot;| L6
+    L6 --&gt; L7[&quot;source = rule_based&quot;]
+  end
+  L5 --&gt; OUT[&quot;ClinicalReportModal / PDFReport&quot;]
+  L7 --&gt; OUT</pre></div></section>
+<section id="security"><h2>٨. الأمن والصلاحيات والتدقيق</h2><p class="cap">JWT في كوكي + Refresh، مفتاح API بديل للأنظمة الخارجية، صلاحيات RBAC، وسجل تدقيق لكل طلب.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart TB
+  subgraph AUTHF[&quot;Authentication&quot;]
+    REG[&quot;POST /auth/register&quot;] --&gt; HASH[&quot;password hashing&quot;]
+    LOG[&quot;POST /auth/login&quot;] --&gt; JWT[&quot;access JWT + refresh cookie&quot;]
+    REF[&quot;POST /auth/refresh&quot;] --&gt; JWT
+    OUT[&quot;POST /auth/logout&quot;]
+    KEY[&quot;X-API-Key (hash stored)&lt;br/&gt;POST /admin/api-keys&quot;]
+  end
+  subgraph AUTHZ[&quot;Authorisation (RBAC)&quot;]
+    DEP[&quot;get_current_active_user&quot;]
+    RR[&quot;require_role(...)&quot;]
+    ROLES[&quot;roles: doctor, nurse, super_admin&lt;br/&gt;CLINICAL_ROLES = doctor, nurse, super_admin&lt;br/&gt;ADMIN_ROLES = super_admin&quot;]
+    DEP --&gt; RR --&gt; ROLES
+  end
+  JWT --&gt; DEP
+  KEY --&gt; DEP
+  subgraph PROT[&quot;What each role reaches&quot;]
+    P1[&quot;predict, explain, patients, review: clinical roles&quot;]
+    P2[&quot;users, audit-logs, cache flush, retrain, drift run, mlflow: super_admin&quot;]
+  end
+  RR --&gt; P1
+  RR --&gt; P2
+  subgraph DEF[&quot;Defence in depth&quot;]
+    D1[&quot;SecurityHeadersMiddleware + HTTPS enforcement&quot;]
+    D2[&quot;slowapi limits: LIMIT_CLINICAL, LIMIT_ADMIN, 10/min report, 20/min notes&quot;]
+    D3[&quot;AuditMiddleware: user, endpoint, method, status, IP, duration_ms&quot;]
+    D4[&quot;patient soft-delete (deleted_at)&quot;]
+  end
+  D3 --&gt; AL[(&quot;audit_logs&quot;)]</pre></div></section>
+<section id="monitor"><h2>٩. المراقبة والـ Drift و MLflow</h2><p class="cap">مراقبة تشغيلية (Prometheus/Grafana) ومراقبة انحراف المدخلات بإحصاءات KS و chi-square و PSI مقابل مرجع مجمَّد. الانحراف في المدخلات تنبيه للفحص وليس دليلاً على تدهور النموذج.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart LR
+  subgraph RUNTIME[&quot;Runtime metrics&quot;]
+    M1[&quot;MetricsMiddleware&lt;br/&gt;request duration, active requests&quot;]
+    M2[&quot;record_prediction&lt;br/&gt;predictions_total, confidence histogram&quot;]
+    M3[&quot;cache hits / misses&quot;]
+    M4[&quot;conformal decisions, batch rows&quot;]
+    M5[&quot;drift_share gauge&quot;]
+  end
+  M1 --&gt; ME[&quot;GET /metrics&quot;]
+  M2 --&gt; ME
+  M3 --&gt; ME
+  M4 --&gt; ME
+  M5 --&gt; ME
+  ME --&gt; PR[&quot;Prometheus&lt;br/&gt;deploy/prometheus.yml&quot;] --&gt; GR[&quot;Grafana dashboards&quot;]
+  subgraph DRIFT[&quot;Input drift (Gate 8.7c)&quot;]
+    REFP[(&quot;drift_reference.json&lt;br/&gt;frozen profile&lt;br/&gt;built by build_drift_reference.py&quot;)]
+    RECENT[&quot;recent predictions from DB&quot;]
+    PM[&quot;ProfileDriftMonitor&lt;br/&gt;KS, chi-square, PSI on scipy&quot;]
+    REFP --&gt; PM
+    RECENT --&gt; PM
+    PM --&gt; ST[&quot;GET /drift/DISEASE/status&quot;]
+    PM --&gt; RUN[&quot;POST /drift/DISEASE/run&quot;]
+    PM --&gt; REP[&quot;GET /drift/DISEASE/report&quot;]
+    RUN --&gt; M5
+  end
+  subgraph ML[&quot;MLflow&quot;]
+    TR[&quot;mlflow_tracker&lt;br/&gt;experiment OmniDiag&quot;]
+    TR --&gt; RUNS[&quot;GET /mlflow/runs&quot;]
+    TR --&gt; RG[&quot;POST /mlflow/register&quot;]
+  end
+  RUN --&gt; TR
+  RET[&quot;retrain candidates&quot;] --&gt; TR</pre></div></section>
+<section id="er"><h2>١٠. نموذج البيانات (Database)</h2><p class="cap">ثمانية جداول؛ كل تنبؤ يُسجَّل مع مقياسه وعتبته، وطابور المراجعة مرتبط بالتنبؤ بعلاقة واحد لواحد.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">erDiagram
+  USERS ||--o{ USER_ROLES : has
+  ROLES ||--o{ USER_ROLES : grants
+  USERS ||--o{ PATIENTS : created_by
+  PATIENTS ||--o{ PATIENT_VISITS : has
+  PATIENTS ||--o{ PREDICTIONS : linked
+  USERS ||--o{ PREDICTIONS : created_by
+  PREDICTIONS ||--o| REVIEW_QUEUE : flagged
+  USERS ||--o{ REVIEW_QUEUE : reviewer
+  USERS ||--o{ AUDIT_LOGS : actor
+  USERS {
+    string id PK
+    string email
+    string hashed_password
+    string api_key_hash
+    bool is_active
+  }
+  ROLES {
+    int id PK
+    string name
+  }
+  PATIENTS {
+    string id PK
+    string mrn UK
+    string full_name
+    date date_of_birth
+    datetime deleted_at
+  }
+  PATIENT_VISITS {
+    string id PK
+    string patient_id FK
+  }
+  PREDICTIONS {
+    string id PK
+    string disease
+    float confidence
+    string probability_scale
+    string decision
+    float probability_lower
+    float probability_upper
+  }
+  REVIEW_QUEUE {
+    string id PK
+    string prediction_id UK
+    float uncertainty_score
+    float decision_threshold
+    string status
+    int label
+    string notes
+  }
+  AUDIT_LOGS {
+    string id PK
+    string endpoint
+    string method
+    int status_code
+    string ip_address
+    int duration_ms
+  }</pre></div></section>
+<section id="frontend"><h2>١١. الواجهة الأمامية (React SPA)</h2><p class="cap">الفورم يُبنى ديناميكياً من الـ schema القادم من الـ API (لا حقول مكتوبة يدوياً لكل مرض)، ولذلك تظهر الأمراض الجديدة بدون تعديل الواجهة.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart TB
+  MAIN[&quot;main.jsx&quot;] --&gt; PROV[&quot;Providers: Auth, Disease, Theme&quot;]
+  PROV --&gt; APP[&quot;App.jsx - DiseaseSelector, theme toggle, view tabs&quot;]
+  APP --&gt; V1[&quot;Engineering Mode&quot;]
+  APP --&gt; V2[&quot;Clinical EMR Mode&quot;]
+  APP --&gt; V3[&quot;Batch Prediction (CSV, max 500 rows)&quot;]
+  APP --&gt; V4[&quot;Patient Comparison&quot;]
+  APP --&gt; V5[&quot;Review Queue (clinical roles)&quot;]
+  APP --&gt; V6[&quot;AdminDashboard&quot;]
+  subgraph SCH[&quot;Schema-driven form&quot;]
+    H1[&quot;useDiseaseSchema&lt;br/&gt;GET /api/v4/DISEASE/schema&quot;]
+    H2[&quot;schemaFieldParser + schemaToZod&quot;]
+    H3[&quot;DynamicClinicalForm + SchemaFieldFactory&quot;]
+    H4[&quot;ClinicalNotesInput (NLP prefill)&quot;]
+    H1 --&gt; H2 --&gt; H3
+    H4 --&gt; H3
+  end
+  V1 --&gt; SCH
+  V2 --&gt; SCH
+  subgraph RES[&quot;Result views&quot;]
+    R1[&quot;ThresholdBar + decision&quot;]
+    R2[&quot;ShapBarChart (useShapSnapshot)&quot;]
+    R3[&quot;WhatIfScenarioCard&lt;br/&gt;counterfactuals.js + /counterfactuals&quot;]
+    R4[&quot;ClinicalActionPlan&quot;]
+    R5[&quot;ClinicalReportModal + PDFReport&quot;]
+    R6[&quot;PatientRiskTimeline / PatientTimeline&quot;]
+  end
+  SCH --&gt; RES
+  V5 --&gt; RL[&quot;ReviewLabelBox&lt;br/&gt;annotate or skip&quot;]
+  APP --&gt; PWA[&quot;PWA: InstallPrompt, OfflineBanner&quot;]
+  API[&quot;api.js - fetch wrapper, cookies&quot;] --- SCH
+  API --- RES
+  API --- V5
+  API --- V6</pre></div></section>
+<section id="deploy"><h2>١٢. النشر والبنية التحتية (Deployment / CI)</h2><p class="cap">نفس الصورة (image) تعمل محلياً وعلى Hugging Face Spaces وKubernetes. النماذج تُبنى أو تُحمَّل وقت بناء الصورة، فلا ملفات ثنائية في الريبو.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart LR
+  DEV[&quot;Developer&quot;] --&gt; GH[&quot;GitHub repo&quot;]
+  GH --&gt; CI[&quot;CI: .github/workflows/ci.yml&lt;br/&gt;1. pip install, import backend&lt;br/&gt;2. start API check&lt;br/&gt;3. npm ci, npm run build&quot;]
+  GH --&gt; DF[&quot;Dockerfile&lt;br/&gt;python 3.13-slim&quot;]
+  DF --&gt; BUILD[&quot;Build time:&lt;br/&gt;train_heart_glm.py (CSV sha256 verified)&lt;br/&gt;download diabetes models from HF Hub&quot;]
+  BUILD --&gt; IMG[&quot;Image: model baked in&lt;br/&gt;port 7860, instant start&quot;]
+  IMG --&gt; HF[&quot;Hugging Face Space&lt;br/&gt;yahyoha/omnidiag&quot;]
+  IMG --&gt; K8[&quot;Kubernetes&lt;br/&gt;k8s/*.yaml, helm chart,&lt;br/&gt;HPA, ingress, secrets&quot;]
+  IMG --&gt; DC[&quot;docker-compose&quot;]
+  subgraph COMPOSE[&quot;docker-compose services&quot;]
+    PG[(&quot;postgres 15&quot;)]
+    RD[(&quot;redis 7&quot;)]
+    BE[&quot;backend&quot;]
+    MF[&quot;mlflow&quot;]
+    PRM[&quot;prometheus&quot;]
+    GRF[&quot;grafana&quot;]
+    RTN[&quot;retrain (profile: retrain)&lt;br/&gt;scripts/retrain.py&quot;]
+  end
+  DC --&gt; COMPOSE
+  BE --&gt; PG
+  BE --&gt; RD
+  BE --&gt; MF
+  PRM --&gt; BE
+  GRF --&gt; PRM
+  RTN --&gt; PG
+  RTN --&gt; MF
+  FE[&quot;frontend build (vite dist)&quot;] --&gt; VC[&quot;Vercel&lt;br/&gt;SPA rewrite to index.html&quot;]
+  VC --&gt;|&quot;HTTPS API calls&quot;| HF</pre></div></section>
+<section id="fl"><h2>١٣. التعلّم الاتحادي (Federated Learning): الحالة الفعلية</h2><p class="cap">غير مُشغَّل في المنتج. النموذج الأولي (Flower + FedAvg + XGBoost) لا يستطيع التجميع، والبديل GLORE مُنفَّذ ومقاس في مستودع التجارب فقط.</p>
+<div class="fig" dir="ltr"><pre class="mermaid">flowchart LR
+  subgraph OLD[&quot;backend/federated/ (SUPERSEDED, not used)&quot;]
+    O1[&quot;client.py&lt;br/&gt;pickle.dumps(XGBoost)&quot;]
+    O2[&quot;aggregator.py&lt;br/&gt;Flower FedAvg&quot;]
+    O3[&quot;add_dp_noise()&lt;br/&gt;never called, no epsilon&quot;]
+    O1 --&gt;|&quot;opaque bytes, cannot be averaged&quot;| O2
+    O2 -.-x O3
+  end
+  subgraph NEW[&quot;omnidiag_experiments (research only, not merged)&quot;]
+    G0[&quot;4 sites: Cleveland, Hungarian,&lt;br/&gt;Switzerland, Long Beach VA&quot;]
+    G1[&quot;each site computes locally&lt;br/&gt;gradient g and Hessian H&quot;]
+    G2[&quot;coordinator sums g, H&lt;br/&gt;arrow-block Newton step&lt;br/&gt;per-site intercept, shared slopes&quot;]
+    G3[&quot;7 iterations =&lt;br/&gt;centralised fit (error 2e-14)&quot;]
+    G0 --&gt; G1 --&gt; G2 --&gt; G3
+    G2 --&gt;|&quot;updated beta&quot;| G1
+  end
+  NEW --&gt; RES[&quot;Measured: LOSO AUC 0.779 vs 0.802 shipped (-0.023)&lt;br/&gt;no differential privacy, simulation on one machine&quot;]</pre></div></section>
+
+<footer>مستخرَج من كود المستودع الفعلي: backend/main.py، router.py، model_backends، active_learning، nlp، llm، monitoring، db_models، configs، Dockerfile، docker-compose، frontend/src.</footer>
+</div>
+
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({startOnLoad:false, theme: dark ? "dark" : "default", securityLevel:"loose", flowchart:{htmlLabels:true, useMaxWidth:false}});
+await mermaid.run({querySelector:"pre.mermaid"});
+</script>
+</body>
+</html>

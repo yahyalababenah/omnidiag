@@ -1,0 +1,61 @@
+# Gate 9.0b pre-work — curated-20 characterisation (D9-01)
+date: 2026-09-28
+env: ~/Desktop/بيانات سكر جديدة/venv  (py3.13, interpret_core 0.7.8, numpy 2.5.3, pandas 3.0.6, sklearn 1.9.1)
+cohort: rebuilt from nhanes_raw/ all 6 cycles via lines 59-175 of 'omnidiag_nhanes_research (1).py'
+        n=26904, prevalence 0.3288, temporal split train 18508 / val 2148 / cal 2149 / test 4099
+feature set: CURATED20, 'nhanes_leakage_ladder (2).py' line 130.  All 20 present in the cohort.
+NO MODEL WAS FITTED. These are data-layer facts only.
+
+| # | field | meaning | unit | non-missing | p1 | p50 | p99 | univar AUC |
+|---|---|---|---|---|---|---|---|---|
+| 1 | RIDAGEYR | age | years | 1.000 | 20 | 47 | 80 | 0.717 |
+| 2 | RIAGENDR | sex | 1=male 0=female | 1.000 | 0 | 0 | 1 | 0.507 |
+| 3 | BMXBMI | BMI | kg/m2 | 0.989 | 17.81 | 27.69 | 50.2 | 0.625 |
+| 4 | BMXWAIST | waist circumference | cm | 0.955 | 68.6 | 96.6 | 143.5 | 0.650 |
+| 5 | SBP | systolic BP | mmHg (mean of BPXSY1-3) | 0.961 | 92.67 | 120 | 180.7 | 0.644 |
+| 6 | DBP | diastolic BP | mmHg (mean of BPXDI1-3, zeros->NaN) | 0.959 | 43.33 | 71.33 | 100 | 0.537 |
+| 7 | BPXPLS | pulse | beats/60s | 0.963 | 50 | 72 | 104 | 0.505 |
+| 8 | MCQ300C | family history of diabetes | 1=yes 0=no | 0.982 | 0 | 0 | 1 | 0.541 |
+| 9 | CVD_ANY | any CVD (MCQ160B/C/E/F) | 1=any | 1.000 | 0 | 0 | 1 | 0.535 |
+| 10 | PAQ650 | vigorous recreational activity | 1=yes 0=no | 1.000 | 0 | 0 | 1 | 0.566 |
+| 11 | PAQ665 | moderate recreational activity | 1=yes 0=no | 1.000 | 0 | 0 | 1 | 0.536 |
+| 12 | LBDHDD | HDL cholesterol | mg/dL | 0.988 | 26 | 51 | 102 | 0.563 |
+| 13 | LBXSCH | total cholesterol | mg/dL | 0.985 | 114 | 191 | 305 | 0.559 |
+| 14 | LBXSTR | triglycerides | mg/dL | 0.985 | 35 | 116 | 589 | 0.604 |
+| 15 | LBXSATSI | ALT | U/L | 0.985 | 9 | 20 | 99 | 0.547 |
+| 16 | LBXSGTSI | GGT | U/L | 0.985 | 7 | 20 | 175.9 | 0.600 |
+| 17 | LBXSCR | creatinine | mg/dL | 0.986 | 0.47 | 0.84 | 1.74 | 0.553 |
+| 18 | LBXSBU | BUN | mg/dL | 0.985 | 5 | 13 | 30 | 0.581 |
+| 19 | LBXSAL | albumin | g/dL | 0.986 | 3.4 | 4.3 | 5 | 0.602 |
+| 20 | LBXSUA | uric acid | mg/dL | 0.985 | 2.7 | 5.3 | 9.3 | 0.583 |
+
+LEAK GUARD 1 (univariate, on the 20 alone): max AUC = 0.717 (RIDAGEYR)  -> PASS (< 0.85)
+LEAK GUARD 2 (glucose reconstruction):      R2 = 0.115                  -> PASS (< 0.60)
+   extra:  R2(HbA1c | 20 features) = 0.161
+
+F9-09 recheck (race recoverability WITHOUT creatine kinase; logistic on the 20, in-sample):
+   AUC(20 -> NH Black)         = 0.781
+   AUC(20 -> NH Asian)         = 0.790
+   AUC(20 -> Mexican American) = 0.722
+   AUC(20 -> NH White)         = 0.650
+   For comparison, CK alone -> NH Black was 0.706 in the research report.
+   CONCLUSION: dropping CK did NOT make the feature set race-blind.
+
+CBC / creatine-kinase columns remaining in the 20: none
+   -> LBXRDW, LBXMC, LBXMCHSI, LBXSCK cannot appear in the contribution panel (F9-08 explanation
+      defect removed; the HbA1c label bias itself is unchanged).
+
+Conventional/SI duplicate pairs remaining in the 20: none  (F9-14 closed)
+Raw BP readings alongside their mean: none (only SBP/DBP means)  (F9-14 closed)
+
+Monotone constraints applicable (from the research script's INC/DEC lists):
+   increasing (8): RIDAGEYR BMXBMI BMXWAIST SBP MCQ300C LBXSTR LBXSATSI LBXSGTSI
+   decreasing (3): PAQ650 PAQ665 LBDHDD
+   unconstrained (9): RIAGENDR DBP BPXPLS CVD_ANY LBXSCH LBXSCR LBXSBU LBXSAL LBXSUA
+   note: BPQ020/BPQ080 (known hypertension/hyperlipidaemia) are NOT in the 20.
+
+Missingness:
+   rows with all 20 present : 0.895
+   rows with >=1 missing    : 0.105
+   mean missing per row     : 0.32 of 20
+   -> an EBM missing-bin for any single field is learned from 1.1-4.5% of rows.

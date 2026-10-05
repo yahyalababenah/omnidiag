@@ -493,9 +493,9 @@ Disease-specific now, not uniform: **diabetes** implements a [`BaseFeatureEngine
 >
 > The gradients and Hessians are statistical summaries that may leak information, as in any federated learning without differential privacy. The design critique is `gate_8_10a.md` and the results are `gate_8_10b_design.md` in the research repo.
 
-[`OmniDiagFLClient`](backend/federated/client.py:27) implements the hospital-site node. [`get_parameters()`](backend/federated/client.py:67) serialises the current XGBoost model via `pickle.dumps`; [`set_parameters()`](backend/federated/client.py:77) deserialises and applies the aggregated global model. [`fit()`](backend/federated/client.py:77) runs 10 incremental XGBoost rounds on local EHR data — raw patient records never leave the site. [`evaluate()`](backend/federated/client.py:99) computes local binary accuracy and returns it as a Flower metric dict.
+[`OmniDiagFLClient`](archive/post_expo_2026-10/backend/federated/client.py:27) implements the hospital-site node. [`get_parameters()`](archive/post_expo_2026-10/backend/federated/client.py:67) serialises the current XGBoost model via `pickle.dumps`; [`set_parameters()`](archive/post_expo_2026-10/backend/federated/client.py:77) deserialises and applies the aggregated global model. [`fit()`](archive/post_expo_2026-10/backend/federated/client.py:77) runs 10 incremental XGBoost rounds on local EHR data — raw patient records never leave the site. [`evaluate()`](archive/post_expo_2026-10/backend/federated/client.py:99) computes local binary accuracy and returns it as a Flower metric dict.
 
-[`start_fl_server()`](backend/federated/aggregator.py:62) configures a Flower `FedAvg` strategy with `fraction_fit=1.0` (all connected clients participate in each round) and a configurable `FL_MIN_CLIENTS` threshold. [`add_dp_noise()`](backend/federated/aggregator.py:96) is a standalone utility that clips a gradient vector to `max_grad_norm` (L2) and adds calibrated Gaussian noise scaled by `noise_multiplier=1.1`. It is **not yet wired** into `client.py`'s `get_parameters()`/`fit()` — those transmit the full pickled XGBoost model (`pickle.dumps(model)`), not a gradient vector, so differential privacy is implemented but not yet applied to weight transmission. Both files use `try: import flwr as fl` with a `log.error` fallback, so the rest of the backend starts without Flower installed; `flwr>=1.0.0` is now listed in `requirements.txt`.
+[`start_fl_server()`](archive/post_expo_2026-10/backend/federated/aggregator.py:62) configures a Flower `FedAvg` strategy with `fraction_fit=1.0` (all connected clients participate in each round) and a configurable `FL_MIN_CLIENTS` threshold. [`add_dp_noise()`](archive/post_expo_2026-10/backend/federated/aggregator.py:96) is a standalone utility that clips a gradient vector to `max_grad_norm` (L2) and adds calibrated Gaussian noise scaled by `noise_multiplier=1.1`. It is **not yet wired** into `client.py`'s `get_parameters()`/`fit()` — those transmit the full pickled XGBoost model (`pickle.dumps(model)`), not a gradient vector, so differential privacy is implemented but not yet applied to weight transmission. Both files use `try: import flwr as fl` with a `log.error` fallback, so the rest of the backend starts without Flower installed; `flwr>=1.0.0` is now listed in `requirements.txt`.
 
 ### Schema-Driven Frontend Architecture
 
@@ -629,11 +629,9 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │
 ├── features/                             # Per-disease feature engineering
 │   ├── base_features.py                  # BaseFeatureEngineer (ABC) — 3 abstract methods
-│   ├── heart_disease_features.py         # CAD: heuristic / clinical / medical paths
 │   └── diabetes_features.py             # DM: heuristic / clinical / medical paths
 │
 ├── models/                               # Trained model artifacts
-│   ├── advanced_feature_engineering.py   # Standalone feature computation functions
 │   ├── heart_disease/                    # CAD bundle (heart_l3_glm_stack.pkl), built at image build time
 │   ├── diabetes/                         # BRFSS DM ensemble weights + preprocessors (superseded)
 │   └── diabetes_nhanes/                  # NHANES EBM bundle (.joblib), model_card.json, drift_reference.json
@@ -720,7 +718,7 @@ The `patients.deleted_at` nullable timestamp implements GDPR soft-delete — pre
 │   ├── assets/research/                  # Heart research figures copied from the experiments repo
 │   └── phase9/                           # NHANES record: DISCOVERY_RECORD, FINDINGS_REGISTER, RESEARCH_FIDELITY_AUDIT, figures/
 ├── data/                                 # Raw and processed datasets per disease
-├── experiment_files/                     # Training experiments and diagnostics
+├── archive/                              # Superseded files, kept for provenance (each folder has its own index)
 ├── docker-compose.yml                    # 7 services: postgres, redis, backend, mlflow, prometheus, grafana, retrain
 ├── Dockerfile                            # Production container
 ├── requirements.txt                      # Python dependencies
@@ -912,7 +910,7 @@ Two different prefixes are actually in use — verified live against a running i
 | Metrics | [prometheus-client 0.20+](backend/monitoring/metrics.py) | `/metrics` scrape endpoint |
 | Drift | [Evidently 0.4+](backend/monitoring/drift.py:48) | Dataset drift detection — **code only, not live** |
 | MLOps | [MLflow 2.10+](backend/monitoring/mlflow_tracker.py:63) | Experiment tracking — **code only, not live** |
-| Federated | [Flower (flwr 1.0+)](backend/federated/aggregator.py:62) | Prototype, **superseded** — see [Federated Learning](#federated-learning-prototype-superseded--replacement-simulated-in-the-research-repo-not-shipped) |
+| Federated | [Flower (flwr 1.0+)](archive/post_expo_2026-10/backend/federated/aggregator.py:62) | Prototype, **superseded** — see [Federated Learning](#federated-learning-prototype-superseded--replacement-simulated-in-the-research-repo-not-shipped) |
 | Validation | [Pydantic v2](backend/schemas.py) | Input/output model validation |
 | Config | [PyYAML 6.0+](configs/config_loader.py) | Disease configuration files |
 

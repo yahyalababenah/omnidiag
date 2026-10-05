@@ -6,10 +6,10 @@
 **الأدلة:** `evaluation_evidence/diabetes/final_metrics_table.md` (المصدر الوحيد لكل رقم أداء هنا)،
 `threshold_decision_log.md`, `ppv_collapse_table.md`, `calibration.json`, `oof_threshold.json`،
 وللتجربة المضبوطة في §3: `prevalence_experiment_results.txt`, `prevalence_experiment_raw.csv`
-**الكود القابل لإعادة التشغيل:** `scratch/diabetes_oof_threshold.py` ثم `scratch/generate_diabetes_evidence.py`
+**الكود القابل لإعادة التشغيل:** `archive/post_expo_2026-10/scratch/diabetes_oof_threshold.py` ثم `archive/post_expo_2026-10/scratch/generate_diabetes_evidence.py`
 
 > **تصحيح جوهري على النسخة الأولى:** كانت أرقام هذا التقرير مقيسة على **نموذج XGBoost بديل**
-> (300 شجرة، عمق 6، مدخلات غير مقيَّسة) دربته سكربتات `scratch/audit_diabetes.py` و
+> (300 شجرة، عمق 6، مدخلات غير مقيَّسة) دربته سكربتات `archive/post_expo_2026-10/scratch/audit_diabetes.py` و
 > `prevalence_experiment.py`، لا على الـstacking ensemble المشحون. كل رقم أداء أدناه أُعيد قياسه
 > على النماذج المشحونة فعلاً (مجموعة اختبار محجوبة n = 14,139، وفواصل ثقة 95% من bootstrap بـ2000
 > إعادة، بذرة 42). **الاتجاهات والمنهجية لم تتغير؛ المقادير تغيّرت.**
@@ -82,7 +82,7 @@ ROC-AUC بعد استبعاد المتطابقة     : 0.8256   [0.8187, 0.8324]
 
 ### 2.1 استُخرجت من مجموعة الاختبار ❌
 
-**الموقع (قبل الإصلاح):** `models/train_diabetes_ensemble.py:933-934`
+**الموقع (قبل الإصلاح):** `archive/post_expo_2026-10/models/train_diabetes_ensemble.py:933-934`
 
 ```python
 threshold_result = find_optimal_clinical_threshold(
@@ -113,7 +113,7 @@ threshold_result = find_optimal_clinical_threshold(
 ### 2.2 المعايرة على نسبة انتشار خاطئة ❌ — المشكلة الأكبر
 
 الملف `diabetes_binary_5050split` **موازن صناعياً 50/50**. انتشار السكري في الأردن **23.7%**
-(`docs/OmniDiag_Proposal_Defense.md`؛ حتى 2026-09-21 استُخدم بدلاً منه رقم مؤقت أمريكي/BRFSS
+(`archive/post_expo_2026-10/docs/OmniDiag_Proposal_Defense.md`؛ حتى 2026-09-21 استُخدم بدلاً منه رقم مؤقت أمريكي/BRFSS
 حوالي **14%** — انظر §الملاحظة أدناه).
 
 **الأثر، بتثبيت النموذج والعتبة وتغيير الانتشار فقط:**
@@ -144,7 +144,7 @@ PPV = (Se·π) / (Se·π + (1−Sp)(1−π))
 
 فالظاهرة خاصية رياضية، لا مصادفة في هذه البيانات.
 
-**ارتباط بتوثيق سابق:** `plans/omnidiag_problem_analysis_report.md §6.4` يذكر «إجهاد الإنذارات» بنوعية 54.6%. الرقم الحقيقي أسوأ، وله الآن سبب محدد وقابل للقياس.
+**ارتباط بتوثيق سابق:** `archive/post_expo_2026-10/plans/omnidiag_problem_analysis_report.md §6.4` يذكر «إجهاد الإنذارات» بنوعية 54.6%. الرقم الحقيقي أسوأ، وله الآن سبب محدد وقابل للقياس.
 
 ---
 
@@ -340,5 +340,5 @@ diabetes_binary_health_indicators_BRFSS2015.csv    253,680 صفاً، انتشا
 ---
 
 *انتهى. كل رقم أداء في هذا التقرير مصدره `evaluation_evidence/diabetes/final_metrics_table.md`،
-ويُعاد إنتاجه بتشغيل `scratch/diabetes_oof_threshold.py` ثم `scratch/generate_diabetes_evidence.py`.
-أرقام §3 وحدها من التجربة المضبوطة `scratch/prevalence_experiment.py`.*
+ويُعاد إنتاجه بتشغيل `archive/post_expo_2026-10/scratch/diabetes_oof_threshold.py` ثم `archive/post_expo_2026-10/scratch/generate_diabetes_evidence.py`.
+أرقام §3 وحدها من التجربة المضبوطة `archive/post_expo_2026-10/scratch/prevalence_experiment.py`.*

@@ -100,5 +100,5 @@ adding one file.
 - `stacking_ensemble` has a hard-coded list of engineered-feature names in
   `generate_counterfactuals` (diabetes-specific).
 - Counterfactual scenario content for diabetes is not reproducible between two runs of the
-  same code (see `scratch/golden_master.py::normalise`). This was found while building the
+  same code (see `scripts/golden_master.py::normalise`). This was found while building the
   golden master. It predates this refactor and is out of scope.

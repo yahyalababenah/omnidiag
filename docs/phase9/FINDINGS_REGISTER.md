@@ -124,7 +124,7 @@ Per age: +0.013 / +0.038 / +0.044.
 
 ### F9-12 — Jordan's 0.237 prevalence figure does not transfer, and there is no matched substitute in the folder.
 `configs/diabetes.yaml` currently sets `prevalence_deploy: 0.237` (Abu-Raddad
-2020, via `docs/OmniDiag_Proposal_Defense.md`). That is **total diabetes
+2020, via `archive/post_expo_2026-10/docs/OmniDiag_Proposal_Defense.md`). That is **total diabetes
 prevalence including diagnosed cases**. This model's target is HbA1c ≥ 5.7
 among the **undiagnosed and untreated**, measured at **32.9%** in NHANES. The
 figures measure different events in different populations; carrying 0.237 across

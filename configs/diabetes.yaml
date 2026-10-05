@@ -100,7 +100,7 @@ model:
   weights_path: "models/diabetes/omni_diag_xgb_optimized.pkl"
   # Prior-shift (Bayes) correction — see backend/prevalence_correction.py.
   # The training file is the pre-balanced 50/50 BRFSS variant; deployment
-  # prevalence is Jordan's diabetes prevalence, 23.7% (docs/OmniDiag_Proposal_Defense.md),
+  # prevalence is Jordan's diabetes prevalence, 23.7% (archive/post_expo_2026-10/docs/OmniDiag_Proposal_Defense.md),
   # not the earlier placeholder US/BRFSS figure of ~14%. predict() maps every
   # probability from prevalence_train to prevalence_deploy before comparing
   # and returning it.

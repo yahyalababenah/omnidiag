@@ -445,7 +445,7 @@ class TestHeartNonRegression:
     @pytest.mark.parametrize("bad_oldpeak", ["inf", "-inf", "nan"], ids=["inf", "-inf", "nan"])
     async def test_batch_isolates_a_row_with_inf_or_nan_oldpeak(self, live_client, doctor_token, bad_oldpeak):
         """
-        Regression guard for HM-3 (WEAKNESS_REGISTER.md): before Oldpeak got
+        Regression guard for HM-3 (archive/post_expo_2026-10/WEAKNESS_REGISTER.md): before Oldpeak got
         ge/le bounds, a single row with Oldpeak=inf passed pydantic
         validation, reached ModelLoader.predict_batch()'s single vectorized
         predict_proba() call, and crashed it for the WHOLE validated group
@@ -495,7 +495,7 @@ class TestHeartNonRegression:
     @pytest.mark.parametrize("missing_field", ["ST_Slope", "MaxHR"], ids=["ST_Slope", "MaxHR"])
     async def test_batch_low_impact_missing_field_succeeds_without_warning(self, live_client, doctor_token, missing_field):
         """
-        Regression guard for HM-5 (WEAKNESS_REGISTER.md). A blank field must
+        Regression guard for HM-5 (archive/post_expo_2026-10/WEAKNESS_REGISTER.md). A blank field must
         not warn unless it changes the prediction, or the warning stops meaning
         anything. Since Gate 8.1 the model reads seven inputs (L3, D-25), so
         ST_Slope and MaxHR are not read at all and blanking them cannot

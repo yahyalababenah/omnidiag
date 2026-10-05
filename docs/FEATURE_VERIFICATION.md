@@ -15,11 +15,11 @@
 
 | الأداة | ما تغطّيه | المخرجات |
 |---|---|---|
-| `scratch/ui_verify.py` (Playwright، Chromium 1243) | 57 فحص نقر على البناء الإنتاجي: الصياغة، القائمة المنسدلة، Scales/Randomize/Reset، Compare، Batch (المرضان + السقف + التبديل)، محلل الملاحظات (Apply + العربية)، الملاحظة السريرية، History، طابور Admin | `ui_results.json` + `shots/*.png` |
+| `scripts/ui_verify.py` (Playwright، Chromium 1243) | 57 فحص نقر على البناء الإنتاجي: الصياغة، القائمة المنسدلة، Scales/Randomize/Reset، Compare، Batch (المرضان + السقف + التبديل)، محلل الملاحظات (Apply + العربية)، الملاحظة السريرية، History، طابور Admin | `ui_results.json` + `shots/*.png` |
 | `pytest` | 537 اختباراً (كانت 422 — **+115 جديد**) | أدناه |
-| `scratch/golden_master.py` | كل مخرجات `/predict` `/explain` `/counterfactuals` `/batch` `/schema` للمرضين | **1474 قيمة، فرقان اثنان فقط** وكلاهما الحقل الإضافي `prevalence_corrected` على `/diseases`. `/predict` و`/explain` **مطابقان تماماً** بسماحية 1e-9 |
+| `scripts/golden_master.py` | كل مخرجات `/predict` `/explain` `/counterfactuals` `/batch` `/schema` للمرضين | **1474 قيمة، فرقان اثنان فقط** وكلاهما الحقل الإضافي `prevalence_corrected` على `/diseases`. `/predict` و`/explain` **مطابقان تماماً** بسماحية 1e-9 |
 | `scripts/warmup_demo_cache.py` | تسخين الكاش لكل المرضى التجريبيين | أدناه |
-| `scratch/verify_randomize.mjs` | 500 مريض عشوائي/مرض: داخل حدود الـ schema والنطاق السريري، ومقبولون من `/predict` | أدناه |
+| `scripts/verify_randomize.mjs` | 500 مريض عشوائي/مرض: داخل حدود الـ schema والنطاق السريري، ومقبولون من `/predict` | أدناه |
 | قياس تزامن مباشر | `GET /` أثناء What-If سكري حقيقي غير مخزّن | أدناه |
 
 ---
@@ -235,7 +235,7 @@ backend/.venv/bin/python scripts/warmup_demo_cache.py
 
 1. انشر الواجهة من `deploy/v2-platform` (لوحة Vercel → Redeploy، أو `vercel --prod` من `frontend/`).
 2. تأكّد أن الحزمة تغيّرت: `curl -s https://omnidiag-delta.vercel.app/ | grep -o 'index-[^"]*\.js'` — يجب ألّا تكون `index-Ca31dcIj.js`.
-3. أعد تشغيل `scratch/ui_verify.py https://omnidiag-delta.vercel.app https://yahyoha-omnidiag.hf.space` — المتوقع 57/57.
+3. أعد تشغيل `scripts/ui_verify.py https://omnidiag-delta.vercel.app https://yahyoha-omnidiag.hf.space` — المتوقع 57/57.
 4. شغّل `scripts/warmup_demo_cache.py` بعد أي إعادة تشغيل للـ Space.
 
 **الرجوع (rollback) للخلفية:**

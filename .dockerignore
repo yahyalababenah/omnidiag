@@ -42,6 +42,13 @@ reports/figures
 !scripts/build_drift_reference.py
 experiment_files
 
+# Post-expo cleanup (2026-10): superseded files and one-off tools. Nothing the
+# build or the running app reads lives here -- checked by tracing every file
+# train_heart_glm.py and build_drift_reference.py open during --verify.
+archive
+scratch
+logs
+
 # Gate 8.6-b: README illustrations. `*.png` and `*.md` above match ROOT-level
 # files only -- measured, not assumed: a probe build showed
 # docs/assets/research/fig.png and docs/guide.md both reaching the context.

@@ -30,7 +30,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #
 #   * Heart is served by HeartGlmConformalBackend, which takes its warning list
 #     from the disease config's model.high_impact_features -- not from here.
-#     This ModelLoader is instantiated by no serving path (only scratch/).
+#     This ModelLoader is instantiated by no serving path (only the archived archive/post_expo_2026-10/scratch/).
 #   * The five features below were taken by hand from
 #     evaluation_evidence/heart/shap_importance.json, which describes a model
 #     that was never deployed (F0-1). Two of the five -- Oldpeak and
@@ -56,7 +56,7 @@ def _completeness_warning(patient_data: Dict[str, Any]) -> Optional[str]:
     schema) and the Pipeline's imputer will fill it in — but that's a
     statistical guess standing in for one of the model's most influential
     inputs, not the patient's actual value, and a clinician reading the
-    prediction should know that. See WEAKNESS_REGISTER.md HM-5.
+    prediction should know that. See archive/post_expo_2026-10/WEAKNESS_REGISTER.md HM-5.
     """
     missing = [f for f in _LEGACY_HIGH_IMPACT_FEATURES_UNUSED if patient_data.get(f) is None]
     if not missing:
@@ -272,7 +272,7 @@ class ModelLoader:
         that row has any missing values, so calling it 303 times on one
         row each is far slower than calling it once on 303 rows (measured
         ~300x on the real batch endpoint's traffic shape; see
-        WEAKNESS_REGISTER.md HM-2). Used by /batch (backend/main.py) when
+        archive/post_expo_2026-10/WEAKNESS_REGISTER.md HM-2). Used by /batch (backend/main.py) when
         the loader supports it; predict() is unchanged and still used by
         /predict.
 
@@ -282,7 +282,7 @@ class ModelLoader:
                 -- a single row that reaches here with an inf/nan/invalid
                 value can fail the whole group (StandardScaler/check_array
                 reject the entire matrix on one such value; confirmed by
-                direct test, see WEAKNESS_REGISTER.md HM-3). The caller
+                direct test, see archive/post_expo_2026-10/WEAKNESS_REGISTER.md HM-3). The caller
                 (backend/main.py::batch_predict) is expected to validate
                 every patient with the disease's pydantic schema first, so
                 that no value reaching this call can trigger that failure

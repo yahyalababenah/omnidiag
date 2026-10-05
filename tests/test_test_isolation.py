@@ -1,5 +1,5 @@
 """
-Test-suite isolation guards (WEAKNESS_REGISTER.md P-13).
+Test-suite isolation guards (archive/post_expo_2026-10/WEAKNESS_REGISTER.md P-13).
 
 Every pytest run used to append rows to the developer's real omnidiag_dev.db:
 the audit middleware opened its own session instead of going through get_db,

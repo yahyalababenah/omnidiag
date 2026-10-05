@@ -47,6 +47,8 @@ experiment_files/
 *.zip
 *.xlsx
 results/
+# Phase 9 research outputs (gate results, model cards) are documentation, not run output.
+!docs/phase9/results/
 
 # LibreOffice lock files
 .~lock.*#
@@ -276,3 +278,7 @@ recordings/
 # Generated one-off comparison reports (candidate vs. shipped). Regenerable
 # from models/heart_disease/candidates/<run_id>/candidate_card.json.
 reports/
+
+# Local run logs and hand-made database snapshots (e.g. omnidiag_dev.db.before-annotations).
+logs/
+*.db.*
