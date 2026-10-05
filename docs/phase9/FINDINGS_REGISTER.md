@@ -1415,3 +1415,22 @@ refuses it again before reading a single sample, so a CLI call is covered too.
 replaces `get_annotated_samples` and `retrain_xgb` with functions that fail if called, and
 asserts a 410; `test_retrain_answers_410` covers the route. With the guard disabled in memory,
 both fail.
+
+## W-26 — SUPERSEDED by gate B4 — the active-learning XGBoost retrain path was removed
+
+**Originally** `WEAKNESS_REGISTER.md` W-26 (now `archive/post_expo_2026-10/`): the retrain
+path built its design matrix from dict key order and raw, un-engineered predict-time values,
+so heart crashed on its text inputs and BRFSS diabetes trained on the wrong columns.
+
+**Status: superseded, not fixed.** Commit `3eb4c84` (gate B4, branch `chore/retire-brfss`)
+deleted `retrain_xgb`, the function W-26 describes. No live module read what it wrote: BRFSS
+diabetes is retired (gate B3), the NHANES module has no XGBoost file, and the heart revert
+path (`sklearn_pipeline`) loads a different file. Every family outside the candidate path
+(`glm_ivap_conformal`) now gets `status: "unsupported"`, reason `retrain not yet supported for
+<family>`, before a single review row is read. Heart's live retrain is the candidate builder
+(Gate 8.10), which never had this defect.
+
+**Proof:** `tests/test_heart_candidate_retrain.py::TestRoutingIsByModelFamily::test_every_other_family_is_refused_before_reading`
+runs NHANES and the heart `sklearn_pipeline` revert with sample reading and candidate building
+replaced by functions that fail if called; `test_the_legacy_xgboost_writer_is_gone` asserts the
+function is absent. Routing those families back to a builder makes the first test fail.
