@@ -42,6 +42,33 @@ HEART_ALLOWED = {
     "Cholesterol": ("decrease", 150),
     "FastingBS": ("to", 0),
 }
+# NHANES (backend/diabetes_what_if_levers.py). "increase" is the HDL lever
+# (F9-32): it may only move up, never above the ceiling, and must leave an HDL
+# already above it alone.
+NHANES_ALLOWED = {
+    "BMXBMI": ("decrease", 24.9),
+    "ADIPOSITY_BAND": ("decrease", 0),
+    "SBP": ("decrease", 120),
+    "DBP": ("decrease", 80),
+    "LBXSTR": ("decrease", 150),
+    "LBXSCH": ("decrease", 200),
+    "LBXSGTSI": ("decrease", 40),
+    "LBXSATSI": ("decrease", 40),
+    "LBXSUA": ("decrease", 6.0),
+    "LBDHDD": ("increase", 60),
+    "PAQ650": ("to", 1),
+    "PAQ665": ("to", 1),
+}
+NHANES_IMMUTABLE = {
+    "RIDAGEYR", "RIAGENDR", "MCQ300C", "CVD_ANY", "BPXPLS", "LBXSCR", "LBXSBU", "LBXSAL",
+}
+POLICIES = {
+    "heart_disease": HEART_ALLOWED,
+    "diabetes": DIABETES_ALLOWED,
+    "diabetes_nhanes": NHANES_ALLOWED,
+}
+# ADIPOSITY_BAND arrives as a name; its order is what "decrease" means.
+_BAND_LEVEL = {"normal": 0, "increased": 1, "high": 2}
 ENGINEERED = {
     "BMI_Age_Interaction", "Health_Index", "Lifestyle_Score",
     "SES_Composite", "Diabetes_Clinical_Risk",
@@ -60,6 +87,12 @@ DEMO = {
         "D-003": {"HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 33, "Smoker": 1, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 0, "Fruits": 0, "Veggies": 0, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 4, "MentHlth": 5, "PhysHlth": 12, "DiffWalk": 1, "Sex": 1, "Age": 9, "Education": 4, "Income": 4},
         "D-004": {"HighBP": 1, "HighChol": 0, "CholCheck": 1, "BMI": 26, "Smoker": 0, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 1, "Fruits": 1, "Veggies": 1, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 3, "MentHlth": 0, "PhysHlth": 0, "DiffWalk": 0, "Sex": 0, "Age": 6, "Education": 5, "Income": 6},
     },
+    # N-001 is cleared (not applicable), N-002 crosses, N-003 only has a fallback.
+    "diabetes_nhanes": {
+        "N-001": {"RIDAGEYR": 28, "RIAGENDR": 0, "BMXBMI": 22, "ADIPOSITY_BAND": "normal", "SBP": 108, "DBP": 68, "BPXPLS": 70, "MCQ300C": 0, "CVD_ANY": 0, "PAQ650": 1, "PAQ665": 1, "LBDHDD": 66, "LBXSCH": 185, "LBXSTR": 70, "LBXSATSI": 16, "LBXSGTSI": 14, "LBXSCR": 0.85, "LBXSBU": 13, "LBXSAL": 4.3, "LBXSUA": 5},
+        "N-002": {"RIDAGEYR": 45, "RIAGENDR": 1, "BMXBMI": 30, "ADIPOSITY_BAND": "high", "SBP": 126, "DBP": 80, "BPXPLS": 72, "MCQ300C": 0, "CVD_ANY": 0, "PAQ650": 0, "PAQ665": 1, "LBDHDD": 46, "LBXSCH": 195, "LBXSTR": 140, "LBXSATSI": 26, "LBXSGTSI": 30, "LBXSCR": 0.9, "LBXSBU": 14, "LBXSAL": 4.3, "LBXSUA": 5.8},
+        "N-003": {"RIDAGEYR": 58, "RIAGENDR": 1, "BMXBMI": 33, "ADIPOSITY_BAND": "high", "SBP": 138, "DBP": 84, "BPXPLS": 70, "MCQ300C": 1, "CVD_ANY": 0, "PAQ650": 0, "PAQ665": 0, "LBDHDD": 38, "LBXSCH": 185, "LBXSTR": 240, "LBXSATSI": 36, "LBXSGTSI": 52, "LBXSCR": 0.85, "LBXSBU": 13, "LBXSAL": 4.3, "LBXSUA": 6.8},
+    },
 }
 # Extra positives that exercise every lever and the "no crossing" path.
 EDGE = {
@@ -70,10 +103,20 @@ EDGE = {
     "diabetes": {
         "all_levers": {"HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 38, "Smoker": 1, "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 0, "Fruits": 0, "Veggies": 0, "HvyAlcoholConsump": 1, "AnyHealthcare": 1, "NoDocbcCost": 1, "GenHlth": 4, "MentHlth": 10, "PhysHlth": 10, "DiffWalk": 1, "Sex": 1, "Age": 10, "Education": 3, "Income": 3},
     },
+    "diabetes_nhanes": {
+        # Every one of the 12 levers engaged.
+        "all_levers": {"RIDAGEYR": 50, "RIAGENDR": 1, "BMXBMI": 36, "ADIPOSITY_BAND": "high", "SBP": 150, "DBP": 95, "BPXPLS": 70, "MCQ300C": 1, "CVD_ANY": 0, "PAQ650": 0, "PAQ665": 0, "LBDHDD": 35, "LBXSCH": 260, "LBXSTR": 300, "LBXSATSI": 70, "LBXSGTSI": 80, "LBXSCR": 0.85, "LBXSBU": 13, "LBXSAL": 4.3, "LBXSUA": 8.0},
+        # F9-32: an HDL already above the ceiling must never be pulled down to it.
+        "hdl_above_ceiling": {"RIDAGEYR": 58, "RIAGENDR": 1, "BMXBMI": 33, "ADIPOSITY_BAND": "high", "SBP": 138, "DBP": 84, "BPXPLS": 70, "MCQ300C": 1, "CVD_ANY": 0, "PAQ650": 0, "PAQ665": 0, "LBDHDD": 75, "LBXSCH": 185, "LBXSTR": 240, "LBXSATSI": 36, "LBXSGTSI": 52, "LBXSCR": 0.85, "LBXSBU": 13, "LBXSAL": 4.3, "LBXSUA": 6.8},
+        # Optional levers left blank: skipped, never guessed.
+        "missing_levers": {"RIDAGEYR": 58, "RIAGENDR": 1, "BMXBMI": 33, "ADIPOSITY_BAND": "high", "SBP": None, "DBP": None, "BPXPLS": 70, "MCQ300C": 1, "CVD_ANY": 0, "PAQ650": 0, "PAQ665": 0, "LBDHDD": 38, "LBXSCH": None, "LBXSTR": None, "LBXSATSI": None, "LBXSGTSI": None, "LBXSCR": 0.85, "LBXSBU": 13, "LBXSAL": 4.3, "LBXSUA": None},
+        # Still flagged with every lever already at its target: nothing to move.
+        "no_lever_left": {"RIDAGEYR": 76, "RIAGENDR": 1, "BMXBMI": 24, "ADIPOSITY_BAND": "normal", "SBP": 118, "DBP": 76, "BPXPLS": 88, "MCQ300C": 1, "CVD_ANY": 1, "PAQ650": 1, "PAQ665": 1, "LBDHDD": 62, "LBXSCH": 190, "LBXSTR": 140, "LBXSATSI": 30, "LBXSGTSI": 35, "LBXSCR": 1.6, "LBXSBU": 30, "LBXSAL": 3.6, "LBXSUA": 5.5},
+    },
 }
 
 
-DISEASES = ("heart_disease", "diabetes")
+DISEASES = ("heart_disease", "diabetes", "diabetes_nhanes")
 
 
 def _patients(disease):
@@ -103,21 +146,29 @@ def _as_pairs(scenario, patient):
     return [(f, patient.get(f), v) for f, v in changes.items()]
 
 
+def _level(value):
+    return float(_BAND_LEVEL[value]) if isinstance(value, str) and value in _BAND_LEVEL else float(value)
+
+
 def assert_allowed(disease, scenario, patient):
-    allowed = HEART_ALLOWED if disease == "heart_disease" else DIABETES_ALLOWED
+    allowed = POLICIES[disease]
     pairs = _as_pairs(scenario, patient)
     assert pairs, "a scenario must change something"
     for feat, before, after in pairs:
         assert feat not in ENGINEERED, f"engineered feature {feat} was perturbed directly"
         assert feat in allowed, f"immutable feature {feat} changed {before} -> {after}"
         assert before is not None, f"missing lever {feat} was used"
-        assert float(before) == float(patient[feat])
+        assert _level(before) == _level(patient[feat])
+        before, after = _level(before), _level(after)
         kind, bound = allowed[feat]
         if kind == "decrease":
-            assert float(after) < float(before), f"{feat} {before} -> {after} is not a decrease"
-            assert float(after) >= bound, f"{feat} {after} below floor {bound}"
+            assert after < before, f"{feat} {before} -> {after} is not a decrease"
+            assert after >= bound, f"{feat} {after} below floor {bound}"
+        elif kind == "increase":
+            assert after > before, f"{feat} {before} -> {after} is not an increase"
+            assert after <= bound, f"{feat} {after} above ceiling {bound}"
         else:
-            assert float(after) == float(bound), f"{feat} {before} -> {after}, only -> {bound} allowed"
+            assert after == float(bound), f"{feat} {before} -> {after}, only -> {bound} allowed"
 
 
 def _validated(disease, patient):
@@ -250,6 +301,57 @@ class TestPolicyViolationsFunction:
         }
 
 
+class TestNhanesPolicy:
+    def test_code_policy_matches_the_specification(self):
+        from backend.diabetes_what_if_levers import DIABETES_LEVERS, IMMUTABLE
+
+        assert {k: (kind, float(v)) for k, (kind, v) in DIABETES_LEVERS.items()} == {
+            k: (kind, float(v)) for k, (kind, v) in NHANES_ALLOWED.items()
+        }
+        assert set(IMMUTABLE) == NHANES_IMMUTABLE
+
+    def test_every_input_is_either_a_lever_or_immutable(self, real_router):
+        # A field added to the schema must be classified on purpose, not left
+        # to whatever the generator does with an unknown feature.
+        from backend.schemas import get_schema_for_disease
+
+        fields = set(get_schema_for_disease("diabetes_nhanes").model_fields)
+        assert fields == set(NHANES_ALLOWED) | NHANES_IMMUTABLE
+        assert not set(NHANES_ALLOWED) & NHANES_IMMUTABLE
+
+    def test_an_hdl_above_the_ceiling_is_never_moved(self, cf_results):
+        # F9-32: a healthy HDL of 75 must not be "improved" down to 60.
+        result = cf_results["diabetes_nhanes"]["hdl_above_ceiling"]
+        scenarios = result["counterfactuals"] + (
+            [result["best_achievable"]] if result.get("best_achievable") else []
+        )
+        assert scenarios, "the case must produce something to check"
+        for scenario in scenarios:
+            assert "LBDHDD" not in {c["feature"] for c in scenario["changes"]}
+
+    def test_all_improvements_leaves_a_healthy_hdl_alone(self):
+        # The direct F9-32 guard. The scenario test above can pass even with the
+        # bug back, because lowest_achievable drops a lever that raises risk, and
+        # lowering HDL does.
+        from backend.diabetes_what_if_levers import all_improvements
+
+        patient = _patients("diabetes_nhanes")["hdl_above_ceiling"]
+        assert all_improvements(patient)["LBDHDD"] == patient["LBDHDD"]
+        low = {**patient, "LBDHDD": 38}
+        assert all_improvements(low)["LBDHDD"] == 60
+
+    def test_a_missing_lever_is_skipped_not_guessed(self, cf_results):
+        patient = _patients("diabetes_nhanes")["missing_levers"]
+        missing = {f for f, v in patient.items() if v is None}
+        result = cf_results["diabetes_nhanes"]["missing_levers"]
+        scenarios = result["counterfactuals"] + (
+            [result["best_achievable"]] if result.get("best_achievable") else []
+        )
+        assert scenarios, "the case must produce something to check"
+        for scenario in scenarios:
+            assert not missing & {c["feature"] for c in scenario["changes"]}
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # B. Defence in depth
 # ═════════════════════════════════════════════════════════════════════════════
@@ -293,6 +395,21 @@ class TestFinalFilter:
             assert_allowed("heart_disease", result["best_achievable"], patient)
 
 
+    def test_nhanes_backend_never_emits_injected_violations(self, real_router, monkeypatch):
+        from backend.model_backends import diabetes_ebm_conformal as nhanes
+
+        patient = _validated("diabetes_nhanes", EDGE["diabetes_nhanes"]["hdl_above_ceiling"])
+        # Every candidate now also rewrites immutable facts and pulls the healthy
+        # HDL down (the F9-32 failure) -- all of which would flip the decision.
+        monkeypatch.setattr(nhanes, "all_improvements", lambda p, policy=None: {
+            **p, "RIDAGEYR": 20.0, "MCQ300C": 0, "CVD_ANY": 0, "LBXSCR": 0.6,
+            "LBDHDD": 60.0, "BMXBMI": 22.0,
+        })
+        result = real_router.counterfactuals("diabetes_nhanes", patient)
+        assert result["counterfactuals"] == []
+        assert result["best_achievable"] is None
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # C. Honest result when nothing crosses
 # ═════════════════════════════════════════════════════════════════════════════
@@ -325,6 +442,29 @@ class TestBestAchievable:
         assert result["crosses_threshold"] is True
         assert result["best_achievable"] is None
         assert 1 <= len(result["counterfactuals"]) <= 3
+
+
+    def test_nhanes_n003_reports_best_achievable(self, cf_results):
+        result = cf_results["diabetes_nhanes"]["N-003"]
+        assert result["counterfactuals"] == []
+        assert result["crosses_threshold"] is False
+        best = result["best_achievable"]
+        assert best["crosses_threshold"] is False
+        assert best["probability"] < result["baseline_probability"]
+        assert best["risk_reduction_relative_pct"] > 0
+        # NHANES recommends an HbA1c test, not a "referral" (heart's wording).
+        assert "HbA1c test" in result["message"]
+
+    def test_nhanes_crossing_patient_has_no_fallback(self, cf_results):
+        result = cf_results["diabetes_nhanes"]["N-002"]
+        assert result["crosses_threshold"] is True
+        assert result["best_achievable"] is None
+        assert len(result["counterfactuals"]) == 1
+
+    def test_nhanes_cleared_patient_is_not_applicable(self, cf_results):
+        result = cf_results["diabetes_nhanes"]["N-001"]
+        assert result["status"] == "not_applicable"
+        assert result["counterfactuals"] == []
 
 
 # ═════════════════════════════════════════════════════════════════════════════

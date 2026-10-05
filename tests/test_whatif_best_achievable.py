@@ -12,6 +12,7 @@ import pytest
 
 from backend.counterfactual_generator import (
     NO_IMPROVEMENT_MESSAGE,
+    NO_IMPROVEMENT_MESSAGE_DECISION,
     all_improvements,
     lowest_achievable,
 )
@@ -134,6 +135,14 @@ def test_no_best_is_explained(results, disease, name, patient):
         return
     # Flagged, nothing crosses, nothing lowers: the message must say which.
     assert r["message"], f"{disease}/{name}: no explanation"
+    if disease == "diabetes_nhanes":
+        # NHANES words its outcome as an HbA1c test rather than a referral when
+        # no lever is left; with levers that all fail it shares the decision text.
+        if "No modifiable factor is available" in r["message"]:
+            assert "HbA1c test is still recommended" in r["message"]
+        else:
+            assert r["message"] == NO_IMPROVEMENT_MESSAGE_DECISION
+        return
     assert "Referral is recommended" in r["message"]
     if "No modifiable factor is available" not in r["message"]:
         assert r["message"] == NO_IMPROVEMENT_MESSAGE
