@@ -42,6 +42,8 @@ shipped code: several describe models that are no longer served.
 | `docs/OmniDiag_Proposal_Defense.md` | Expo proposal defence; presents BRFSS as the diabetes module (state of 2026-09-26) |
 | `docs/CRITERION_01_AUDIT.md` | Pre-expo proposal audit |
 | `docs/code_cleanup_report.md` | 2026-06-28 report on another branch |
+| `configs/diabetes.yaml` | BRFSS diabetes module retired (gate B3, 2026-10-05). Its absence from `configs/` is what unregisters it; `backend/retired_diseases.py` answers 410 for it. Kept for the numbers the docs cite: prevalence_train / prevalence_deploy, inference_threshold 0.108184 |
+| `configs/diabetes.yaml.kaggle` | Orphan variant of the same config; never loaded (the router reads `.yaml`/`.yml` only) |
 
 ## Moved elsewhere (not archived)
 

@@ -27,6 +27,7 @@ import importlib
 import yaml
 from typing import Dict, List, Optional, Any
 from fastapi import HTTPException
+from backend.retired_diseases import reject_if_retired
 from backend.model_backends import ModelBackend, UnknownModelFamilyError, get_backend
 
 log = logging.getLogger("omnidiag.router")
@@ -316,7 +317,9 @@ class OmniDiagRouter:
         
         Raises:
             HTTPException 404: If disease is not registered.
+            HTTPException 410: If disease is retired (backend/retired_diseases.py).
         """
+        reject_if_retired(disease)
         if disease not in self.model_loaders:
             available = self.get_available_diseases()
             raise HTTPException(

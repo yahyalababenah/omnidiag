@@ -31,6 +31,7 @@ from backend.db_models.patient import Patient
 from backend.db_models.patient_visit import PatientVisit
 from backend.db_models.prediction import Prediction
 from backend.db_models.user import User
+from backend.retired_diseases import reject_if_retired
 from pydantic import BaseModel as _BaseModel
 from datetime import date as _date
 from typing import List as _List
@@ -320,6 +321,7 @@ async def create_visit(
     _user: User = Depends(require_role(*CLINICAL_ROLES)),
     db: AsyncSession = Depends(get_db),
 ):
+    reject_if_retired(body.disease)  # a new visit is a write
     patient = await _get_active_patient(patient_id, db)
     visit_dt = datetime.now(timezone.utc)
     if body.visit_date:
@@ -397,6 +399,7 @@ async def attach_clinical_note(
     The note attaches to the patient's most recent prediction for the given
     disease, which is the one on screen when the Save button is pressed.
     """
+    reject_if_retired(body.disease)
     patient = await _get_active_patient(patient_id, db)
 
     filters = [Prediction.patient_id == patient.id]
@@ -425,6 +428,9 @@ async def attach_clinical_note(
             },
         )
 
+    # Without a disease the note lands on the latest row, which may belong to a
+    # retired module: still a write, still refused.
+    reject_if_retired(latest.disease)
     latest.notes = body.notes
     await db.commit()
     await db.refresh(latest)

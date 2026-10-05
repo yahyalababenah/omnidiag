@@ -84,7 +84,7 @@ class TestStatusEndpoint:
     ):
         """This asserted `monitor_ready is False` until Gate 8.7c made it true."""
         resp = await client.get(
-            "/api/v4/admin/drift/diabetes/status",
+            "/api/v4/admin/drift/heart_disease/status",  # diabetes (BRFSS) is retired: 410
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 200, resp.text
@@ -97,7 +97,7 @@ class TestStatusEndpoint:
 
     async def test_drift_status_still_requires_admin(self, client, doctor_token, db_tables):
         resp = await client.get(
-            "/api/v4/admin/drift/diabetes/status",
+            "/api/v4/admin/drift/heart_disease/status",  # diabetes (BRFSS) is retired: 410
             headers={"Authorization": f"Bearer {doctor_token}"},
         )
         assert resp.status_code == 403

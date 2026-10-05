@@ -110,7 +110,7 @@ class TestSeeding:
         self, db_tables, monkeypatch
     ):
         monkeypatch.setattr(demo_seed, "AsyncSessionLocal", TestSessionLocal)
-        demo = demo_seed.load_demo_patients()
+        demo = demo_seed.active_demo_patients()
         expected_patients = sum(len(p) for p in demo.values())
 
         patients_before, predictions_before, visits_before = await self._counts()

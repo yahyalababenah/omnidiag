@@ -62,6 +62,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.router import OmniDiagRouter
+from backend.retired_diseases import display_name as retired_display_name, reject_if_retired
 from backend.schemas import get_schema_for_disease, ExplainResponse, PredictResponse
 from backend.auth.routes import router as auth_router
 from backend.admin.routes import router as admin_router
@@ -363,6 +364,9 @@ async def get_disease_schema(disease: str, response: Response):
     Cached for CACHE_TTL_SCHEMA (24 h by default) — schema changes only on
     deployment.
     """
+    # Before the cache: a schema cached while a module was live must not be
+    # served after it is retired.
+    reject_if_retired(disease)
     key = schema_cache_key(disease)
     cached = await cache_get(key)
     if cached is not None:
@@ -1077,7 +1081,11 @@ async def generate_clinical_report(
     _user: Optional[User] = Depends(get_optional_user),
 ) -> Dict[str, Any]:
     disease_info = router.get_disease_info(body.disease)
-    disease_display = (disease_info or {}).get("display_name", body.disease)
+    # A retired module has no config, but a report rendered from one of its
+    # stored rows is a read and stays allowed; it names the module as retired.
+    disease_display = (disease_info or {}).get(
+        "display_name", retired_display_name(body.disease)
+    )
     probability_corrected = body.resolved_probability_corrected
 
     # Bands come from the disease itself, already on the same scale as the
@@ -1149,6 +1157,9 @@ async def parse_notes(
     request: Request,
     body: NotesParseRequest,
 ) -> Dict[str, Any]:
+    # Parsing a note fills the input form for a new prediction, which a retired
+    # module no longer accepts.
+    reject_if_retired(body.disease)
     if _parse_clinical_note is None:
         return {"extracted_features": {}, "mapped_features": {}, "field_count": 0, "engine": "none"}
     from backend.nlp.notes_parser import bert_status, language_support

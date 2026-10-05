@@ -1391,3 +1391,27 @@ Reproduce: `docs/phase9/results/f9_40_cross_group_monotonicity.py`. It needs the
 data directory, rebuilds the cohort exactly as the training script does, and uses the
 backend's own `_platt` and `_decide`. Outputs: `docs/phase9/results/f9_40_cross_group_monotonicity.json`
 and `f9_40_clinical_readout.json`.
+
+## W-08 — CLOSED by gate B3 — retraining a retired disease could overwrite the old weights
+
+**Originally** `WEAKNESS_REGISTER.md` W-08 (now `archive/post_expo_2026-10/`): `/admin/retrain`
+for `diabetes` wrote `models/diabetes/omni_diag_xgb_optimized.pkl` through the legacy
+`retrain_xgb` path.
+
+**Why it got worse before it was closed.** Archiving `configs/diabetes.yaml` (gate B3) means
+`_model_family("diabetes")` returns None, so the pipeline treats the disease as "not a
+candidate family" and falls through to `retrain_xgb`. Measured on a copy of the local
+database with the config removed: with annotated `diabetes` rows present the route answered
+200 `failed` only because that worktree held no BRFSS weights. The production image still
+downloads them (Dockerfile, until the Docker/data gate), so there the same request would have
+found the file and overwritten it.
+
+**Closed.** `backend/retired_diseases.py` is the single list of retired modules. The
+`/admin/retrain` route refuses a retired disease with 410 **before** its catch-all `try`
+(which would otherwise turn the refusal into a 200 "error"), and `run_retrain_pipeline`
+refuses it again before reading a single sample, so a CLI call is covered too.
+
+**Proof:** `tests/test_retired_disease.py::test_retrain_never_reaches_the_legacy_xgboost_writer`
+replaces `get_annotated_samples` and `retrain_xgb` with functions that fail if called, and
+asserts a 410; `test_retrain_answers_410` covers the route. With the guard disabled in memory,
+both fail.

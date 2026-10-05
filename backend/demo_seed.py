@@ -51,6 +51,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 
+from backend.retired_diseases import is_retired
 from backend.active_learning.sampler import (
     DEFAULT_DECISION_THRESHOLD,
     prediction_entropy,
@@ -96,6 +97,17 @@ def load_demo_patients() -> Dict[str, List[Dict[str, Any]]]:
         return json.load(f)
 
 
+def active_demo_patients() -> Dict[str, List[Dict[str, Any]]]:
+    """The demo patients of modules that are still live.
+
+    A retired module (backend/retired_diseases.py) cannot score, so seeding it
+    would only log failures and leave empty patient rows. Filtered here rather
+    than in load_demo_patients(), which mirrors the frontend's file exactly and
+    is tested against it.
+    """
+    return {d: p for d, p in load_demo_patients().items() if not is_retired(d)}
+
+
 def historical_features(
     current: Dict[str, Any], disease: str, steps_back: int
 ) -> Dict[str, Any]:
@@ -124,9 +136,11 @@ def historical_features(
 
 async def _already_seeded(db) -> bool:
     """True when a previous run already created the demo patients."""
+    # The same list seed_demo_history() writes, or a retired module's patients
+    # would never exist and every startup would believe seeding was unfinished.
     demo_ids = [
         patient["id"]
-        for patients in load_demo_patients().values()
+        for patients in active_demo_patients().values()
         for patient in patients
     ]
     if not demo_ids:
@@ -149,7 +163,7 @@ async def seed_demo_history(router, *, force: bool = False) -> int:
     *router* is the live OmniDiagRouter — the seeded probabilities are its
     own output, not stored constants.
     """
-    demo = load_demo_patients()
+    demo = active_demo_patients()
 
     async with AsyncSessionLocal() as db:
         if not force and await _already_seeded(db):

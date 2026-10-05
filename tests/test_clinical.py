@@ -206,6 +206,7 @@ DIABETES_PAYLOAD = {
 }
 
 
+@pytest.mark.brfss
 class TestDiabetes:
     async def test_diabetes_predict_returns_result(self, client, doctor_token):
         resp = await client.post(

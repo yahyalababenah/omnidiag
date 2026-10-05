@@ -340,6 +340,11 @@ async def run_retrain_pipeline(
 
     Returns a status dict suitable for the API response.
     """
+    # Before anything is read (W-08): a retired disease has no config, so it would
+    # otherwise reach retrain_xgb and overwrite whatever weights the image holds.
+    from backend.retired_diseases import reject_if_retired
+    reject_if_retired(disease)
+
     features_list, labels = await get_annotated_samples(db, disease, min_samples)
 
     if not features_list:

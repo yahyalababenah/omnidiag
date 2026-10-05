@@ -467,7 +467,11 @@ async def seed_database(db_url: str) -> None:
                     print(f"  ✓ CAD patient already exists: {pat_data['full_name']}")
 
             # ── 5. Seed Diabetes patients ─────────────────────────────────
-            for pat_data in DM_PATIENTS:
+            # BRFSS diabetes is retired (backend/retired_diseases.py): its config
+            # is archived, so it cannot be scored, and a seeded row must come from
+            # the real model. Existing rows are left as they are.
+            from backend.retired_diseases import is_retired
+            for pat_data in ([] if is_retired("diabetes") else DM_PATIENTS):
                 result = await session.execute(
                     text("SELECT id FROM patients WHERE mrn = :mrn"),
                     {"mrn": pat_data["mrn"]},

@@ -38,11 +38,14 @@ from backend.router import OmniDiagRouter as _RealOmniDiagRouter
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CONFIGS_DIR = os.path.join(_ROOT, "configs")
 
-with open(os.path.join(_CONFIGS_DIR, "diabetes.yaml")) as _f:
-    _DIABETES_MODEL_CFG = yaml.safe_load(_f)["model"]
-PI_TRAIN = float(_DIABETES_MODEL_CFG["prevalence_train"])
-PI_DEPLOY = float(_DIABETES_MODEL_CFG["prevalence_deploy"])
-THRESHOLD_DEPLOYED = float(_DIABETES_MODEL_CFG["inference_threshold"])
+# The BRFSS module is retired and its config archived (gate B3). These are its
+# last shipped values, written out so the prevalence-correction tests no longer
+# need the file at import time; test_pinned_values_match_the_archived_config
+# keeps them honest against it.
+_ARCHIVED_DIABETES_CFG = os.path.join(_ROOT, "archive", "post_expo_2026-10", "configs", "diabetes.yaml")
+PI_TRAIN = 0.5
+PI_DEPLOY = 0.237
+THRESHOLD_DEPLOYED = 0.108184
 
 
 def correct(p, pi_train=PI_TRAIN, pi_deploy=PI_DEPLOY):
@@ -54,6 +57,15 @@ def correct(p, pi_train=PI_TRAIN, pi_deploy=PI_DEPLOY):
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestCorrectionFormula:
+    def test_pinned_values_match_the_archived_config(self):
+        with open(_ARCHIVED_DIABETES_CFG) as f:
+            model = yaml.safe_load(f)["model"]
+        assert (PI_TRAIN, PI_DEPLOY, THRESHOLD_DEPLOYED) == (
+            float(model["prevalence_train"]), float(model["prevalence_deploy"]),
+            float(model["inference_threshold"]),
+        )
+        assert RISK_BANDS_RAW == model["risk_bands"]
+
     def test_strictly_monotonic_on_200_points(self):
         p = np.linspace(0.001, 0.999, 200)
         out = correct(p)
@@ -245,7 +257,7 @@ CORRECTION_KEYS = {
     "prevalence_train", "prevalence_deploy", "inference_threshold_raw",
     "risk_bands", "risk_bands_raw",
 }
-RISK_BANDS_RAW = _DIABETES_MODEL_CFG["risk_bands"]
+RISK_BANDS_RAW = {"high": 0.7, "moderate": 0.4}
 
 
 @pytest.fixture(scope="module")
@@ -383,8 +395,6 @@ class TestDiabetesPredictApi:
     def test_heart_disease_info_declares_no_bands(self, real_router):
         # Heart keeps the frontend default constants; nothing leaked into it.
         assert real_router.get_disease_info("heart_disease")["risk_bands"] is None
-        diabetes_bands = real_router.get_disease_info("diabetes")["risk_bands"]
-        assert diabetes_bands["high"] == pytest.approx(correct(RISK_BANDS_RAW["high"]))
 
     @pytest.mark.brfss
     async def test_fixtures_exercise_both_decisions(self, live_client):
@@ -637,7 +647,9 @@ class TestDiabetesEdgeInputs:
     def test_loader_refuses_config_without_priors(self):
         from backend.ensemble_loader import EnsembleModelLoader
 
-        cfg = {"model": {k: v for k, v in _DIABETES_MODEL_CFG.items() if k != "prevalence_deploy"}}
+        with open(_ARCHIVED_DIABETES_CFG) as f:
+            model_cfg = yaml.safe_load(f)["model"]
+        cfg = {"model": {k: v for k, v in model_cfg.items() if k != "prevalence_deploy"}}
         with pytest.raises(KeyError, match="prevalence_deploy"):
             EnsembleModelLoader(cfg)
 

@@ -500,6 +500,9 @@ def get_schema_for_disease(disease_name: str) -> Type[BaseModel]:
     Raises:
         HTTPException 404: If no schema is registered for the disease.
     """
+    from backend.retired_diseases import reject_if_retired
+
+    reject_if_retired(disease_name)
     if disease_name not in DISEASE_SCHEMA_REGISTRY:
         raise HTTPException(
             status_code=404,

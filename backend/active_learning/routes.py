@@ -25,6 +25,7 @@ from backend.database import get_db
 from backend.db_models.prediction import Prediction
 from backend.db_models.review_queue import ReviewQueue
 from backend.db_models.user import User
+from backend.retired_diseases import RETIRED_DISEASES, is_retired, reject_if_retired
 
 router = APIRouter()
 
@@ -36,6 +37,12 @@ class AnnotateRequest(BaseModel):
     # reaches a model: retraining reads `label` and the prediction's own
     # input_features.
     notes: Optional[str] = None
+
+
+async def _disease_of(rq: ReviewQueue, db: AsyncSession) -> Optional[str]:
+    return (await db.execute(
+        select(Prediction.disease).where(Prediction.id == rq.prediction_id)
+    )).scalar_one_or_none()
 
 
 @router.get(
@@ -101,6 +108,9 @@ async def list_review_queue(
             "reviewer": (rq.reviewer.email if rq.reviewer else None),
             "created_at": rq.created_at.isoformat() if rq.created_at else None,
             "disease": pred.disease if pred else None,
+            # A retired module's items stay listed (reading is allowed) but can
+            # no longer be labelled; the flag says so before anyone tries.
+            "retired": is_retired(pred.disease) if pred else False,
             "model_prediction": pred.prediction if pred else None,
             "confidence": pred.confidence if pred else None,
             "probability_scale": pred.probability_scale if pred else None,
@@ -135,6 +145,7 @@ async def annotate_review(
         raise HTTPException(status_code=404, detail="Review item not found")
     if rq.status != "pending":
         raise HTTPException(status_code=409, detail=f"Item already {rq.status}")
+    reject_if_retired(await _disease_of(rq, db))
     if body.label not in (0, 1):
         raise HTTPException(status_code=422, detail="label must be 0 or 1")
 
@@ -168,6 +179,7 @@ async def skip_review(
         raise HTTPException(status_code=404, detail="Review item not found")
     if rq.status != "pending":
         raise HTTPException(status_code=409, detail=f"Item already {rq.status}")
+    reject_if_retired(await _disease_of(rq, db))
     rq.status = "skipped"
     rq.reviewer_id = current_user.id
     rq.reviewed_at = datetime.now(timezone.utc)
@@ -189,8 +201,18 @@ async def review_stats(
         .group_by(ReviewQueue.status)
     )).all()
     stats = {r.status: r.count for r in rows}
+    # Pending items of a retired module can never be labelled, so they are not
+    # work waiting for a reviewer: counted apart, not in `pending`.
+    retired_pending = (await db.execute(
+        select(func.count())
+        .select_from(ReviewQueue)
+        .join(Prediction, ReviewQueue.prediction_id == Prediction.id)
+        .where(and_(ReviewQueue.status == "pending",
+                    Prediction.disease.in_(list(RETIRED_DISEASES))))
+    )).scalar_one()
     return {
-        "pending": stats.get("pending", 0),
+        "pending": stats.get("pending", 0) - retired_pending,
+        "retired_pending": retired_pending,
         "reviewed": stats.get("reviewed", 0),
         "skipped": stats.get("skipped", 0),
         "total": sum(stats.values()),

@@ -624,4 +624,5 @@ def test_unused_inputs_come_from_the_artifact(backend):
 
 def test_a_module_that_reads_everything_reports_no_unused_inputs(router):
     """The default is empty, so only a module that really ignores inputs labels any."""
-    assert router._get_loader("diabetes").unused_input_features == []
+    # NHANES reads all 20 of its inputs (BRFSS, the earlier example, is retired).
+    assert router._get_loader("diabetes_nhanes").unused_input_features == []

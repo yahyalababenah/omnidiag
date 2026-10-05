@@ -81,7 +81,8 @@ DIABETES_PATIENT = {
 
 def _write_configs(directory, extra: dict):
     os.makedirs(directory, exist_ok=True)
-    for name in ("heart_disease.yaml", "diabetes.yaml"):
+    # The live modules. BRFSS diabetes is retired and its config archived (B3).
+    for name in ("heart_disease.yaml", "diabetes_nhanes.yaml"):
         shutil.copy(os.path.join(_CONFIGS_DIR, name), directory)
     for filename, cfg in extra.items():
         with open(os.path.join(directory, filename), "w") as f:
@@ -202,7 +203,7 @@ class TestRegistry:
 
     def test_builtin_configs_dispatch_by_family(self, real_router):
         assert real_router._get_loader("heart_disease").family == "glm_ivap_conformal"
-        assert real_router._get_loader("diabetes").family == "stacking_ensemble"
+        assert real_router._get_loader("diabetes_nhanes").family == "ebm_platt_conformal"
 
     def test_sklearn_pipeline_still_loads_and_predicts(self, tmp_path_factory):
         """Reverting heart to the previous XGBoost model must stay a two-line
@@ -301,7 +302,7 @@ class TestBuiltinFamiliesInterface:
 class TestDemoLogregThroughRealApp:
     def test_registered_with_generic_explainer(self, demo_router):
         assert set(demo_router.get_available_diseases()) == {
-            "heart_disease", "diabetes", "demo_logreg",
+            "heart_disease", "diabetes_nhanes", "demo_logreg",
         }
         backend = demo_router._get_loader("demo_logreg")
         assert backend.family == "sklearn_generic"

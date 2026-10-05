@@ -660,7 +660,12 @@ async def trigger_retrain(
 ) -> RetrainResponse:
     import traceback as _tb
     from backend.active_learning.retrain import run_retrain_pipeline
+    from backend.retired_diseases import reject_if_retired
 
+    # Outside the try below, which turns any exception into a 200 "error".
+    # W-08: for a retired disease with no config, the pipeline would fall to the
+    # legacy retrain_xgb path and overwrite the old weights still in the image.
+    reject_if_retired(body.disease)
     try:
         result = await run_retrain_pipeline(db, body.disease, body.min_samples)
     except Exception as exc:

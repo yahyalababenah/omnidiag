@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.auth.rbac import require_role, ADMIN_ROLES
+from backend.retired_diseases import reject_if_retired
 from backend.database import get_db
 from backend.monitoring.drift import get_monitor, drift_unavailable_reason
 from backend.monitoring.metrics import get_metrics_response
@@ -57,6 +58,7 @@ async def drift_status(
     disease: str,
     _: object = Depends(require_role(*ADMIN_ROLES)),
 ) -> DriftStatusResponse:
+    reject_if_retired(disease)  # a retired module has no live model to monitor
     monitor = get_monitor(disease)
     return DriftStatusResponse(
         disease=disease,
@@ -92,6 +94,7 @@ async def run_drift(
     _: object = Depends(require_role(*ADMIN_ROLES)),
     db: AsyncSession = Depends(get_db),
 ) -> DriftStatusResponse:
+    reject_if_retired(disease)
     # Previously imported `async_session_maker` from backend.database — a name
     # that does not exist there (the factory is AsyncSessionLocal), so every
     # call to this route raised ImportError. The session now comes from the
@@ -195,6 +198,7 @@ async def drift_html_report(
     disease: str,
     _: object = Depends(require_role(*ADMIN_ROLES)),
 ) -> HTMLResponse:
+    reject_if_retired(disease)
     monitor = get_monitor(disease)
     if monitor.last_report is None:
         return HTMLResponse(

@@ -231,26 +231,28 @@ def test_heart_counterfactual_policy_is_unchanged():
 
 # ── Task 3: side-by-side deployment ──────────────────────────────────────
 
-def test_both_diabetes_modules_are_configured():
-    """The BRFSS module is NOT deprecated. Both configs must load and declare
-    different families, different keys and different scales."""
-    with open("configs/diabetes.yaml") as handle:
-        brfss = yaml.safe_load(handle)
+def test_nhanes_is_the_configured_diabetes_module():
+    """Gate B3 retired BRFSS: its config is archived and its name answers 410.
+    NHANES is the one diabetes module left in configs/."""
+    import os
+    from backend.retired_diseases import RETIRED_DISEASES
+
     with open(CONFIG_PATH) as handle:
         nhanes = yaml.safe_load(handle)
-
-    assert brfss["disease"]["name"] == "diabetes"
     assert nhanes["disease"]["name"] == "diabetes_nhanes"
-    assert brfss["model"]["family"] == "stacking_ensemble"
     assert nhanes["model"]["family"] == "ebm_platt_conformal"
+    assert not os.path.exists("configs/diabetes.yaml")
+    assert RETIRED_DISEASES["diabetes"]["replaced_by"] == "diabetes_nhanes"
 
 
+@pytest.mark.brfss
 def test_the_two_modules_share_no_weights(config):
     with open("configs/diabetes.yaml") as handle:
         brfss = yaml.safe_load(handle)
     assert brfss["model"]["weights_path"] != config["model"]["weights_path"]
 
 
+@pytest.mark.brfss
 def test_brfss_keeps_its_threshold_and_bands():
     """Whatever Phase 9 does, the legacy module keeps deciding the way it always
     has. Its threshold and bands are not ours to retire yet."""

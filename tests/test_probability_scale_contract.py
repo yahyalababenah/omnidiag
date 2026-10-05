@@ -396,7 +396,10 @@ class TestScaleOfResult:
 
     def test_shipped_configs(self):
         import yaml
-        with open(os.path.join(ROOT, "configs", "diabetes.yaml")) as f:
+        # BRFSS, the only module on the corrected scale, is retired (gate B3);
+        # every module still shipped reports on its own model's scale.
+        for name in ("heart_disease.yaml", "diabetes_nhanes.yaml"):
+            with open(os.path.join(ROOT, "configs", name)) as f:
+                assert scale_of_disease_config(yaml.safe_load(f)) is Scale.RAW, name
+        with open(os.path.join(ROOT, "archive", "post_expo_2026-10", "configs", "diabetes.yaml")) as f:
             assert scale_of_disease_config(yaml.safe_load(f)) is Scale.CORRECTED
-        with open(os.path.join(ROOT, "configs", "heart_disease.yaml")) as f:
-            assert scale_of_disease_config(yaml.safe_load(f)) is Scale.RAW
