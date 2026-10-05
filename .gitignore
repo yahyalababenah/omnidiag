@@ -36,10 +36,9 @@ experiment_files/
 # ============== CLEANUP: Data files ==============
 *.csv
 
-# Gate 8.7c: build_drift_reference.py reads this file unconditionally to build
-# the diabetes drift-reference profile, and that step runs at Docker build time
-# on HF (Dockerfile line 66). HF builds from the pushed git tree, so the file
-# must be tracked, not merely present on disk.
+# Gate 8.7c tracked this file because build_drift_reference.py read it at Docker
+# build time. Since Gate B2 (BRFSS retirement) nothing at build time reads it; it
+# stays tracked only until the Docker/data gate removes it with the module.
 !data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv
 
 # ولكن استبعاد النسخ الاحتياطية القديمة للمعالجات

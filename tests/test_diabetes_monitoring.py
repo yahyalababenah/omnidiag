@@ -69,8 +69,8 @@ def test_no_reweighting_and_it_says_why(profile):
 
 
 def test_the_profile_states_it_cannot_be_rebuilt_in_repo(profile):
-    """scripts/build_drift_reference.py --verify rebuilds heart and BRFSS from
-    committed CSVs. This one's source is 79 MB of raw survey files that are not
+    """scripts/build_drift_reference.py --verify rebuilds the heart profile from
+    a committed CSV. This one's source is 79 MB of raw survey files that are not
     committed (F9-17), so the profile has to say so rather than look rebuildable
     and silently never be checked."""
     assert profile["source"]["rebuildable_in_repo"] is False
@@ -79,7 +79,7 @@ def test_the_profile_states_it_cannot_be_rebuilt_in_repo(profile):
 
 def test_the_shared_builder_was_not_touched():
     """Adding this disease to scripts/build_drift_reference.py would break every
-    run for heart and BRFSS, whose CI rebuilds and diffs them."""
+    image build: --verify rebuilds what it lists, and this source is not committed."""
     source = Path("scripts/build_drift_reference.py").read_text()
     assert "diabetes_nhanes" not in source
 

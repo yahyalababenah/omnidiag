@@ -10,8 +10,8 @@ WHY A PROFILE AND NOT THE CSV AT RUNTIME
 2. A reference read from a CSV changes whenever the CSV changes, silently. The
    profile carries the source's sha256, so a changed source is an explicit
    failure rather than drift that appears out of nowhere.
-3. The diabetes CSV is 6.3 MB. Reading it per drift run to recompute a fixed
-   distribution is waste.
+3. Reading a training CSV on every drift run to recompute a fixed distribution
+   is waste.
 
 The profile is committed, and rebuilt with --verify at image build time: if the
 regenerated profile differs from the committed one, the build fails. Same shape
@@ -36,28 +36,15 @@ and reported separately: blanking any of them changes the decision for exactly
 zero of the 920 patients (Gate 8.3), so letting them raise the drift share would
 raise alarms nothing can act on.
 
-DIABETES: REWEIGHTED TO THE DECLARED DEPLOYMENT PREVALENCE
-----------------------------------------------------------
-The only BRFSS file in this repository is the 50/50 balanced sample, and a drift
-reference built on it compares real people against a sample balanced by
-construction -- every feature correlated with diabetes reads as drifted.
-
-The unbalanced file is not here, and no new data is downloaded for this. Instead
-each feature's reference distribution is reweighted to the prevalence the model
-already deploys against:
-
-    P_ref(x) = p * P(x | y=1) + (1 - p) * P(x | y=0),  p = prevalence_deploy
-
-p comes from configs/diabetes.yaml (`prevalence_deploy`), the same number
-predict() already corrects its probabilities onto, so the drift reference and
-the probability scale end up on one prevalence.
-
-DECLARED LIMIT: that number is Jordan's diabetes prevalence, not BRFSS 2015's own
-(~14 %). The reference is reweighted to the prevalence the model is DEPLOYED
-against, which is a choice, and it is recorded in the profile itself.
-
-Nothing else in the diabetes path is touched: not the model, not the threshold
-(0.108184), not the prevalence correction.
+OTHER MODULES: NOT BUILT HERE
+-----------------------------
+This script builds the heart profile only. The BRFSS diabetes profile
+(models/diabetes/drift_reference.json) is frozen as committed while that module
+is retired, and is no longer rebuilt or verified at image build: its source CSV
+and config are on their way out of the repository. The NHANES dysglycaemia
+module's profile is built in the research repository from raw survey files that
+are not committed (F9-17), and says so in its own `source` block; adding that
+module here would make every image build depend on files it does not have.
 """
 from __future__ import annotations
 
@@ -72,7 +59,6 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -83,7 +69,6 @@ from backend.monitoring.drift_stats import (  # noqa: E402
 )
 
 HEART_CSV = ROOT / "data/heart_disease/processed/uci_heart_by_site.csv"
-DIABETES_CSV = ROOT / "data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv"
 N_BINS = 10
 
 
@@ -165,112 +150,6 @@ def heart_profile(csv_path: Optional[Path] = None) -> Dict[str, Any]:
     }
 
 
-def diabetes_profile(csv_path: Optional[Path] = None) -> Dict[str, Any]:
-    cfg = yaml.safe_load(open(ROOT / "configs/diabetes.yaml"))
-    model_cfg = cfg.get("model", cfg)
-    p_deploy = _find_key(cfg, "prevalence_deploy")
-    p_train = _find_key(cfg, "prevalence_train")
-    if p_deploy is None or p_train is None:
-        raise SystemExit("prevalence_deploy / prevalence_train not found in configs/diabetes.yaml")
-
-    csv_path = csv_path or DIABETES_CSV
-    frame = pd.read_csv(csv_path)
-    target = "Diabetes_binary"
-    feats = cfg["features"]
-    binary, numerical = list(feats["binary_columns"]), list(feats["numerical_columns"])
-
-    pos = frame[frame[target] == 1]
-    neg = frame[frame[target] == 0]
-    n_total = len(frame)
-    monitored: Dict[str, Any] = {}
-
-    for f in numerical:
-        # Edges from the pooled sample: the bins must cover both classes' ranges.
-        edges = quantile_edges(frame[f].tolist(), N_BINS)
-        c_pos = np.asarray(bin_counts(pos[f].tolist(), edges), dtype=float)
-        c_neg = np.asarray(bin_counts(neg[f].tolist(), edges), dtype=float)
-        mixed = _reweight(c_pos, c_neg, p_deploy, n_total)
-        # The KS reference sample is reweighted the same way, on the feature's own
-        # distinct values: same people, reweighted to the deployment prevalence.
-        uniq = np.unique(frame[f].dropna().to_numpy(dtype=float))
-        u_pos = np.array([int((pos[f] == v).sum()) for v in uniq], dtype=float)
-        u_neg = np.array([int((neg[f] == v).sum()) for v in uniq], dtype=float)
-        u_mixed = _reweight(u_pos, u_neg, p_deploy, n_total)
-        keep = [(v, c) for v, c in zip(uniq, u_mixed) if c > 0]
-        monitored[f] = {"kind": "numeric",
-                        "edges": [None if not np.isfinite(e) else float(e) for e in edges],
-                        "counts": mixed, "n": int(sum(mixed)), "n_missing": 0,
-                        "ecdf": {"values": [float(v) for v, _ in keep],
-                                 "counts": [int(c) for _, c in keep]},
-                        "note": "counts and ecdf both reweighted to prevalence_deploy; "
-                                "last bin is missing"}
-    for f in binary:
-        cats = sorted({str(v) for v in frame[f].dropna().unique()})
-        c_pos = np.asarray([int((pos[f].astype(str) == c).sum()) for c in cats], dtype=float)
-        c_neg = np.asarray([int((neg[f].astype(str) == c).sum()) for c in cats], dtype=float)
-        mixed = _reweight(c_pos, c_neg, p_deploy, n_total)
-        monitored[f] = {"kind": "categorical", "categories": cats, "counts": mixed,
-                        "n": int(sum(mixed)), "n_missing": 0,
-                        "note": "counts reweighted to prevalence_deploy"}
-
-    return {
-        "disease": "diabetes",
-        "space": "raw BRFSS columns (no encoding inversion exists for this module)",
-        "source": {"path": str(csv_path.relative_to(ROOT)) if ROOT in csv_path.parents
-                          else str(csv_path),
-                   "sha256": sha256(csv_path), "rows": int(n_total),
-                   "note": "the 50/50 BALANCED sample — the only BRFSS file in this repository"},
-        "reweighting": {
-            "applied": True,
-            "formula": "P_ref(x) = p * P(x | y=1) + (1 - p) * P(x | y=0)",
-            "prevalence_of_sample": float(p_train),
-            "prevalence_of_reference": float(p_deploy),
-            "prevalence_source": "configs/diabetes.yaml: prevalence_deploy",
-            "why": ("a reference built on the 50/50 sample compares real people against a "
-                    "sample balanced by construction, so every feature correlated with "
-                    "diabetes reads as drifted"),
-            "declared_limit": (f"{p_deploy} is Jordan's diabetes prevalence, which is what this "
-                               "model deploys against. It is NOT BRFSS 2015's own prevalence "
-                               "(~14%). The unbalanced BRFSS file is not in this repository and "
-                               "no new data was downloaded for this."),
-            "unchanged": "the diabetes model, its threshold (0.108184) and its prevalence "
-                         "correction are untouched; this is a monitoring reference only",
-        },
-        "monitored": monitored,
-        "profiled_but_not_monitored": {},
-        "not_monitored_reason": "",
-    }
-
-
-def _reweight(c_pos: np.ndarray, c_neg: np.ndarray, p: float, n_total: int) -> List[int]:
-    """Mix two class-conditional count vectors at prevalence p, keeping the total n.
-
-    Kept at the original n so the reference stays a distribution of a stated size
-    rather than an arbitrary one: it is the same people, reweighted.
-    """
-    pp = c_pos / c_pos.sum() if c_pos.sum() else np.zeros_like(c_pos)
-    pn = c_neg / c_neg.sum() if c_neg.sum() else np.zeros_like(c_neg)
-    mixed = (p * pp + (1 - p) * pn) * n_total
-    out = np.floor(mixed).astype(int)
-    # Hand the rounding remainder to the largest fractions so the total is exact.
-    short = int(n_total - out.sum())
-    if short > 0:
-        for i in np.argsort(-(mixed - out))[:short]:
-            out[i] += 1
-    return out.tolist()
-
-
-def _find_key(node: Any, key: str) -> Any:
-    if isinstance(node, dict):
-        if key in node:
-            return node[key]
-        for v in node.values():
-            found = _find_key(v, key)
-            if found is not None:
-                return found
-    return None
-
-
 def canonical(profile: Dict[str, Any]) -> str:
     """The profile without its timestamp, for comparing two builds."""
     return json.dumps({k: v for k, v in profile.items() if k != "built_at"},
@@ -286,11 +165,10 @@ def _rule() -> Dict[str, Any]:
 
 
 def build_profiles(sources: Optional[Dict[str, Path]] = None) -> Dict[str, Dict[str, Any]]:
-    """Build both profiles. `sources` lets a test point at a tampered CSV without
-    touching the real one -- see verify_profiles() and its test."""
+    """Build the heart profile. `sources` lets a test point at a tampered CSV
+    without touching the real one -- see verify_profiles() and its test."""
     src = sources or {}
-    built = {"heart_disease": heart_profile(src.get("heart_disease")),
-             "diabetes": diabetes_profile(src.get("diabetes"))}
+    built = {"heart_disease": heart_profile(src.get("heart_disease"))}
     rule = _rule()
     for profile in built.values():
         profile["rule"] = rule
