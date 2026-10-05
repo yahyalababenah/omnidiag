@@ -178,9 +178,10 @@ async def demo_client(demo_app, db_tables):
 
 class TestRegistry:
     def test_builtin_families_registered(self):
-        assert {"sklearn_pipeline", "stacking_ensemble", "sklearn_generic"} <= set(
-            registered_families()
-        )
+        families = set(registered_families())
+        assert {"sklearn_pipeline", "sklearn_generic", "glm_ivap_conformal",
+                "ebm_platt_conformal"} <= families
+        assert "stacking_ensemble" not in families  # removed with BRFSS (gate B4)
 
     def test_unknown_family_lists_registered_ones(self):
         with pytest.raises(UnknownModelFamilyError) as exc:

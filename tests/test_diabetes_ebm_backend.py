@@ -53,7 +53,8 @@ def test_family_registers_by_existing():
 
 
 def test_adding_this_family_did_not_disturb_the_others():
-    for family in ("glm_ivap_conformal", "sklearn_pipeline", "stacking_ensemble"):
+    # stacking_ensemble went with BRFSS diabetes (gate B4).
+    for family in ("glm_ivap_conformal", "sklearn_pipeline"):
         assert family in registered_families()
 
 

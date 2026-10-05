@@ -43,7 +43,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Every backend module that reads, compares or forwards a diabetes probability.
 # Heart-only modules are intentionally absent.
 SCANNED_MODULES = (
-    "backend/ensemble_loader.py",
     "backend/counterfactual_generator.py",
     "backend/active_learning/sampler.py",
     "backend/llm/report_generator.py",

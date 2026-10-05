@@ -82,8 +82,6 @@ VISIT_INTERVAL_DAYS = 90
 HISTORY_LEVERS: Dict[str, Dict[str, Any]] = {
     # Total cholesterol, mg/dL — higher at older visits.
     "heart_disease": {"field": "Cholesterol", "step": 18, "minimum": 100, "maximum": 400},
-    # BMI — higher at older visits.
-    "diabetes": {"field": "BMI", "step": 2, "minimum": 18, "maximum": 60},
     # NHANES dysglycaemia module: BMI in kg/m2, higher at older visits. It moves
     # only BMXBMI, not ADIPOSITY_BAND, so the earlier visits are synthetic history
     # in the same sense as the other two modules'.

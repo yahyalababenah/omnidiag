@@ -453,10 +453,11 @@ class TestHeartNonRegression:
         assert out["diagnosis"] == golden["diagnosis"]
         assert out["confidence"] == pytest.approx(golden["confidence"], abs=1e-6)
 
-    def test_heart_loader_is_not_the_ensemble_loader(self, real_router):
-        from backend.ensemble_loader import EnsembleModelLoader
+    def test_heart_is_served_by_its_own_backend(self, real_router):
+        # The ensemble loader this used to rule out was deleted with BRFSS (gate B4).
+        from backend.model_backends.heart_glm_conformal import HeartGlmConformalBackend
 
-        assert not isinstance(real_router._get_loader("heart_disease"), EnsembleModelLoader)
+        assert isinstance(real_router._get_loader("heart_disease"), HeartGlmConformalBackend)
 
     @pytest.mark.parametrize("bad_oldpeak", ["inf", "-inf", "nan"], ids=["inf", "-inf", "nan"])
     async def test_batch_isolates_a_row_with_inf_or_nan_oldpeak(self, live_client, doctor_token, bad_oldpeak):

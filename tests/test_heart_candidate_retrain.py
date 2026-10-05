@@ -612,11 +612,14 @@ class TestRoutingIsByModelFamily:
 
         assert _model_family("heart_disease") in CANDIDATE_FAMILIES
 
-    def test_diabetes_is_not(self):
-        """The diabetes path is untouched by this gate."""
+    def test_nhanes_is_not(self):
+        """BRFSS diabetes is retired (gate B3) and has no family at all; NHANES is
+        the live module that is not on the candidate path."""
         from backend.active_learning.retrain import CANDIDATE_FAMILIES, _model_family
 
-        assert _model_family("diabetes") not in CANDIDATE_FAMILIES
+        assert _model_family("diabetes_nhanes") == "ebm_platt_conformal"
+        assert _model_family("diabetes_nhanes") not in CANDIDATE_FAMILIES
+        assert _model_family("diabetes") is None
 
     def test_the_branch_reads_the_config_and_not_the_disease_name(self):
         """
@@ -639,16 +642,46 @@ class TestRoutingIsByModelFamily:
         assert "candidate_built_not_promoted" in source
         assert "promote" not in source.replace("candidate_built_not_promoted", "")
 
-    def test_the_xgb_path_is_unchanged_for_the_families_that_use_it(self):
+    @pytest.mark.parametrize("disease,family", [
+        ("diabetes_nhanes", None),                 # its own config: ebm_platt_conformal
+        ("heart_disease", "sklearn_pipeline"),     # the two-line revert to the old XGBoost
+    ], ids=["nhanes", "heart-revert-sklearn_pipeline"])
+    async def test_every_other_family_is_refused_before_reading(self, monkeypatch, disease, family):
         """
-        This gate routes heart away from `retrain_xgb`; it does not rewrite it.
-        The diabetes path must still reach exactly the code it reached before.
+        Gate B4 removed `retrain_xgb`, the writer every non-candidate family used
+        to reach: no live module read what it wrote (the W-08 pattern). Such a
+        family is now refused with a stated reason, before a single review row
+        is read -- which is also what the admin page displays (status + reason).
         """
         from backend.active_learning import retrain
 
-        source = code_of(retrain.retrain_xgb)
-        assert "omni_diag_xgb_optimized.pkl" in source
-        assert "xgb_model=model" in source
+        if family is not None:   # simulate configs/heart_disease.yaml reverted
+            real = retrain.load_disease_config
+
+            def reverted(d):
+                cfg = real(d)
+                if d == disease:
+                    cfg = {**cfg, "model": {**cfg["model"], "family": family}}
+                return cfg
+
+            monkeypatch.setattr(retrain, "load_disease_config", reverted)
+        expected = family or "ebm_platt_conformal"
+
+        def boom(*a, **k):
+            raise AssertionError("an unsupported family read samples or built a model")
+
+        monkeypatch.setattr(retrain, "get_annotated_samples", boom)
+        monkeypatch.setattr(retrain, "retrain_candidate", boom)
+        result = await retrain.run_retrain_pipeline(None, disease, 1)
+        assert result["status"] == "unsupported"
+        assert result["reason"] == f"retrain not yet supported for {expected}"
+        assert result["samples_used"] == 0
+
+    def test_the_legacy_xgboost_writer_is_gone(self):
+        from backend.active_learning import retrain
+
+        assert not hasattr(retrain, "retrain_xgb")
+        assert "omni_diag_xgb_optimized.pkl" not in code_of(retrain.run_retrain_pipeline)
 
 
 # ── The candidate bundle is a working bundle ─────────────────────────────────

@@ -289,14 +289,6 @@ class PredictResponse(BaseModel):
     risk_bands_raw: Optional[Dict[str, float]] = Field(
         None, description="The same bands on the training-prior scale"
     )
-    model_contributions: Optional[Dict[str, float]] = Field(
-        None, description="Per-base-model probability, training-prior scale (uncorrected)"
-    )
-    ensemble_type: Optional[str] = Field(None, description="'stacking' or 'voting'")
-    ensemble_variance: Optional[float] = Field(
-        None, description="Std of base-model probabilities (training-prior scale)", ge=0.0
-    )
-    model_agreement: Optional[str] = Field(None, description="'high' | 'moderate' | 'low'")
     data_completeness_warning: Optional[str] = Field(
         None,
         description=(
@@ -381,102 +373,17 @@ class ExplainResponse(BaseModel):
         ),
         ge=0.0
     )
-    ensemble_variance: Optional[float] = Field(
-        None,
-        description="Standard deviation of base model probabilities (model disagreement)",
-        ge=0.0
-    )
-    model_agreement: Optional[str] = Field(
-        None,
-        description="Qualitative model agreement: 'high', 'moderate', or 'low'"
-    )
     counterfactuals: Optional[List[Counterfactual]] = Field(
         None,
         description="Diverse counterfactual scenarios for clinical actionability"
     )
 
 
-# =============================================================================
-# Diabetes Schema
-# =============================================================================
-
-class DiabetesInput(BaseModel):
-    """
-    Patient input schema for Diabetes Risk Assessment.
-
-    All 21 fields correspond to the CDC BRFSS 2015 Health Indicators dataset.
-    Binary fields (0/1) and continuous/ordinal fields are validated with
-    appropriate ranges.
-
-    **Auto-computed features (no input needed):**
-    When a prediction is made, the system automatically computes:
-        - BMI_Age_Interaction, Health_Index, Lifestyle_Score, SES_Composite
-        - Diabetes_Clinical_Risk
-
-    These are calculated server-side; you only need to provide the 21 base fields.
-    """
-    # Binary (0/1) risk factors
-    HighBP: int = Field(..., description="High blood pressure (1=Yes, 0=No)", ge=0, le=1)
-    HighChol: int = Field(..., description="High cholesterol (1=Yes, 0=No)", ge=0, le=1)
-    CholCheck: int = Field(..., description="Cholesterol check in past 5 years (1=Yes, 0=No)", ge=0, le=1)
-    Smoker: int = Field(..., description="Smoked at least 100 cigarettes in life (1=Yes, 0=No)", ge=0, le=1)
-    Stroke: int = Field(..., description="Ever told you had a stroke (1=Yes, 0=No)", ge=0, le=1)
-    HeartDiseaseorAttack: int = Field(..., description="Coronary heart disease or MI (1=Yes, 0=No)", ge=0, le=1)
-    PhysActivity: int = Field(..., description="Physical activity in past 30 days (1=Yes, 0=No)", ge=0, le=1)
-    Fruits: int = Field(..., description="Consume fruit 1+ times per day (1=Yes, 0=No)", ge=0, le=1)
-    Veggies: int = Field(..., description="Consume vegetables 1+ times per day (1=Yes, 0=No)", ge=0, le=1)
-    HvyAlcoholConsump: int = Field(..., description="Heavy drinkers: adult men >14, women >7 per week (1=Yes, 0=No)", ge=0, le=1)
-    AnyHealthcare: int = Field(..., description="Have any form of health insurance (1=Yes, 0=No)", ge=0, le=1)
-    NoDocbcCost: int = Field(..., description="Could not see doctor due to cost (1=Yes, 0=No)", ge=0, le=1)
-    DiffWalk: int = Field(..., description="Serious difficulty walking/climbing stairs (1=Yes, 0=No)", ge=0, le=1)
-    Sex: int = Field(..., description="Sex: 1=Male, 0=Female", ge=0, le=1)
-
-    # Continuous / ordinal health indicators
-    BMI: float = Field(..., description="Body Mass Index", ge=10.0, le=100.0)
-    MentHlth: int = Field(..., description="Days of poor mental health in past 30", ge=0, le=30)
-    PhysHlth: int = Field(..., description="Days of poor physical health in past 30", ge=0, le=30)
-    GenHlth: int = Field(..., description="General health: 1=Excellent, 2=Very Good, 3=Good, 4=Fair, 5=Poor", ge=1, le=5)
-    Age: int = Field(..., description="Age category: 1=18-24 ... 13=80+ (BRFSS coding)", ge=1, le=13)
-    Education: int = Field(..., description="Education level: 1=None to 6=College graduate", ge=1, le=6)
-    Income: int = Field(..., description="Income scale: 1=<$10K to 8=>$75K", ge=1, le=8)
-
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "HighBP": 1,
-            "HighChol": 1,
-            "CholCheck": 1,
-            "BMI": 30.0,
-            "Smoker": 1,
-            "Stroke": 0,
-            "HeartDiseaseorAttack": 0,
-            "PhysActivity": 0,
-            "Fruits": 0,
-            "Veggies": 0,
-            "HvyAlcoholConsump": 0,
-            "AnyHealthcare": 1,
-            "NoDocbcCost": 0,
-            "GenHlth": 3,
-            "MentHlth": 10,
-            "PhysHlth": 5,
-            "DiffWalk": 0,
-            "Sex": 1,
-            "Age": 7,
-            "Education": 4,
-            "Income": 4,
-        }
-    })
-
-
-# =============================================================================
-# Schema Registry
-# =============================================================================
-# Maps disease names (from config) to their Pydantic input schemas.
 # A new disease can instead declare `schema: {module, class}` in its YAML;
 # backend/router.py then calls register_schema() for it.
 
 DISEASE_SCHEMA_REGISTRY: Dict[str, Type[BaseModel]] = {
     "heart_disease": HeartDiseaseInput,
-    "diabetes": DiabetesInput,
 }
 
 

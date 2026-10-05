@@ -119,7 +119,10 @@ def main() -> int:
     args = parser.parse_args()
 
     base_url = args.base_url.rstrip("/")
-    patients = load_demo_patients()
+    # A retired module answers 410 by design; warming it would only count failures.
+    sys.path.insert(0, ROOT)
+    from backend.retired_diseases import is_retired
+    patients = {d: p for d, p in load_demo_patients().items() if not is_retired(d)}
 
     endpoints = ["predict", "explain"]
     if not args.skip_counterfactuals:

@@ -164,43 +164,6 @@ CAD_PATIENTS = [
 ]
 
 
-# ── Real model output for seeded diabetes rows ────────────────────────────────
-_DIABETES_LOADER = None
-
-
-def _score_diabetes(input_features: dict) -> dict:
-    """
-    Score one seeded diabetes patient with the shipped ensemble.
-
-    Returns prediction, confidence (prevalence-corrected, exactly as /predict
-    returns it), diagnosis and the probability_scale to stamp on the row.
-
-    Deliberately has no fallback: if the model cannot be loaded, seeding
-    fails loudly instead of inventing a number. A fabricated probability in
-    a clinical demo database is worse than no row.
-    """
-    global _DIABETES_LOADER
-    if _DIABETES_LOADER is None:
-        import yaml
-        from backend.ensemble_loader import EnsembleModelLoader
-
-        cfg_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "configs", "diabetes.yaml",
-        )
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            _DIABETES_LOADER = EnsembleModelLoader(yaml.safe_load(f))
-
-    from backend.probability_scale import scale_of_result
-
-    result = _DIABETES_LOADER.predict(input_features)
-    return {
-        "prediction": int(result["prediction"]),
-        "confidence": float(result["confidence"]),
-        "diagnosis": result["diagnosis"],
-        "probability_scale": scale_of_result(result).value,
-    }
-
 _HEART_LOADER = None
 
 
@@ -208,8 +171,8 @@ def _score_heart(input_features: dict) -> dict:
     """
     Score one seeded CAD patient with the shipped model.
 
-    The same rule the diabetes seeder already followed, applied to heart, which
-    it was not: the three CAD patients carried hardcoded `confidence` literals
+    A seeded row must be the model's own output, not a literal. The three CAD
+    patients used not to be: the three CAD patients carried hardcoded `confidence` literals
     (0.72, 0.91, 0.84) and a "Positive" / "Negative" label. Those belong to
     heart_full_tuned.pkl, which has not shipped since Gate 8.1. The shipped model
     scores the same three patients at 0.476, 0.465 and 0.087 and calls two of
@@ -219,7 +182,7 @@ def _score_heart(input_features: dict) -> dict:
     Also returns the conformal decision and its interval, so a seeded row is
     indistinguishable from one written by /predict.
 
-    Deliberately has no fallback, for the same reason as diabetes: a fabricated
+    Deliberately has no fallback: a fabricated
     probability in a clinical demo database is worse than no row.
     """
     global _HEART_LOADER
@@ -243,93 +206,6 @@ def _score_heart(input_features: dict) -> dict:
         "probability_lower": result.get("probability_lower"),
         "probability_upper": result.get("probability_upper"),
     }
-
-
-# Diabetes patients.
-#
-# Only the INPUTS are fixed here. The model output stored for each patient is
-# produced at seed time by EnsembleModelLoader.predict() — the same code path
-# /api/v4/diabetes/predict uses — so a seeded row always matches what the
-# running model would say for that patient, on the scale it reports.
-#
-# These used to be hand-written (0.87 and 0.93). Those were raw-prior-looking
-# numbers with no scale marker; under the prevalence-corrected contract the
-# same two patients score ~0.3–0.5, and a demo database seeded with 0.9x
-# values contradicted every live prediction beside it.
-DM_PATIENTS = [
-    {
-        "mrn": "DM-001",
-        "full_name": "Layla Mansour",
-        "date_of_birth": date(1966, 3, 10),
-        "gender": "F",
-        "contact_email": "layla.mansour@example.com",
-        "prediction": {
-            "disease": "diabetes",
-            "input_features": {
-                "HighBP": 1,
-                "HighChol": 1,
-                "CholCheck": 1,
-                "BMI": 32.4,
-                "Smoker": 0,
-                "Stroke": 0,
-                "HeartDiseaseorAttack": 0,
-                "PhysActivity": 0,
-                "Fruits": 0,
-                "Veggies": 0,
-                "HvyAlcoholConsump": 0,
-                "AnyHealthcare": 1,
-                "NoDocbcCost": 0,
-                "GenHlth": 3,
-                "MentHlth": 12,
-                "PhysHlth": 18,
-                "DiffWalk": 1,
-                "Sex": 0,
-                "Age": 10,
-                "Education": 3,
-                "Income": 4,
-            },
-            # prediction / confidence / diagnosis are NOT written here: they
-            # are computed by the real model at seed time — see
-            # _score_diabetes() below.
-        },
-    },
-    {
-        "mrn": "DM-002",
-        "full_name": "Mohammed Al-Sayed",
-        "date_of_birth": date(1960, 7, 28),
-        "gender": "M",
-        "contact_email": "mohammed.alsayed@example.com",
-        "prediction": {
-            "disease": "diabetes",
-            "input_features": {
-                "HighBP": 1,
-                "HighChol": 1,
-                "CholCheck": 1,
-                "BMI": 28.7,
-                "Smoker": 1,
-                "Stroke": 0,
-                "HeartDiseaseorAttack": 1,
-                "PhysActivity": 0,
-                "Fruits": 1,
-                "Veggies": 0,
-                "HvyAlcoholConsump": 0,
-                "AnyHealthcare": 1,
-                "NoDocbcCost": 0,
-                "GenHlth": 4,
-                "MentHlth": 8,
-                "PhysHlth": 22,
-                "DiffWalk": 1,
-                "Sex": 1,
-                "Age": 11,
-                "Education": 2,
-                "Income": 3,
-            },
-            # prediction / confidence / diagnosis are NOT written here: they
-            # are computed by the real model at seed time — see
-            # _score_diabetes() below.
-        },
-    },
-]
 
 
 # ── Main Seeder ─────────────────────────────────────────────────────────────
@@ -466,55 +342,8 @@ async def seed_database(db_url: str) -> None:
                 else:
                     print(f"  ✓ CAD patient already exists: {pat_data['full_name']}")
 
-            # ── 5. Seed Diabetes patients ─────────────────────────────────
-            # BRFSS diabetes is retired (backend/retired_diseases.py): its config
-            # is archived, so it cannot be scored, and a seeded row must come from
-            # the real model. Existing rows are left as they are.
-            from backend.retired_diseases import is_retired
-            for pat_data in ([] if is_retired("diabetes") else DM_PATIENTS):
-                result = await session.execute(
-                    text("SELECT id FROM patients WHERE mrn = :mrn"),
-                    {"mrn": pat_data["mrn"]},
-                )
-                existing = result.scalar_one_or_none()
-                if existing is None:
-                    patient_id = str(uuid.uuid4())
-                    patient = Patient(
-                        id=patient_id,
-                        mrn=pat_data["mrn"],
-                        full_name=pat_data["full_name"],
-                        date_of_birth=pat_data["date_of_birth"],
-                        gender=pat_data["gender"],
-                        contact_email=pat_data["contact_email"],
-                        created_by=doctor_id,
-                    )
-                    session.add(patient)
-                    await session.flush()
-
-                    # Create prediction from the real model, not a literal
-                    pred = pat_data["prediction"]
-                    scored = _score_diabetes(pred["input_features"])
-                    prediction = Prediction(
-                        id=str(uuid.uuid4()),
-                        patient_id=patient_id,
-                        disease=pred["disease"],
-                        input_features=pred["input_features"],
-                        prediction=scored["prediction"],
-                        confidence=scored["confidence"],
-                        probability_scale=scored["probability_scale"],
-                        diagnosis=scored["diagnosis"],
-                        created_by=doctor_id,
-                    )
-                    session.add(prediction)
-                    stats["patients"] += 1
-                    stats["predictions"] += 1
-                    print(
-                        f"  ➕ Created DM patient: {pat_data['full_name']} ({pat_data['mrn']}) "
-                        f"— model: {scored['diagnosis']}, "
-                        f"{scored['confidence']:.1%} ({scored['probability_scale']})"
-                    )
-                else:
-                    print(f"  ✓ DM patient already exists: {pat_data['full_name']}")
+            # (BRFSS diabetes patients were seeded here; that module is retired —
+            # backend/retired_diseases.py — and gate B4 removed its seeding.)
 
         # ── Commit is handled by `async with session.begin()` ─────────────
 

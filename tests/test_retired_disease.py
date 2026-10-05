@@ -177,7 +177,9 @@ async def test_retrain_never_reaches_the_legacy_xgboost_writer(monkeypatch):
         raise AssertionError("reached past the retired-disease guard")
 
     monkeypatch.setattr(retrain, "get_annotated_samples", boom)
-    monkeypatch.setattr(retrain, "retrain_xgb", boom)
+    monkeypatch.setattr(retrain, "retrain_candidate", boom)
+    # retrain_xgb itself was removed in gate B4; nothing that writes is reachable.
+    assert not hasattr(retrain, "retrain_xgb")
     with pytest.raises(HTTPException) as err:
         await retrain.run_retrain_pipeline(None, RETIRED, 1)
     assert err.value.status_code == 410

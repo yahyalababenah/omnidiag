@@ -217,8 +217,9 @@ def test_the_live_weights_path_is_never_written(tmp_path):
 
 
 def test_the_shared_retrain_module_is_untouched():
-    """`retrain.py` hard-codes an XGBoost path that does not exist for this module,
-    and the heart cycle already fails on the same line. It is not edited here."""
+    """`retrain.py` names no module: it routes by family. Since gate B4 a family
+    outside the candidate path (this one included) gets a generic "unsupported",
+    never a branch written for it."""
     import inspect
 
     from backend.active_learning import retrain

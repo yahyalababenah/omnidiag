@@ -110,25 +110,20 @@ class TestLoggingNeverBreaksTheBuild:
 
 
 class TestRetrainIsNotClaimedToWork:
-    def test_the_broken_retrain_path_is_still_the_only_other_caller(self):
+    def test_the_only_retrain_path_left_is_the_candidate_builder(self):
         """
-        Pins `retrain_xgb` to the family it actually trains.
-
-        Gate 8.6 wrote this to guard against quietly declaring the retrain cycle
-        fixed while `retrain_xgb` still looked for a filename heart does not
-        have. Gate 8.10 fixed it FOR HEART, and not by changing this function:
-        heart is routed away from it by model family to a candidate builder (see
-        `retrain_candidate`), and this function keeps training the XGBoost path
-        for the families that ship one, still against this filename. The
-        condition below is therefore unchanged and still meaningful — if this
-        filename moves, what reaches MLflow on that path changes with it.
+        Gate 8.6 pinned `retrain_xgb` so the retrain cycle could not be quietly
+        declared fixed. Gate 8.10 routed heart to a candidate builder; gate B4
+        removed `retrain_xgb` itself (no live module read what it wrote). What
+        reaches MLflow from a retrain is therefore only the candidate run.
         """
         from backend.active_learning import retrain
 
         source = inspect_source(retrain)
-        assert "omni_diag_xgb_optimized.pkl" in source, (
-            "the retrain path changed — re-check what MLflow now receives"
-        )
+        assert not hasattr(retrain, "retrain_xgb")
+        assert not hasattr(retrain, "_log_to_mlflow")
+        assert "omni_diag_xgb_optimized.pkl" not in source
+        assert "start_candidate_run" in source
 
 
 def inspect_source(module) -> str:

@@ -25,11 +25,12 @@ Flow, both families:
     7. Log provenance + aggregates to MLflow. Replace nothing, reload nothing.
        Promotion is a human decision and is not implemented here.
 
-    any other family (diabetes and the legacy XGBoost path) — unchanged:
-    4. Retrain XGBoost incrementally (via xgb_model=)
-    5. Save new model to disk
-    6. Reload the running ModelLoader so new predictions use updated model
-    7. Log the run to MLflow (if available)
+    any other family — refused, before a single sample is read:
+    `status: "unsupported"`, reason "retrain not yet supported for <family>".
+    Gate B4 removed the incremental-XGBoost writer (`retrain_xgb`) that used to
+    serve every other family. No live module read what it wrote: BRFSS diabetes
+    is retired, the NHANES module has no XGBoost file, and the heart revert path
+    (sklearn_pipeline) loads a different file and fed it raw strings (W-26). A writer whose output nothing reads is the W-08 hazard, so it went.
 
 Why heart is not on the XGBoost path: it has not shipped an XGBoost since Gate
 8.1. `retrain_xgb` looked for a filename this disease does not have and built its
@@ -44,15 +45,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import pickle
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger("omnidiag.retrain")
-
-MODELS_DIR = Path(os.getenv("MODELS_DIR", "models"))
-
 
 async def get_annotated_samples(
     db,
@@ -98,78 +95,6 @@ async def get_annotated_samples(
             continue
 
     return features_list, labels
-
-
-def retrain_xgb(
-    disease: str,
-    features_list: List[Dict[str, Any]],
-    labels: List[int],
-) -> Optional[Path]:
-    """
-    Incrementally retrain the XGBoost model for the given disease.
-
-    Returns the path to the newly saved model, or None on failure.
-
-    🚧 KNOWN LIMITATION (confirmed via live testing, 2026-09-07):
-      - heart_disease: `features_list[i].values()` are the RAW predict-time
-        inputs (e.g. Sex="M", ChestPainType="ATA") — not label-encoded or
-        feature-engineered. Building `X` directly from these raises
-        `ValueError: could not convert string to float: 'ATA'`. Any real
-        active-learning cycle for heart_disease currently fails here.
-        Fix requires running the same encode→engineer pipeline used by
-        ModelLoader.predict() before constructing the DMatrix.
-      - diabetes: this function always writes to the single hardcoded path
-        `models/{disease}/omni_diag_xgb_optimized.pkl`, which is NOT one of
-        the three files EnsembleModelLoader actually loads (xgb_model.pkl,
-        lgb_model.pkl, rf_model.pkl + meta_learner.pkl). Even when this
-        succeeds numerically, it retrains an orphan file disconnected from
-        the live ensemble — a silent no-op for diabetes.
-    Hot-reload (ModelLoader.invalidate() / EnsembleModelLoader.invalidate(),
-    wired in run_retrain_pipeline() below) is verified working correctly in
-    isolation — it is this function's own model-building step that blocks
-    the pipeline before reload is ever reached.
-    """
-    try:
-        import xgboost as xgb
-        import numpy as np
-
-        model_path = MODELS_DIR / disease / "omni_diag_xgb_optimized.pkl"
-        if not model_path.exists():
-            log.error(f"Model not found: {model_path}")
-            return None
-
-        with open(model_path, "rb") as f:
-            model = pickle.load(f)
-
-        X = np.array([list(feat.values()) for feat in features_list], dtype=np.float32)
-        y = np.array(labels, dtype=np.float32)
-
-        dtrain = xgb.DMatrix(X, label=y)
-        updated_model = xgb.train(
-            params={
-                "objective": "binary:logistic",
-                "eval_metric": "logloss",
-                "max_depth": 5,
-                "learning_rate": 0.05,
-            },
-            dtrain=dtrain,
-            num_boost_round=20,
-            xgb_model=model,
-            verbose_eval=False,
-        )
-
-        backup_path = model_path.with_suffix(f".bak.{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pkl")
-        model_path.rename(backup_path)
-
-        with open(model_path, "wb") as f:
-            pickle.dump(updated_model, f)
-
-        log.info(f"Retrained {disease} model saved to {model_path} ({len(labels)} new samples)")
-        return model_path
-
-    except Exception as exc:
-        log.error(f"Retraining failed for {disease}: {exc!r}")
-        return None
 
 
 #: Model families whose retraining produces a reviewed CANDIDATE rather than a
@@ -312,38 +237,37 @@ def retrain_candidate(
     }
 
 
-def _log_to_mlflow(disease: str, n_samples: int, model_path: Optional[Path]) -> None:
-    try:
-        from backend.monitoring.mlflow_tracker import log_model_info
-        log_model_info(
-            disease=disease,
-            model_version=f"retrain_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
-            metrics={"retrain_samples": n_samples, "success": 1 if model_path else 0},
-        )
-    except Exception as exc:
-        log.warning(f"MLflow logging failed: {exc!r}")
-
-
 async def run_retrain_pipeline(
     db,
     disease: str,
     min_samples: int = 5,
 ) -> Dict[str, Any]:
     """
-    Full pipeline: fetch annotated samples → retrain → reload → log.
+    Full pipeline: refuse what cannot be retrained, fetch annotated samples,
+    build a candidate.
 
-    Two outcomes, decided by the model family in the disease config:
-
-      CANDIDATE_FAMILIES  → build an isolated candidate, log the comparison,
-                            replace nothing, reload nothing. (heart, Gate 8.10)
-      anything else       → the incremental XGBoost path, unchanged.
+      retired disease     -> 410 (backend/retired_diseases.py)
+      CANDIDATE_FAMILIES  -> build an isolated candidate, log the comparison,
+                             replace nothing, reload nothing. (heart, Gate 8.10)
+      any other family    -> {"status": "unsupported", "reason": ...}; nothing
+                             is read and nothing is written (gate B4)
 
     Returns a status dict suitable for the API response.
     """
-    # Before anything is read (W-08): a retired disease has no config, so it would
-    # otherwise reach retrain_xgb and overwrite whatever weights the image holds.
+    # Before anything is read (W-08): a retired disease has no config.
     from backend.retired_diseases import reject_if_retired
     reject_if_retired(disease)
+
+    # The family decides, and it is asked before the samples are fetched, so an
+    # unsupported family never reads the review queue at all.
+    family = _model_family(disease)
+    if family not in CANDIDATE_FAMILIES:
+        return {
+            "status": "unsupported",
+            "disease": disease,
+            "samples_used": 0,
+            "reason": f"retrain not yet supported for {family}",
+        }
 
     features_list, labels = await get_annotated_samples(db, disease, min_samples)
 
@@ -355,48 +279,7 @@ async def run_retrain_pipeline(
             "samples_used": 0,
         }
 
-    # Before any training: which kind of model is this? Asked of the config,
-    # because the config is what decides which artifact is live -- heart stopped
-    # shipping an XGBoost at Gate 8.1 and `retrain_xgb` was never told.
-    if _model_family(disease) in CANDIDATE_FAMILIES:
-        return await asyncio.to_thread(retrain_candidate, disease, features_list, labels)
-
-    model_path = retrain_xgb(disease, features_list, labels)
-
-    _log_to_mlflow(disease, len(labels), model_path)
-
-    if model_path:
-        # Reload model in running process so next predict uses updated weights.
-        # The router (backend.main.router) holds the live ModelLoader /
-        # EnsembleModelLoader instance for this disease; invalidate() clears
-        # its cached model so the next request lazy-reloads the new weights.
-        try:
-            from backend.main import router as _router
-            loader = _router.model_loaders.get(disease)
-            if loader is not None and hasattr(loader, "invalidate"):
-                loader.invalidate()
-                log.info(f"Hot-reloaded model loader for {disease}")
-            else:
-                log.warning(
-                    f"No active loader found for {disease} — "
-                    f"will take effect on next startup"
-                )
-        except Exception as exc:
-            log.warning(f"Model hot-reload failed (will take effect on next startup): {exc!r}")
-
-        return {
-            "status": "success",
-            "disease": disease,
-            "samples_used": len(labels),
-            "model_path": str(model_path),
-        }
-    else:
-        return {
-            "status": "failed",
-            "disease": disease,
-            "samples_used": len(labels),
-            "reason": "Retraining step failed — check logs",
-        }
+    return await asyncio.to_thread(retrain_candidate, disease, features_list, labels)
 
 
 if __name__ == "__main__":

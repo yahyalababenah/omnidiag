@@ -7,6 +7,8 @@ Scheduled retraining script. Triggered by:
   2. Cron / Docker (see docker-compose.yml retrain service)
   3. Drift threshold breach via POST /admin/drift/{disease}/run
 
+Since gate B4 any family NOT in CANDIDATE_FAMILIES is refused (exit 2) before
+anything is read; the steps below are the old legacy path, unreachable now.
 Pipeline (models whose family is NOT in CANDIDATE_FAMILIES — diabetes and the
 legacy XGBoost path). A `glm_ivap_conformal` module, i.e. heart since Gate 8.1,
 is delegated to the candidate builder by run_candidate_path() and never reaches
@@ -16,7 +18,7 @@ is promoted at all (Gate 8.10).
 
   1. Load reference CSV + recent predictions from DB
   2. Merge new labelled samples (prediction > threshold treated as label)
-  3. Retrain XGBoost / LGB model (or stacking ensemble for diabetes)
+  3. Retrain XGBoost / LGB model
   4. Evaluate on held-out split — compare AUC vs. current production model
   5. If new model AUC > current AUC - tolerance → promote to production
   6. Log all metrics + artifacts to MLflow
@@ -43,7 +45,7 @@ log = logging.getLogger("omnidiag.retrain")
 
 def parse_args():
     p = argparse.ArgumentParser(description="OmniDiag auto-retrain pipeline")
-    p.add_argument("--disease", required=True, help="Disease key (e.g. heart_disease, diabetes)")
+    p.add_argument("--disease", required=True, help="Disease key (e.g. heart_disease)")
     p.add_argument("--min-samples", type=int, default=200, help="Minimum new samples required to retrain")
     p.add_argument("--auc-tolerance", type=float, default=0.005, help="Allow promotion if new AUC >= current - tolerance")
     p.add_argument("--dry-run", action="store_true", help="Run pipeline but do not promote model")
@@ -55,7 +57,6 @@ def load_reference_data(disease: str):
     """Load the reference (training) dataset for this disease."""
     paths = {
         "heart_disease": "data/heart_disease/processed/final_ready_data.csv",
-        "diabetes": "data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv",
     }
     ref_path = paths.get(disease)
     if ref_path is None or not Path(ref_path).exists():
@@ -194,6 +195,14 @@ def main() -> None:
     if family in CANDIDATE_FAMILIES:
         run_candidate_path(disease)
         return
+    # Gate B4: every other family is refused before anything is read, as the API
+    # does. The legacy XGBoost steps below wrote a file no live module loads (the
+    # W-08 pattern); they are unreachable now and go with the tools cleanup.
+    from backend.retired_diseases import is_retired
+    reason = ("retired (backend/retired_diseases.py)" if is_retired(disease)
+              else f"retrain not yet supported for {family}")
+    log.error("unsupported — %s: %s", disease, reason)
+    sys.exit(2)
 
     # 1. Load reference data
     try:
