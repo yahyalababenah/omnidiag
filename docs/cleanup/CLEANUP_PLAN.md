@@ -173,7 +173,7 @@ State recorded on 2026-10-06, before any release step:
 | Layer | Target | How |
 |---|---|---|
 | Backend (HF Space) | `d6fb3238de7974dc7c43e8ed49420cfc291e4641` | `git push --force hf d6fb3238de7974dc7c43e8ed49420cfc291e4641:refs/heads/main` |
-| Frontend (Vercel) | the production deployment serving `assets/index-BNeSlGQM.js` (`index.html` last-modified Fri 2026-10-02 16:14:19 GMT, etag `86704c8f1bcadc129929094836ac3ef5`) | Vercel dashboard → Deployments → that deployment → **Instant Rollback** |
+| Frontend (Vercel) | the previous production deployment, serving `assets/index-BNeSlGQM.js` (`index.html` last-modified Fri 2026-10-02 16:14:19 GMT, etag `86704c8f1bcadc129929094836ac3ef5`). Deployment ID: **not recorded** | Vercel → Overview → **Instant Rollback** (Yahya, 2026-10-06) |
 | GitHub `deploy/v2-platform` | `f22b4695f14e42f9cc3c1eaa29d71c3e783bb87f` | `git revert` of the pushed range; never a force push |
 
 The Vercel deployment **ID** is not visible from this machine: the response headers carry no deployment
@@ -305,7 +305,8 @@ does not, someone deployed in between: stop, and record the new hash as the roll
 | 1.2 Merge | `deploy/v2-platform` = `8bbbfe9cc08a00ea5487a35b42e3a380e04ad7e5` (= `chore/retire-brfss`); fast-forward of `f22b469` confirmed from git |
 | 1.3 Bundle changed | `index-BNeSlGQM.js` → `index-CSdJeAX2.js` (`index.html` last-modified 2026-10-06 06:23:51 GMT). The bundle carries `archived_note` and `retired_pending`, no BRFSS field names, and the API base is `yahyoha-omnidiag.hf.space` |
 | 1.4 New frontend vs old backend (`d6fb323`) | Backend listed `diabetes, diabetes_nhanes, heart_disease`; the frontend's `withoutRetired` gave `diabetes_nhanes, heart_disease`. 6 demo patients: schema/predict/explain/counterfactuals all 200, valid What-If states (frontend source at `8bbbfe9`, run in Node). The authenticated screens (AL queue, history) were not checked here: there is no account; Yahya checked the preview visually |
-| Vercel rollback ID | **Not recorded.** The message that confirmed the merge still had the placeholder `<ID>` |
+| Vercel rollback ID | **Not recorded** (twice the placeholder came through unfilled). The rollback target is identified by its bundle `index-BNeSlGQM.js` and `index.html` etag instead |
+| Vercel promotion (Yahya) | The Vercel **Production Branch was `main`** (`52a1ab7`, 2026-06-28), not `deploy/v2-platform`: a push to `deploy/v2-platform` gives only a preview. Yahya promoted the `8bbbfe9` deployment to production manually; domain `omnidiag-delta.vercel.app`. Re-checked: bundle `index-CSdJeAX2.js`, `index.html` last-modified 06:44:37 GMT. Yahya is switching the Production Branch to `deploy/v2-platform`; until that is confirmed, `main` must not be deleted (Phase C 3.0) |
 | 2.0 Precondition | `git ls-remote hf main` = `d6fb323` |
 | 2.1–2.2 Snapshot | tree `1e9021f`, built from `8bbbfe9` minus 54 binaries. Checks: 0 binaries; HF front matter present; equals the source minus exactly the strip list; heart training CSV present; no BRFSS paths; `sqlalchemy[asyncio]`, no flwr/lightgbm |
 | 2.3 Push | `c81615055d9be57672d76d5ddf90c08468d57511`, child of `d6fb323`; fast-forward `d6fb323..c816150` |
@@ -315,7 +316,7 @@ does not, someone deployed in between: stop, and record the new hash as the roll
 | 6 Parity | `verify_live.py` against the live Space: 6 patients × 3 endpoints IDENTICAL (tol 1e-6), exit 0 |
 | 6 Frontend vs new backend | The same Node check: picker = backend list (heart, NHANES); 6 patients all 200 |
 | 6 Report | `POST /api/v4/generate-report` for a heart result: `source: llm`, `risk_band: null` |
-| 6 **DB write + read** | **PENDING.** It needs a clinician account. The plan says the credentials come from Yahya and not from the repo; none was given. The defaults in `backend/main.py` were not tried |
+| 6 **DB write + read** | **PENDING.** It needs a clinician account. The plan says the credentials come from Yahya and not from the repo; none was given. The defaults in `backend/main.py` were not tried. Security note: unless `ADMIN_PASSWORD`/`DOCTOR_PASSWORD` secrets are set, the live accounts use the passwords published in the repo |
 | 6 archived_note | Nothing to check: there is no `DATABASE_URL` secret (Yahya, 2026-10-06), so the rebuild wiped the SQLite DB and no BRFSS rows exist on the Space. Covered by tests |
 
 **Declared done:** not yet; the release waits for the DB write + read. Phase C has not been run.
@@ -326,6 +327,11 @@ Commands only; Yahya runs them. They follow the approved Phase C table. Tags com
 tag-then-delete branches, `main1` included. `hf/main` (the live Space) and `deploy/v2-platform` are
 not touched. Each tag pins the commit recorded on 2026-10-06; a branch that moved since then fails
 the check in 3.1.
+
+**3.0 Gate for `main` (added 2026-10-06).** Vercel's Production Branch was `main`. Yahya is switching it to
+`deploy/v2-platform`. **`main` is not deleted until Yahya confirms the switch**, because deleting the
+production branch of a Vercel project before the switch would leave it pointing at a missing branch.
+`main` is therefore taken out of 3.3 and deleted on its own in 3.3b.
 
 **3.1 Check that every branch is still where it was recorded** (prints `OK` per branch, or `MOVED`):
 ```
@@ -368,7 +374,12 @@ The last command must list all 7 tags, each pointing to an annotated tag whose t
 2026-10-06. `chore/post-expo-cleanup` is the same commit as `deploy/v2-platform` (`f22b469`), which is the
 confirmation its table row asked for.
 ```
-git push origin --delete fix/demo-blockers fix/feature-verification fix/heart-retrain-candidate merge/heart-retrain-plus-phase9 monitoring/request-metrics main chore/post-expo-cleanup
+git push origin --delete fix/demo-blockers fix/feature-verification fix/heart-retrain-candidate merge/heart-retrain-plus-phase9 monitoring/request-metrics chore/post-expo-cleanup
+```
+
+**3.3b Delete `main`, only after Yahya confirms the Vercel Production Branch is `deploy/v2-platform`** (3.0):
+```
+git push origin --delete main
 ```
 
 **3.4 Delete the tag-then-delete branches** (only after 3.2 is confirmed):
