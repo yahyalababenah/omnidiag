@@ -15,9 +15,10 @@ Compared per patient:
 Exit code 0 = identical within tolerance, 1 = differences.
 
 Why this exists: the Space once resolved scikit-learn 1.7.2 (models saved
-with 1.8/1.9) and served different diabetes probabilities from the same
-pickles (Case C 63.7% local vs 49.4% live). requirements.txt now pins the
-numeric stack; this script is the check that the pin holds.
+with 1.8/1.9) and served different probabilities from the same pickles (the
+since-retired BRFSS diabetes module: Case C 63.7% local vs 49.4% live).
+requirements.txt pins the numeric stack; this script is the check that the
+pin holds. The demo patients are heart and NHANES since gate B6.
 """
 import os
 import sys

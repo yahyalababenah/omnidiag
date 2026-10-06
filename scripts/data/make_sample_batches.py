@@ -28,18 +28,31 @@ def heart_row():
     }
 
 
-def diabetes_row():
+def nhanes_row():
+    """NHANES dysglycaemia module (configs/diabetes_nhanes.yaml): values inside
+    the schema bounds, loosely correlated so both decisions occur."""
     hi = rng.random() < 0.45
-    p = lambda a, b: int(rng.random() < (a if hi else b))
+    age = int(clip(rng.gauss(58 if hi else 40, 12), 20, 80))
+    bmi = round(clip(rng.gauss(32 if hi else 25, 5), 16, 60), 1)
+    band = "high" if bmi >= 32 else "increased" if bmi >= 26 else "normal"
     return {
-        "HighBP": p(.7, .25), "HighChol": p(.6, .3), "CholCheck": 1, "BMI": round(clip(rng.gauss(33 if hi else 25, 5), 16, 60), 1),
-        "Smoker": p(.5, .4), "Stroke": p(.1, .02), "HeartDiseaseorAttack": p(.25, .05),
-        "PhysActivity": p(.5, .8), "Fruits": p(.5, .65), "Veggies": p(.7, .85),
-        "HvyAlcoholConsump": p(.03, .06), "AnyHealthcare": 1, "NoDocbcCost": p(.15, .07),
-        "GenHlth": rng.choice([3, 4, 5] if hi else [1, 2, 3]), "MentHlth": rng.choice([0, 0, 2, 5, 10, 20]),
-        "PhysHlth": rng.choice([0, 3, 10, 20, 30] if hi else [0, 0, 0, 2, 5]), "DiffWalk": p(.4, .08),
-        "Sex": rng.randint(0, 1), "Age": rng.randint(8, 13) if hi else rng.randint(3, 9),
-        "Education": rng.randint(3, 6), "Income": rng.randint(2, 8),
+        "RIDAGEYR": age, "RIAGENDR": rng.randint(0, 1), "BMXBMI": bmi, "ADIPOSITY_BAND": band,
+        "SBP": int(clip(rng.gauss(138 if hi else 118, 15), 90, 200)),
+        "DBP": int(clip(rng.gauss(82 if hi else 72, 10), 50, 120)),
+        "BPXPLS": int(clip(rng.gauss(74, 10), 45, 120)),
+        "MCQ300C": int(rng.random() < (0.45 if hi else 0.2)),
+        "CVD_ANY": int(rng.random() < (0.15 if hi else 0.03)),
+        "PAQ650": int(rng.random() < (0.15 if hi else 0.35)),
+        "PAQ665": int(rng.random() < (0.35 if hi else 0.6)),
+        "LBDHDD": int(clip(rng.gauss(42 if hi else 56, 12), 20, 110)),
+        "LBXSCH": int(clip(rng.gauss(200, 38), 110, 340)),
+        "LBXSTR": int(clip(rng.gauss(190 if hi else 110, 60), 40, 600)),
+        "LBXSATSI": int(clip(rng.gauss(30 if hi else 22, 10), 8, 120)),
+        "LBXSGTSI": int(clip(rng.gauss(40 if hi else 24, 18), 8, 200)),
+        "LBXSCR": round(clip(rng.gauss(0.9, 0.2), 0.4, 2.0), 2),
+        "LBXSBU": int(clip(rng.gauss(14, 4), 5, 40)),
+        "LBXSAL": round(clip(rng.gauss(4.3, 0.3), 3.2, 5.2), 1),
+        "LBXSUA": round(clip(rng.gauss(6.2 if hi else 5.2, 1.2), 2.5, 10.0), 1),
     }
 
 
@@ -61,9 +74,16 @@ heart[45]["ChestPainType"] = "XYZ"  # invalid category
 heart[80]["Sex"] = ""           # required field missing
 write("heart_disease_batch_sample.csv", heart)
 
-# Diabetes: module cap is 20 rows; 18 valid + 2 invalid
-diab = [diabetes_row() for _ in range(20)]
-diab[6]["BMI"] = 5       # below allowed range
-diab[14]["GenHlth"] = 9  # out of range
-write("diabetes_batch_sample.csv", diab)
+# NHANES dysglycaemia: the module cap (max_batch_rows) is 100 rows. 6 with
+# missing optional values (valid), 3 invalid (error rows). The BRFSS sample
+# (diabetes_batch_sample.csv) went with that module in gate B7.
+nhanes = [nhanes_row() for _ in range(100)]
+for i in (3, 21, 39, 52, 68, 84):
+    nhanes[i]["LBXSTR"] = ""
+    if i % 2:
+        nhanes[i]["SBP"] = nhanes[i]["DBP"] = ""
+nhanes[12]["RIDAGEYR"] = 15          # below the adult cohort (20-80)
+nhanes[47]["ADIPOSITY_BAND"] = "XL"  # invalid category
+nhanes[77]["LBDHDD"] = ""            # required field missing
+write("diabetes_nhanes_batch_sample.csv", nhanes)
 print("ok")

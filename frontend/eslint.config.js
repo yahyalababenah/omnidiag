@@ -5,9 +5,12 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
+  // A config object holding only `ignores` is a GLOBAL ignore in the flat
+  // config. Inside the object below it only narrowed that object's `files`,
+  // and dist/ was linted (about 950 of the reported problems).
+  { ignores: ['dist'] },
   {
     files: ['**/*.{js,jsx}'],
-    ignores: ['dist'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

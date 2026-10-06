@@ -39,6 +39,7 @@ shipped code: several describe models that are no longer served.
 | `features/heart_disease_features.py` | `HeartDiseaseFeatureEngineer`: no importer, no config `features.module` names it (only the git-ignored `configs/heart_disease.yaml.bak`, which the router does not load) |
 | `backend/federated/__init__.py`, `client.py`, `aggregator.py` | Flower/FedAvg prototype, superseded; no importer. The GLORE replacement is documented in `docs/fl_report/` |
 | `scripts/simulate_federated.py` | Flower simulation; no references |
+| `scripts/ui_verify.py` | Playwright check of the live UI (57 clicks), written for heart + BRFSS: 22 BRFSS references, none for NHANES. Archived in gate B7 with `docs/FEATURE_VERIFICATION.md`, whose items it ran; a rebuilt UI check for heart + NHANES is backlog item 4 in `docs/cleanup/CLEANUP_PLAN.md` |
 | `docs/OmniDiag_Proposal_Defense.md` | Expo proposal defence; presents BRFSS as the diabetes module (state of 2026-09-26) |
 | `docs/CRITERION_01_AUDIT.md` | Pre-expo proposal audit |
 | `docs/code_cleanup_report.md` | 2026-06-28 report on another branch |

@@ -3,14 +3,16 @@ Golden master for the model-family registry refactor.
 
 Captures every observable output of /predict, /explain, /counterfactuals,
 /batch, /schema (plus /diseases and the legacy /api/v3/predict) for heart and
-diabetes, through the REAL router and the REAL FastAPI app, in-process.
+NHANES dysglycaemia, through the REAL router and the REAL FastAPI app,
+in-process. (Reworked for heart + NHANES in gate B7; it covered heart and the
+retired BRFSS module before.)
 
     backend/.venv/bin/python scripts/golden_master.py capture golden_before.json
     backend/.venv/bin/python scripts/golden_master.py capture golden_after.json
     backend/.venv/bin/python scripts/golden_master.py diff golden_before.json golden_after.json
 
-Run before and after in the SAME environment (LightGBM output can shift
-across environments, not within one).
+Run before and after in the SAME environment (model output can shift across
+library versions, not within one environment).
 """
 import os
 import sys
@@ -34,7 +36,7 @@ TOL = 1e-9
 # ── Inputs ────────────────────────────────────────────────────────────────────
 
 def load_demo_patients():
-    """The frontend's own A/B/C/D (diabetes) and P-001..3 (heart) demo cases."""
+    """The frontend's own demo cases: P-001..3 (heart), N-001..3 (NHANES)."""
     src = os.path.join(ROOT, "frontend", "src", "mockPatients.js")
     js = (
         "import(process.argv[1]).then(m => "
@@ -72,25 +74,30 @@ HEART_EDGE = [
     }),
 ]
 
-_DIAB_KEYS = [
-    "HighBP", "HighChol", "CholCheck", "BMI", "Smoker", "Stroke",
-    "HeartDiseaseorAttack", "PhysActivity", "Fruits", "Veggies",
-    "HvyAlcoholConsump", "AnyHealthcare", "NoDocbcCost", "GenHlth",
-    "MentHlth", "PhysHlth", "DiffWalk", "Sex", "Age", "Education", "Income",
-]
-_DIAB_MIN = {k: 0 for k in _DIAB_KEYS}
-_DIAB_MIN.update({"BMI": 10.0, "GenHlth": 1, "Age": 1, "Education": 1, "Income": 1})
-_DIAB_MAX = {k: 1 for k in _DIAB_KEYS}
-_DIAB_MAX.update({"BMI": 100.0, "MentHlth": 30, "PhysHlth": 30, "GenHlth": 5,
-                  "Age": 13, "Education": 6, "Income": 8})
-_DIAB_HISTORY_ONLY = dict(_DIAB_MIN)
-_DIAB_HISTORY_ONLY.update({"Stroke": 1, "HeartDiseaseorAttack": 1, "BMI": 24.5,
-                           "GenHlth": 3, "Age": 9, "Education": 4, "Income": 5,
-                           "CholCheck": 1, "AnyHealthcare": 1})
-DIABETES_EDGE = [
-    ("edge_all_min", _DIAB_MIN),
-    ("edge_all_max", _DIAB_MAX),
-    ("edge_history_only", _DIAB_HISTORY_ONLY),
+# NHANES dysglycaemia: the six required inputs, then the optional ones.
+# Bounds from backend/schemas_diabetes_nhanes.py::DiabetesNhanesInput.
+_NHANES_MIN = {
+    "RIDAGEYR": 20, "BMXBMI": 10.0, "ADIPOSITY_BAND": "normal", "LBDHDD": 10.0,
+    "PAQ650": 0, "PAQ665": 0, "RIAGENDR": 0, "SBP": 60.0, "DBP": 30.0, "BPXPLS": 30.0,
+    "MCQ300C": 0, "CVD_ANY": 0, "LBXSCH": 50.0, "LBXSTR": 10.0, "LBXSATSI": 1.0,
+    "LBXSGTSI": 1.0, "LBXSCR": 0.1, "LBXSBU": 1.0, "LBXSAL": 1.0, "LBXSUA": 0.5,
+}
+_NHANES_MAX = {
+    "RIDAGEYR": 80, "BMXBMI": 100.0, "ADIPOSITY_BAND": "high", "LBDHDD": 150.0,
+    "PAQ650": 1, "PAQ665": 1, "RIAGENDR": 1, "SBP": 260.0, "DBP": 150.0, "BPXPLS": 200.0,
+    "MCQ300C": 1, "CVD_ANY": 1, "LBXSCH": 500.0, "LBXSTR": 3000.0, "LBXSATSI": 1000.0,
+    "LBXSGTSI": 1000.0, "LBXSCR": 20.0, "LBXSBU": 200.0, "LBXSAL": 6.0, "LBXSUA": 20.0,
+}
+_NHANES_REQUIRED = ("RIDAGEYR", "BMXBMI", "ADIPOSITY_BAND", "LBDHDD", "PAQ650", "PAQ665")
+_NHANES_REQUIRED_ONLY = {
+    k: ({"RIDAGEYR": 52, "BMXBMI": 29.5, "ADIPOSITY_BAND": "increased", "LBDHDD": 44.0,
+         "PAQ650": 0, "PAQ665": 1}[k] if k in _NHANES_REQUIRED else None)
+    for k in _NHANES_MIN
+}
+NHANES_EDGE = [
+    ("edge_min_bounds", _NHANES_MIN),
+    ("edge_max_bounds", _NHANES_MAX),
+    ("edge_required_only", _NHANES_REQUIRED_ONLY),
 ]
 
 
@@ -105,12 +112,15 @@ def batch_rows(disease, cases):
             if base.get("MaxHR") is not None:
                 base["MaxHR"] = 90 + (i * 11) % 100
         else:
-            base["BMI"] = 18.0 + (i * 3.7) % 30
-            base["Age"] = 1 + (i * 5) % 13
+            base["BMXBMI"] = round(18.0 + (i * 3.7) % 30, 1)
+            base["RIDAGEYR"] = 20 + (i * 7) % 60
         rows.append(base)
         i += 1
     bad = dict(cases[0][1])
-    bad["Age"] = 5 if disease == "heart_disease" else 99   # out of schema bounds
+    if disease == "heart_disease":
+        bad["Age"] = 5            # out of schema bounds
+    else:
+        bad["RIDAGEYR"] = 5       # out of schema bounds (20-80)
     rows.append(bad)
     keys = list(cases[0][1].keys())
     lines = [",".join(keys)]
@@ -171,7 +181,7 @@ async def capture(out_path):
     demos = load_demo_patients()
     cases = {
         "heart_disease": demos["heart_disease"] + HEART_EDGE,
-        "diabetes": demos["diabetes"] + DIABETES_EDGE,
+        "diabetes_nhanes": demos["diabetes_nhanes"] + NHANES_EDGE,
     }
 
     result = {"cases": {d: [c for c, _ in v] for d, v in cases.items()}}
@@ -258,12 +268,11 @@ def normalise(doc, strict=False):
     """
     What the comparison is allowed to see.
 
-    - /counterfactuals: shape + scenario count only. The diabetes scenario
-      CONTENT differs between two runs of the same unchanged code in the same
-      process environment (verified 2026-09-21: 119 differences between two
-      back-to-back captures on deploy/v2-platform), so it cannot be a
-      refactor oracle. Status code, response keys, status and scenario count
-      were stable across both runs.
+    - /counterfactuals: shape + scenario count only, by default. The BRFSS
+      module's scenario CONTENT differed between two runs of the same code in
+      the same environment (2026-09-21: 119 differences between back-to-back
+      captures), so content is compared only with --strict, under a fixed
+      PYTHONHASHSEED.
     - request_id: a fresh uuid4 per error response.
     """
     doc = json.loads(json.dumps(doc))
