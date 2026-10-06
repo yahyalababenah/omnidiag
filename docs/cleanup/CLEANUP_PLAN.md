@@ -461,6 +461,15 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
     smoke test; pre-existing.
 
 ## Findings and lessons
+- CI / backend (`.github/workflows/ci.yml`) was **red from `9bca50a` (2026-09-22) until `fix/ci-backend`**
+  (2026-10-06). Every push failed at "Install Python dependencies". Cause: `9bca50a` pinned the numeric
+  stack to exact versions that need Python ≥ 3.12 (at least `scipy==1.18.0`, which requires
+  `>=3.12`, and `xgboost==3.3.0`), while the job ran Python 3.11; pip found no matching distribution.
+  It was not caused by the cleanup: `449e7ed`, from before the cleanup, failed the same way. The last
+  green push was `1243fbe` (2026-09-21). Fix: the job runs Python 3.13, like the image
+  (`python:3.13-slim`) and `backend/.venv`. Lesson: the CI Python was never tied to the image's
+  Python, so pinning for the image broke CI silently, and nobody saw it for two weeks because CI runs
+  no tests (backlog 3).
 - W-08 (closed in B3): retrain for a retired disease would have overwritten production BRFSS weights.
 - W-26 (superseded in B4): the legacy retrain writer produced files no live module read.
 - F9-40: NHANES cross-group decision non-monotonicity (documented, not fixed).
