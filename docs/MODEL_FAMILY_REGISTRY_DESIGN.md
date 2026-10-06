@@ -2,6 +2,16 @@
 
 Status: implemented on `feat/model-family-registry` (2026-09-21). Not merged.
 
+> **Addendum, 2026-10-06 (post-expo cleanup, gates B3–B7).** The BRFSS diabetes
+> module is retired, and the `stacking_ensemble` family, `EnsembleModelLoader` and
+> `configs/diabetes.yaml` that this document describes for it are gone (the config is
+> archived under `archive/post_expo_2026-10/configs/`). The registered families are now
+> `glm_ivap_conformal` (heart), `ebm_platt_conformal` (NHANES dysglycaemia),
+> `sklearn_pipeline` and `sklearn_generic`; no family reads a feature-engineer module.
+> A request for `diabetes` answers 410 `DISEASE_RETIRED`. The text below is left as a
+> record. Current guide: [ADDING_A_MODEL_FAMILY.md](ADDING_A_MODEL_FAMILY.md); the
+> cleanup record: [cleanup/CLEANUP_PLAN.md](cleanup/CLEANUP_PLAN.md).
+
 > **Addendum, 2026-09-26 (Phase 8).** This document describes the state of the
 > code on 2026-09-21 and is left as written, because the "before" tables below are
 > a record of what was true then. Two things in it no longer describe the shipped

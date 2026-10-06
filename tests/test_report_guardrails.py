@@ -4,7 +4,7 @@ Tests — LLM report guardrails
 The prompt forbids medication/dose advice and diagnosis wording; any output
 that still contains them is replaced by the deterministic report. The "bad"
 sentences below are verbatim from DeepSeek reports generated on the live
-Space on 2026-09-22 (docs/FEATURE_VERIFICATION.md §6).
+Space on 2026-09-22 (archive/post_expo_2026-10/docs/FEATURE_VERIFICATION.md §6).
 """
 
 import asyncio

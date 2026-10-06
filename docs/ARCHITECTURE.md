@@ -46,7 +46,6 @@ flowchart TB
     subgraph REG["Model-family registry (backend/model_backends)"]
       direction LR
       B1["glm_ivap_conformal<br/>HEART"]
-      B2["stacking_ensemble<br/>DIABETES BRFSS"]
       B3["ebm_platt_conformal<br/>DIABETES NHANES"]
       B4["sklearn_pipeline /<br/>sklearn_generic"]
     end
@@ -110,7 +109,7 @@ flowchart LR
   ROOT --> DOC["docs/, evaluation_evidence/, alembic/"]
   BE --> m1["main.py - app wiring, lifespan,<br/>predict/explain/batch/report/parse-notes"]
   BE --> m2["router.py - disease dispatcher"]
-  BE --> m3["model_backends/ - 5 families,<br/>auto-registered by file"]
+  BE --> m3["model_backends/ - 4 families,<br/>auto-registered by file"]
   BE --> m4["heart_glm/ - stack.py, candidate.py,<br/>reference_scores.json"]
   BE --> m5["auth/ - jwt, hashing, rbac, api_key"]
   BE --> m6["admin/ - users, audit, cache flush,<br/>api-keys, stats, retrain"]
@@ -121,8 +120,8 @@ flowchart LR
   BE --> m11["middleware/ - audit, security"]
   BE --> m12["db_models/ - 8 ORM tables"]
   BE --> m13["federated/ - superseded"]
-  CF --> c1["heart_disease.yaml<br/>diabetes.yaml<br/>diabetes_nhanes.yaml"]
-  CF --> c2["heart_disease_features.py<br/>diabetes_features.py"]
+  CF --> c1["heart_disease.yaml<br/>diabetes_nhanes.yaml"]
+  CF --> c2["base_features.py<br/>(extension point; no live module uses it)"]
   SC --> s1["train_heart_glm.py<br/>build_drift_reference.py<br/>retrain.py, seed_db.py"]
 ```
 
@@ -175,15 +174,13 @@ sequenceDiagram
 
 ## ٤. الإضافة بالإعدادات: Config-driven Registry
 
-إضافة مرض = ملف YAML + ملف features. الـ Router لا يعرف أسماء الأمراض ولا العائلات. كل عائلة نموذج تسجّل نفسها بمجرد وجود ملفها في model_backends.
+إضافة مرض = ملف YAML (وملف features فقط إن احتاجته العائلة). الـ Router لا يعرف أسماء الأمراض ولا العائلات. كل عائلة نموذج تسجّل نفسها بمجرد وجود ملفها في model_backends.
 
 ```mermaid
 flowchart LR
   subgraph FS["Filesystem"]
     Y1["configs/heart_disease.yaml<br/>family: glm_ivap_conformal"]
-    Y2["configs/diabetes.yaml<br/>family: stacking_ensemble"]
     Y3["configs/diabetes_nhanes.yaml<br/>family: ebm_platt_conformal"]
-    FT["features/*_features.py"]
   end
 
   subgraph STARTUP["At startup"]
@@ -200,26 +197,20 @@ flowchart LR
   end
 
   Y1 --> SCAN
-  Y2 --> SCAN
   Y3 --> SCAN
   SCAN -->|family key| GET["get_backend(family)"]
   REGI --> GET
 
   GET -->|unknown family fails at startup| ERR["UnknownModelFamilyError"]
   GET --> L1["HeartGlmConformal"]
-  GET --> L2["StackingEnsemble"]
   GET --> L3["EbmPlattConformal"]
   GET -.-> L4["sklearn_pipeline / sklearn_generic"]
 
   L1 -.->|lazy load on first request| W1[("heart_l3_glm_stack.pkl")]
-  L2 -.-> W2[("rf, xgb, lgb + meta_learner")]
   L3 -.-> W3[("diabetes_nhanes_ebm.joblib")]
 
-  FT --> L1
-  FT --> L2
 
   L1 --- I1
-  L2 --- I1
   L3 --- I1
 ```
 
@@ -263,7 +254,7 @@ flowchart LR
 flowchart TB
   P["Prediction"] --> Q1{"module type"}
   Q1 -->|"conformal (heart, NHANES)"| C1["decision == uncertain"]
-  Q1 -->|"threshold (diabetes BRFSS)"| C2["threshold-centred entropy >= 0.88<br/>(prior-shift map sends threshold to 0.5)"]
+  Q1 -->|"threshold-only module<br/>(none live; the retired BRFSS was one)"| C2["threshold-centred entropy >= 0.88<br/>(prior-shift map sends threshold to 0.5)"]
   C1 --> QUEUE
   C2 --> QUEUE
   QUEUE[("review_queue<br/>status = pending<br/>uncertainty_score, scale, threshold")]
@@ -278,10 +269,9 @@ flowchart TB
   H2 --> H3["compare to SHIPPED model:<br/>conformal coverage +<br/>decision transition matrix"]
   H3 --> H4["log to MLflow"]
   H4 --> H5{{"HUMAN decides promotion<br/>(no code path promotes)"}}
-  FAM -->|"diabetes legacy path"| D1["incremental XGBoost refit"]
-  D1 --> D2["save and reload ModelLoader"]
-  D2 --> D3["log to MLflow"]
-  FAM -->|"NHANES"| N1["candidate only, never promoted<br/>row admitted only with lab provenance (HbA1c)"]
+  FAM -->|"NHANES: ebm_platt_conformal"| N1["status: unsupported (not wired yet);<br/>diabetes_nhanes_candidate.py exists:<br/>candidate only, HbA1c provenance required"]
+  FAM -->|"any other family"| D1["status: unsupported<br/>(nothing read or written)"]
+  FAM -->|"retired disease (diabetes)"| D2["410 DISEASE_RETIRED"]
   SKP -.-> STATS["GET /review/stats"]
   REV -.-> STATS
 ```
@@ -298,7 +288,7 @@ flowchart TB
     N1 -->|"Latin"| N2["1. Regex baseline<br/>spelled numbers to digits, negation"]
     N2 --> N3["2. spaCy dependency parse<br/>numeric mentions, linking words,<br/>overrides regex (optional dep)"]
     N3 --> N4["3. BioBERT NER via HuggingFace<br/>lazy load, overrides on overlap"]
-    N4 --> N5["map_to_disease_schema<br/>e.g. BRFSS age bucket"]
+    N4 --> N5["map_to_disease_schema<br/>(heart only; NHANES has no map)"]
     N5 --> N6["pre-filled form<br/>missing fields omitted, user confirms"]
   end
   N6 --> PRED["/predict"]
@@ -507,7 +497,7 @@ flowchart LR
   DEV["Developer"] --> GH["GitHub repo"]
   GH --> CI["CI: .github/workflows/ci.yml<br/>1. pip install, import backend<br/>2. start API check<br/>3. npm ci, npm run build"]
   GH --> DF["Dockerfile<br/>python 3.13-slim"]
-  DF --> BUILD["Build time:<br/>train_heart_glm.py (CSV sha256 verified)<br/>download diabetes models from HF Hub"]
+  DF --> BUILD["Build time:<br/>train_heart_glm.py (CSV sha256 verified)<br/>download NHANES bundle from HF Hub<br/>(sha256-checked)"]
   BUILD --> IMG["Image: model baked in<br/>port 7860, instant start"]
   IMG --> HF["Hugging Face Space<br/>yahyoha/omnidiag"]
   IMG --> K8["Kubernetes<br/>k8s/*.yaml, helm chart,<br/>HPA, ingress, secrets"]

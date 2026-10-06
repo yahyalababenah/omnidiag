@@ -74,7 +74,7 @@ would be visible to a judge without building one.
 ## Option C — do nothing before 1 October (recommended)
 
 Prometheus stays and works. No drift claim is made anywhere in the UI, and the
-README and FEATURE_VERIFICATION both say drift monitoring is not deployed.
+README and FEATURE_VERIFICATION (archived since 2026-10-06: `archive/post_expo_2026-10/docs/`) both said drift monitoring was not deployed.
 
 The only change worth making now costs nothing and removes a false statement
 from the logs: make the `except ImportError` branch say *"evidently is installed

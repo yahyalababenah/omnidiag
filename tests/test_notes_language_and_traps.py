@@ -9,7 +9,7 @@ it.
 
 The note set lives in tests/fixtures/clinical_notes.json. It was
 reconstructed on 2026-09-23 from the case descriptions in
-docs/FEATURE_VERIFICATION.md section 3 -- the original notes.json was in a
+archive/post_expo_2026-10/docs/FEATURE_VERIFICATION.md section 3 -- the original notes.json was in a
 session scratchpad that no longer exists -- so each note reproduces the
 documented trap rather than the exact original wording.
 

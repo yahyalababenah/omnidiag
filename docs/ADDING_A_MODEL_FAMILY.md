@@ -4,13 +4,14 @@ Design background: [MODEL_FAMILY_REGISTRY_DESIGN.md](MODEL_FAMILY_REGISTRY_DESIG
 Proof: [`tests/test_model_family_registry.py`](../tests/test_model_family_registry.py).
 
 A **model family** is a way of turning a weights file into predictions and SHAP values, for
-example a single sklearn Pipeline or a stacking ensemble. A **disease** is one YAML config
+example a single sklearn Pipeline or a GLM with a conformal layer. A **disease** is one YAML config
 that points at one family.
 
 | Family (`model.family`) | Backend class | Explainer | `/batch` | `/counterfactuals` |
 |---|---|---|---|---|
-| `sklearn_pipeline` | `backend/model_backends/sklearn_pipeline.py` (wraps `ModelLoader`) | TreeExplainer | vectorised | yes (heart-specific) |
-| `stacking_ensemble` | `backend/model_backends/stacking_ensemble.py` (wraps `EnsembleModelLoader`) | TreeExplainer per base model | per row | yes |
+| `glm_ivap_conformal` | `backend/model_backends/heart_glm_conformal.py` (heart) | exact linear SHAP, closed form | vectorised | yes |
+| `ebm_platt_conformal` | `backend/model_backends/diabetes_ebm_conformal.py` (NHANES dysglycaemia) | the EBM's additive terms | vectorised | yes |
+| `sklearn_pipeline` | `backend/model_backends/sklearn_pipeline.py` (wraps `ModelLoader`; the heart revert path, no live disease) | TreeExplainer | vectorised | if the config enables it |
 | `sklearn_generic` | `backend/model_backends/sklearn_generic.py` | generic `shap.Explainer` (slower) | per row | no (501) |
 
 ## Adding a disease within a registered family
@@ -34,8 +35,9 @@ Files, and no edits to `backend/`:
      inference_threshold: 0.5
    ```
 2. A Pydantic input schema class in any importable module, referenced by `schema:`.
-3. A feature engineer, only if the family uses one (`stacking_ensemble` reads
-   `features.module/class`; `sklearn_generic` does not).
+3. No feature engineer: no registered family reads `features.module/class` any more (the
+   BRFSS `stacking_ensemble` family was the only one; it was removed in gate B4).
+   A family that needs derived features computes them in its backend class.
 4. Model weights in the format the family expects. For `sklearn_generic` that is a joblib dict
    `{"pipeline": fitted estimator, "features": [...], "background": DataFrame}`.
 
@@ -43,12 +45,11 @@ Measured for `demo_logreg` (`sklearn_generic`): a **13-line YAML** and a **7-lin
 class** (non-blank lines, docstring excluded). Changes needed in `backend/`: **0**.
 
 **Limit (read before claiming this for the other families).** The config-only path is proven
-for `sklearn_generic`. The two built-in families still hold disease-specific code:
-`sklearn_pipeline` hard-codes heart's completeness-warning feature list
-(`_HIGH_IMPACT_FEATURES`), the heart counterfactual ranges and the `prep`/`clf` step names.
-`stacking_ensemble` hard-codes diabetes's engineered-feature names in
-`generate_counterfactuals`. A second disease in either family would need that code moved to
-YAML first.
+for `sklearn_generic`. The built-in families still hold disease-specific code:
+`sklearn_pipeline` hard-codes the heart counterfactual ranges and the `prep`/`clf` step names,
+and `glm_ivap_conformal` encodes heart's inputs in `backend/heart_glm/stack.py`. A second
+disease in either would need that code moved to YAML or a bundle first. `ebm_platt_conformal`
+names its What-If lever module in the config (`what_if.module`).
 
 ## Adding a model family
 

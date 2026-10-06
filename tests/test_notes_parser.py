@@ -1,7 +1,8 @@
 """
 Tests — clinical notes parser (regex path)
 ==========================================
-The 12 notes are the ones used in docs/FEATURE_VERIFICATION.md §3. Before
+The 12 notes are the ones used in FEATURE_VERIFICATION.md §3 (archived:
+archive/post_expo_2026-10/docs/). Before
 negation handling and the mapping fixes, 10 extracted values were WRONG
 (e.g. "No stroke, no heart disease. Non-smoker." came out as stroke, heart
 disease and smoking all present, and flipped the patient to Positive). The rule tested

@@ -42,7 +42,7 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
 <div class="facts">
 <div class="fact"><b>Backend</b><span>FastAPI, SQLAlchemy async, Alembic</span></div>
 <div class="fact"><b>Frontend</b><span>React, Vite, Tailwind, PWA</span></div>
-<div class="fact"><b>Diseases</b><span>heart_disease, diabetes (BRFSS), diabetes_nhanes</span></div>
+<div class="fact"><b>Diseases</b><span>heart_disease, diabetes_nhanes (BRFSS diabetes retired: 410)</span></div>
 <div class="fact"><b>State</b><span>SQLite dev / PostgreSQL, Redis, MLflow</span></div>
 <div class="fact"><b>Ops</b><span>Docker, HF Space, Vercel, k8s, Helm, Prometheus, Grafana</span></div>
 <div class="fact"><b>Tests</b><span>about 60 pytest files</span></div>
@@ -81,7 +81,6 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
     end
     subgraph REG[&quot;Model-family registry (backend/model_backends)&quot;]
       B1[&quot;glm_ivap_conformal&lt;br/&gt;HEART&quot;]
-      B2[&quot;stacking_ensemble&lt;br/&gt;DIABETES BRFSS&quot;]
       B3[&quot;ebm_platt_conformal&lt;br/&gt;DIABETES NHANES&quot;]
       B4[&quot;sklearn_pipeline /&lt;br/&gt;sklearn_generic&quot;]
     end
@@ -131,7 +130,7 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
   ROOT --&gt; DOC[&quot;docs/, evaluation_evidence/, alembic/&quot;]
   BE --&gt; m1[&quot;main.py - app wiring, lifespan,&lt;br/&gt;predict/explain/batch/report/parse-notes&quot;]
   BE --&gt; m2[&quot;router.py - disease dispatcher&quot;]
-  BE --&gt; m3[&quot;model_backends/ - 5 families,&lt;br/&gt;auto-registered by file&quot;]
+  BE --&gt; m3[&quot;model_backends/ - 4 families,&lt;br/&gt;auto-registered by file&quot;]
   BE --&gt; m4[&quot;heart_glm/ - stack.py, candidate.py,&lt;br/&gt;reference_scores.json&quot;]
   BE --&gt; m5[&quot;auth/ - jwt, hashing, rbac, api_key&quot;]
   BE --&gt; m6[&quot;admin/ - users, audit, cache flush,&lt;br/&gt;api-keys, stats, retrain&quot;]
@@ -142,8 +141,8 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
   BE --&gt; m11[&quot;middleware/ - audit, security&quot;]
   BE --&gt; m12[&quot;db_models/ - 8 ORM tables&quot;]
   BE --&gt; m13[&quot;federated/ - superseded&quot;]
-  CF --&gt; c1[&quot;heart_disease.yaml&lt;br/&gt;diabetes.yaml&lt;br/&gt;diabetes_nhanes.yaml&quot;]
-  CF --&gt; c2[&quot;heart_disease_features.py&lt;br/&gt;diabetes_features.py&quot;]
+  CF --&gt; c1[&quot;heart_disease.yaml&lt;br/&gt;diabetes_nhanes.yaml&quot;]
+  CF --&gt; c2[&quot;base_features.py&lt;br/&gt;(extension point; no live module uses it)&quot;]
   SC --&gt; s1[&quot;train_heart_glm.py&lt;br/&gt;build_drift_reference.py&lt;br/&gt;retrain.py, seed_db.py&quot;]</pre></div></section>
 <section id="predict"><h2>٣. رحلة طلب التنبؤ (Predict Request)</h2><p class="cap">ما يحدث من الضغط على Predict حتى ظهور النتيجة: المصادقة، الكاش، النموذج، التسجيل، وإضافة الحالات غير المؤكدة لطابور المراجعة البشرية.</p>
 <div class="fig" dir="ltr"><pre class="mermaid">sequenceDiagram
@@ -181,13 +180,11 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
   API--&gt;&gt;MW: PredictResponse + Cache-Hit header
   MW-&gt;&gt;DB: INSERT audit_logs (user, endpoint, status, ms)
   MW--&gt;&gt;U: result, SHAP available via /explain</pre></div></section>
-<section id="registry"><h2>٤. الإضافة بالإعدادات: Config-driven Registry</h2><p class="cap">إضافة مرض = ملف YAML + ملف features. الـ Router لا يعرف أسماء الأمراض ولا العائلات. كل عائلة نموذج تسجّل نفسها بمجرد وجود ملفها في model_backends.</p>
+<section id="registry"><h2>٤. الإضافة بالإعدادات: Config-driven Registry</h2><p class="cap">إضافة مرض = ملف YAML (وملف features فقط إن احتاجته العائلة). الـ Router لا يعرف أسماء الأمراض ولا العائلات. كل عائلة نموذج تسجّل نفسها بمجرد وجود ملفها في model_backends.</p>
 <div class="fig" dir="ltr"><pre class="mermaid">flowchart LR
   subgraph FS[&quot;Filesystem&quot;]
     Y1[&quot;configs/heart_disease.yaml&lt;br/&gt;family: glm_ivap_conformal&quot;]
-    Y2[&quot;configs/diabetes.yaml&lt;br/&gt;family: stacking_ensemble&quot;]
     Y3[&quot;configs/diabetes_nhanes.yaml&lt;br/&gt;family: ebm_platt_conformal&quot;]
-    FT[&quot;features/*_features.py&quot;]
   end
   subgraph STARTUP[&quot;At startup&quot;]
     SCAN[&quot;OmniDiagRouter._load_all_configs()&lt;br/&gt;one entry per YAML&quot;]
@@ -196,20 +193,15 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
     IMP --&gt; REGI
   end
   Y1 --&gt; SCAN
-  Y2 --&gt; SCAN
   Y3 --&gt; SCAN
   SCAN --&gt;|&quot;family key&quot;| GET[&quot;get_backend(family)&quot;]
   REGI --&gt; GET
   GET --&gt;|&quot;unknown family fails at startup,&lt;br/&gt;names the registered ones&quot;| ERR[&quot;UnknownModelFamilyError&quot;]
   GET --&gt; L1[&quot;HeartGlmConformal&quot;]
-  GET --&gt; L2[&quot;StackingEnsemble&quot;]
   GET --&gt; L3[&quot;EbmPlattConformal&quot;]
   GET -.-&gt; L4[&quot;sklearn_pipeline / sklearn_generic&quot;]
   L1 -.-&gt;|&quot;lazy load on first request&quot;| W1[(&quot;heart_l3_glm_stack.pkl&quot;)]
-  L2 -.-&gt; W2[(&quot;rf, xgb, lgb + meta_learner&quot;)]
   L3 -.-&gt; W3[(&quot;diabetes_nhanes_ebm.joblib&quot;)]
-  FT --&gt; L1
-  FT --&gt; L2
   subgraph IFACE[&quot;ModelBackend interface&quot;]
     I1[&quot;predict_proba, feature_names, shap_values&quot;]
     I2[&quot;predict, predict_batch, explain&quot;]
@@ -246,7 +238,7 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
 <div class="fig" dir="ltr"><pre class="mermaid">flowchart TB
   P[&quot;Prediction&quot;] --&gt; Q1{&quot;module type&quot;}
   Q1 --&gt;|&quot;conformal (heart, NHANES)&quot;| C1[&quot;decision == uncertain&quot;]
-  Q1 --&gt;|&quot;threshold (diabetes BRFSS)&quot;| C2[&quot;threshold-centred entropy &gt;= 0.88&lt;br/&gt;(prior-shift map sends threshold to 0.5)&quot;]
+  Q1 --&gt;|&quot;threshold-only module&lt;br/&gt;(none live; the retired BRFSS was one)&quot;| C2[&quot;threshold-centred entropy &gt;= 0.88&lt;br/&gt;(prior-shift map sends threshold to 0.5)&quot;]
   C1 --&gt; QUEUE
   C2 --&gt; QUEUE
   QUEUE[(&quot;review_queue&lt;br/&gt;status = pending&lt;br/&gt;uncertainty_score, scale, threshold&quot;)]
@@ -261,10 +253,9 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
   H2 --&gt; H3[&quot;compare to SHIPPED model:&lt;br/&gt;conformal coverage +&lt;br/&gt;decision transition matrix&quot;]
   H3 --&gt; H4[&quot;log to MLflow&quot;]
   H4 --&gt; H5{{&quot;HUMAN decides promotion&lt;br/&gt;(no code path promotes)&quot;}}
-  FAM --&gt;|&quot;diabetes legacy path&quot;| D1[&quot;incremental XGBoost refit&quot;]
-  D1 --&gt; D2[&quot;save and reload ModelLoader&quot;]
-  D2 --&gt; D3[&quot;log to MLflow&quot;]
-  FAM --&gt;|&quot;NHANES&quot;| N1[&quot;candidate only, never promoted&lt;br/&gt;row admitted only with lab provenance (HbA1c)&quot;]
+  FAM --&gt;|&quot;NHANES: ebm_platt_conformal&quot;| N1[&quot;status: unsupported (not wired yet);&lt;br/&gt;diabetes_nhanes_candidate.py exists:&lt;br/&gt;candidate only, HbA1c provenance required&quot;]
+  FAM --&gt;|&quot;any other family&quot;| D1[&quot;status: unsupported&lt;br/&gt;(nothing read or written)&quot;]
+  FAM --&gt;|&quot;retired disease (diabetes)&quot;| D2[&quot;410 DISEASE_RETIRED&quot;]
   SKP -.-&gt; STATS[&quot;GET /review/stats&quot;]
   REV -.-&gt; STATS</pre></div></section>
 <section id="nlpllm"><h2>٧. معالجة اللغة (NLP) والتقرير بالـ LLM</h2><p class="cap">ملاحظة سريرية نصية تتحول إلى حقول جاهزة للنموذج؛ وبعد التنبؤ يُولَّد تقرير سريري بالـ LLM مع حارس يمنع المحتوى الممنوع وبديل قاعدي عند الفشل.</p>
@@ -275,7 +266,7 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
     N1 --&gt;|&quot;Latin&quot;| N2[&quot;1. Regex baseline&lt;br/&gt;spelled numbers to digits, negation&quot;]
     N2 --&gt; N3[&quot;2. spaCy dependency parse&lt;br/&gt;numeric mentions, linking words,&lt;br/&gt;overrides regex (optional dep)&quot;]
     N3 --&gt; N4[&quot;3. BioBERT NER via HuggingFace&lt;br/&gt;lazy load, overrides on overlap&quot;]
-    N4 --&gt; N5[&quot;map_to_disease_schema&lt;br/&gt;e.g. BRFSS age bucket&quot;]
+    N4 --&gt; N5[&quot;map_to_disease_schema&lt;br/&gt;(heart only; NHANES has no map)&quot;]
     N5 --&gt; N6[&quot;pre-filled form&lt;br/&gt;missing fields omitted, user confirms&quot;]
   end
   N6 --&gt; PRED[&quot;/predict&quot;]
@@ -454,7 +445,7 @@ footer{color:var(--muted);font-size:.85rem;padding-block:8px 40px}
   DEV[&quot;Developer&quot;] --&gt; GH[&quot;GitHub repo&quot;]
   GH --&gt; CI[&quot;CI: .github/workflows/ci.yml&lt;br/&gt;1. pip install, import backend&lt;br/&gt;2. start API check&lt;br/&gt;3. npm ci, npm run build&quot;]
   GH --&gt; DF[&quot;Dockerfile&lt;br/&gt;python 3.13-slim&quot;]
-  DF --&gt; BUILD[&quot;Build time:&lt;br/&gt;train_heart_glm.py (CSV sha256 verified)&lt;br/&gt;download diabetes models from HF Hub&quot;]
+  DF --&gt; BUILD[&quot;Build time:&lt;br/&gt;train_heart_glm.py (CSV sha256 verified)&lt;br/&gt;download NHANES bundle from HF Hub&lt;br/&gt;(sha256-checked)&quot;]
   BUILD --&gt; IMG[&quot;Image: model baked in&lt;br/&gt;port 7860, instant start&quot;]
   IMG --&gt; HF[&quot;Hugging Face Space&lt;br/&gt;yahyoha/omnidiag&quot;]
   IMG --&gt; K8[&quot;Kubernetes&lt;br/&gt;k8s/*.yaml, helm chart,&lt;br/&gt;HPA, ingress, secrets&quot;]

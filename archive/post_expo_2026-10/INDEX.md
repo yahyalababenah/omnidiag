@@ -45,6 +45,8 @@ shipped code: several describe models that are no longer served.
 | `docs/code_cleanup_report.md` | 2026-06-28 report on another branch |
 | `configs/diabetes.yaml` | BRFSS diabetes module retired (gate B3, 2026-10-05). Its absence from `configs/` is what unregisters it; `backend/retired_diseases.py` answers 410 for it. Kept for the numbers the docs cite: prevalence_train / prevalence_deploy, inference_threshold 0.108184 |
 | `configs/diabetes.yaml.kaggle` | Orphan variant of the same config; never loaded (the router reads `.yaml`/`.yml` only) |
+| `docs/DIABETES_AUDIT_REPORT.md` | Audit of the BRFSS diabetes module (2026-09-17); that module is retired. Archived in gate B7 |
+| `docs/FEATURE_VERIFICATION.md` | Pre-judging feature verification (2026-09-23), heart + BRFSS; a dated record. Archived in gate B7 with `scripts/ui_verify.py`. The notes fixture and three test docstrings cite it at this path |
 | `models/diabetes/drift_reference.json`, `ensemble_metrics.json`, `metrics.json`, `metrics_lgb.json`, `preprocessors/feature_names.json`, `preprocessors/meta_feature_names.json` | BRFSS diabetes module retired; no live reader since gate B7 (the drift profile path was removed, and the image no longer downloads the BRFSS weights). Kept because the archived audit and `evaluation_evidence/diabetes/` cite these numbers |
 
 ## Moved elsewhere (not archived)
@@ -53,8 +55,8 @@ shipped code: several describe models that are no longer served.
 |---|---|---|
 | `scratch/verify_live.py` | `scripts/verify_live.py` | Live-Space check referenced by `requirements.txt` |
 | `scratch/golden_master.py` | `scripts/golden_master.py` | Golden-master capture/diff tool |
-| `scratch/ui_verify.py` | `scripts/ui_verify.py` | Playwright UI check (docs/FEATURE_VERIFICATION.md) |
-| `scratch/verify_randomize.mjs` | `scripts/verify_randomize.mjs` | Randomize-button check (docs/FEATURE_VERIFICATION.md) |
+| `scratch/ui_verify.py` | `scripts/ui_verify.py` | Playwright UI check (FEATURE_VERIFICATION.md, now archived); itself archived in B7 |
+| `scratch/verify_randomize.mjs` | `scripts/verify_randomize.mjs` | Randomize-button check (FEATURE_VERIFICATION.md, now archived) |
 | `experiment_files/data_pipeline/build_uci_sites.py` | `scripts/data/build_uci_sites.py` | Produces `data/heart_disease/processed/uci_heart_by_site.csv`, the shipped heart model's training data |
 | `experiment_files/data_pipeline/translate_zalizadeh.py` | `scripts/data/translate_zalizadeh.py` | Produces the Tehran external-validation CSV and mapping |
 
