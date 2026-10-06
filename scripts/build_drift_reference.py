@@ -38,10 +38,9 @@ raise alarms nothing can act on.
 
 OTHER MODULES: NOT BUILT HERE
 -----------------------------
-This script builds the heart profile only. The BRFSS diabetes profile
-(models/diabetes/drift_reference.json) is frozen as committed while that module
-is retired, and is no longer rebuilt or verified at image build: its source CSV
-and config are on their way out of the repository. The NHANES dysglycaemia
+This script builds the heart profile only. The retired BRFSS diabetes profile
+is archived under archive/post_expo_2026-10/models/diabetes/ and is not rebuilt
+or verified at image build. The NHANES dysglycaemia
 module's profile is built in the research repository from raw survey files that
 are not committed (F9-17), and says so in its own `source` block; adding that
 module here would make every image build depend on files it does not have.

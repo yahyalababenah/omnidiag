@@ -247,7 +247,6 @@ def get_evidently_monitor(disease: str) -> DriftMonitor:
 
 _PROFILE_PATHS: Dict[str, str] = {
     "heart_disease": "models/heart_disease/drift_reference.json",
-    "diabetes": "models/diabetes/drift_reference.json",
 }
 
 

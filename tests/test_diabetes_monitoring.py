@@ -85,7 +85,7 @@ def test_the_shared_builder_was_not_touched():
 
 
 def test_the_rule_matches_the_other_modules(profile):
-    other = json.loads(Path("models/diabetes/drift_reference.json").read_text())
+    other = json.loads(Path("models/heart_disease/drift_reference.json").read_text())
     assert profile["rule"] == other["rule"]
 
 

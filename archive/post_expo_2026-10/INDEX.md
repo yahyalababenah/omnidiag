@@ -44,6 +44,7 @@ shipped code: several describe models that are no longer served.
 | `docs/code_cleanup_report.md` | 2026-06-28 report on another branch |
 | `configs/diabetes.yaml` | BRFSS diabetes module retired (gate B3, 2026-10-05). Its absence from `configs/` is what unregisters it; `backend/retired_diseases.py` answers 410 for it. Kept for the numbers the docs cite: prevalence_train / prevalence_deploy, inference_threshold 0.108184 |
 | `configs/diabetes.yaml.kaggle` | Orphan variant of the same config; never loaded (the router reads `.yaml`/`.yml` only) |
+| `models/diabetes/drift_reference.json`, `ensemble_metrics.json`, `metrics.json`, `metrics_lgb.json`, `preprocessors/feature_names.json`, `preprocessors/meta_feature_names.json` | BRFSS diabetes module retired; no live reader since gate B7 (the drift profile path was removed, and the image no longer downloads the BRFSS weights). Kept because the archived audit and `evaluation_evidence/diabetes/` cite these numbers |
 
 ## Moved elsewhere (not archived)
 

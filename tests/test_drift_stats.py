@@ -308,26 +308,3 @@ class TestProfileMonitor:
         from backend.monitoring.drift import get_monitor
         report = get_monitor("heart_disease").run(_api_rows("cleveland"))
         assert "not model degradation" in report["measures"]
-
-
-class TestDiabetesReferenceIsReweighted:
-    def test_the_reference_declares_its_reweighting_and_its_limit(self):
-        profile = json.load(open(ROOT / "models/diabetes/drift_reference.json"))
-        rw = profile["reweighting"]
-        assert rw["applied"] is True
-        assert rw["prevalence_of_sample"] == 0.50
-        assert rw["prevalence_of_reference"] == 0.237
-        assert "not BRFSS" in rw["declared_limit"].replace("NOT BRFSS", "not BRFSS")
-        assert "0.108184" in rw["unchanged"]
-
-    def test_reweighting_moves_a_correlated_feature_off_the_5050_value(self):
-        """The false drift the 50/50 reference would have reported."""
-        profile = json.load(open(ROOT / "models/diabetes/drift_reference.json"))
-        counts = profile["monitored"]["HighBP"]["counts"]
-        reweighted_share = counts[1] / sum(counts)
-        raw = pd.read_csv(ROOT / "data/diabetes/raw/"
-                          "diabetes_binary_5050split_health_indicators_BRFSS2015.csv",
-                          usecols=["HighBP", "Diabetes_binary"])
-        assert (raw.HighBP == 1).mean() == pytest.approx(0.5635, abs=1e-3)
-        assert reweighted_share == pytest.approx(0.4639, abs=1e-3)
-        assert abs(reweighted_share - (raw.HighBP == 1).mean()) > 0.09
