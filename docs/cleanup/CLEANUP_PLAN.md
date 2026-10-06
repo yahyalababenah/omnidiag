@@ -319,7 +319,7 @@ does not, someone deployed in between: stop, and record the new hash as the roll
 | 6 **DB write + read** | **PENDING.** It needs a clinician account. The plan says the credentials come from Yahya and not from the repo; none was given. The defaults in `backend/main.py` were not tried. Security note: unless `ADMIN_PASSWORD`/`DOCTOR_PASSWORD` secrets are set, the live accounts use the passwords published in the repo |
 | 6 archived_note | Nothing to check: there is no `DATABASE_URL` secret (Yahya, 2026-10-06), so the rebuild wiped the SQLite DB and no BRFSS rows exist on the Space. Covered by tests |
 
-**Declared done:** not yet; the release waits for the DB write + read. Phase C has not been run.
+**Declared done:** not yet. Yahya chose to skip the DB write + read for now (2026-10-06), so the release stays not-declared-done. Phase C has not been run, and `chore/retire-brfss` is added to its delete list only once the release is declared done.
 
 ### Step 3 — Phase C, branch clean-up (only after step 2 is declared done)
 
