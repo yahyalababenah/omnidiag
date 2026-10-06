@@ -36,11 +36,6 @@ experiment_files/
 # ============== CLEANUP: Data files ==============
 *.csv
 
-# Gate 8.7c tracked this file because build_drift_reference.py read it at Docker
-# build time. Since Gate B2 (BRFSS retirement) nothing at build time reads it; it
-# stays tracked only until the Docker/data gate removes it with the module.
-!data/diabetes/raw/diabetes_binary_5050split_health_indicators_BRFSS2015.csv
-
 # ولكن استبعاد النسخ الاحتياطية القديمة للمعالجات
 /models/heart_disease/preprocessors/*.bak.v4.pkl
 *.zip
