@@ -26,7 +26,7 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 | B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4) `99a2bac`; 6 tests `ee78539`; 7 tools `264e1df`; 8 docs `9421253` | 〃; **B7 done** (final acceptance below) |
 | Tools | Verification and maintenance scripts | — | folded into B7 area 7 |
 | Docs | README and module docs | — | folded into B7 area 8 |
-| Release | Frontend (Vercel) first, then the HF snapshot, then Phase C | — | **plan approved 2026-10-06, not executed** |
+| Release | Frontend (Vercel) first, then the HF snapshot, then Phase C | GitHub `8bbbfe9`; HF `c816150` | **steps 1–2 done; step 6 DB write/read pending (credentials); Phase C not run** |
 
 ## Decisions that stand (do not relitigate)
 
@@ -296,6 +296,29 @@ does not, someone deployed in between: stop, and record the new hash as the roll
 
 **Not covered by this plan:** the HF model repo (`yahyoha/omnidiag-models`) keeps the BRFSS files
 (backlog 11). The image no longer downloads them, so they are inert.
+
+### Release log (2026-10-06)
+
+| Step | Result |
+|---|---|
+| 1.1 Preview check | Done by Yahya, visually: heart + NHANES only |
+| 1.2 Merge | `deploy/v2-platform` = `8bbbfe9cc08a00ea5487a35b42e3a380e04ad7e5` (= `chore/retire-brfss`); fast-forward of `f22b469` confirmed from git |
+| 1.3 Bundle changed | `index-BNeSlGQM.js` → `index-CSdJeAX2.js` (`index.html` last-modified 2026-10-06 06:23:51 GMT). The bundle carries `archived_note` and `retired_pending`, no BRFSS field names, and the API base is `yahyoha-omnidiag.hf.space` |
+| 1.4 New frontend vs old backend (`d6fb323`) | Backend listed `diabetes, diabetes_nhanes, heart_disease`; the frontend's `withoutRetired` gave `diabetes_nhanes, heart_disease`. 6 demo patients: schema/predict/explain/counterfactuals all 200, valid What-If states (frontend source at `8bbbfe9`, run in Node). The authenticated screens (AL queue, history) were not checked here: there is no account; Yahya checked the preview visually |
+| Vercel rollback ID | **Not recorded.** The message that confirmed the merge still had the placeholder `<ID>` |
+| 2.0 Precondition | `git ls-remote hf main` = `d6fb323` |
+| 2.1–2.2 Snapshot | tree `1e9021f`, built from `8bbbfe9` minus 54 binaries. Checks: 0 binaries; HF front matter present; equals the source minus exactly the strip list; heart training CSV present; no BRFSS paths; `sqlalchemy[asyncio]`, no flwr/lightgbm |
+| 2.3 Push | `c81615055d9be57672d76d5ddf90c08468d57511`, child of `d6fb323`; fast-forward `d6fb323..c816150` |
+| 2.4 Rollback | `git push --force hf d6fb3238de7974dc7c43e8ed49420cfc291e4641:refs/heads/main` (unchanged) |
+| 2.5 Build log | Built at 06:25:47. NHANES joblib `sha256sum -c` OK; only the heart revert file downloaded, no BRFSS file. `train_heart_glm --verify`: fingerprint OK, decisions identical for all 920. `build_drift_reference --verify`: profile matches. Installed: `greenlet-3.5.6`, `sqlalchemy-2.1.3`, fastapi 0.138.2, starlette 1.3.1, uvicorn 0.49.0; no flwr, no lightgbm. Space `RUNNING` on `c816150` at 06:29 |
+| 6 Retirement | `/api/v4/diseases` and `all_registered` = `diabetes_nhanes, heart_disease`; `POST /api/v4/diabetes/predict` → 410 `DISEASE_RETIRED`, `replaced_by: diabetes_nhanes`; `/api/v4/diabetes/schema` → 410 |
+| 6 Parity | `verify_live.py` against the live Space: 6 patients × 3 endpoints IDENTICAL (tol 1e-6), exit 0 |
+| 6 Frontend vs new backend | The same Node check: picker = backend list (heart, NHANES); 6 patients all 200 |
+| 6 Report | `POST /api/v4/generate-report` for a heart result: `source: llm`, `risk_band: null` |
+| 6 **DB write + read** | **PENDING.** It needs a clinician account. The plan says the credentials come from Yahya and not from the repo; none was given. The defaults in `backend/main.py` were not tried |
+| 6 archived_note | Nothing to check: there is no `DATABASE_URL` secret (Yahya, 2026-10-06), so the rebuild wiped the SQLite DB and no BRFSS rows exist on the Space. Covered by tests |
+
+**Declared done:** not yet; the release waits for the DB write + read. Phase C has not been run.
 
 ### Step 3 — Phase C, branch clean-up (only after step 2 is declared done)
 
