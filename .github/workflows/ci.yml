@@ -26,11 +26,19 @@ jobs:
           python -c "import sys; sys.path.insert(0, '.'); from backend.router import OmniDiagRouter; from backend.model_loader import ModelLoader; from backend.schemas import get_schema_for_disease; print('All backend modules imported successfully')"
 
       - name: Verify API starts
+        # Each check below is a plain command, so its failure fails the step (bash -e):
+        # no `&&` chain around curl, and stopping the server happens in an EXIT trap,
+        # which cannot mask the result.
         run: |
           uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
-          sleep 3
-          curl -s http://localhost:8000/ && echo ""
-          kill %1 2>/dev/null || true
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          body=$(curl -fsS --retry 10 --retry-connrefused --retry-delay 1 http://localhost:8000/)
+          echo "$body"
+          grep -q '"status":"Healthy"' <<< "$body"
+          grep -q '"heart_disease"' <<< "$body"
+          grep -q '"diabetes_nhanes"' <<< "$body"
+          echo "API healthy; heart_disease and diabetes_nhanes available"
 
   frontend:
     runs-on: ubuntu-latest
