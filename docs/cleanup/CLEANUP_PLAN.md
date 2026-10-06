@@ -26,7 +26,7 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 | B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4) `99a2bac`; 6 tests `ee78539`; 7 tools `264e1df`; 8 docs `9421253` | 〃; **B7 done** (final acceptance below) |
 | Tools | Verification and maintenance scripts | — | folded into B7 area 7 |
 | Docs | README and module docs | — | folded into B7 area 8 |
-| Release | Frontend (Vercel) first, then the HF snapshot, then Phase C | GitHub `8bbbfe9`; HF `c816150` | **steps 1–2 done; step 6 DB write/read pending (credentials); Phase C not run** |
+| Release | Frontend (Vercel) first, then the HF snapshot, then Phase C | GitHub `8bbbfe9`; HF `c816150` | **RELEASE DONE 2026-10-06**; Phase C commands ready, not run |
 
 ## Decisions that stand (do not relitigate)
 
@@ -316,10 +316,10 @@ does not, someone deployed in between: stop, and record the new hash as the roll
 | 6 Parity | `verify_live.py` against the live Space: 6 patients × 3 endpoints IDENTICAL (tol 1e-6), exit 0 |
 | 6 Frontend vs new backend | The same Node check: picker = backend list (heart, NHANES); 6 patients all 200 |
 | 6 Report | `POST /api/v4/generate-report` for a heart result: `source: llm`, `risk_band: null` |
-| 6 **DB write + read** | **PENDING.** It needs a clinician account. The plan says the credentials come from Yahya and not from the repo; none was given. The defaults in `backend/main.py` were not tried. Security note: unless `ADMIN_PASSWORD`/`DOCTOR_PASSWORD` secrets are set, the live accounts use the passwords published in the repo |
+| 6 **DB write + read** | **PASSED.** Run with the seeded default accounts, on Yahya's explicit approval: the doctor for the test, the admin only for the soft-delete. Results: <br>- doctor login 200 (role `doctor`); <br>- `POST /api/v4/patients/` → 201, MRN `RELEASE-TEST-2026-10`, id `836fb5ad-360d-4ae1-9338-11f5555a69f9`; <br>- patient-linked predict, heart P-003 → 200, `no_referral`, 0.0875, `ivap_calibrated_training_mix`; <br>- patient-linked predict, NHANES N-001 → 200, `no_referral`, 0.0359, `platt_calibrated_nhanes_2015_2016`; <br>- neither returned a `review_id`, and no pending review item belongs to the test patient; <br>- the history read returned exactly the two rows, with the same confidences and `probability_scale: raw`; <br>- admin soft-delete → 200; afterwards the patient → 404, and it is absent from the list. <br>The async-session write and read path, which greenlet guards (CL-4), works in the image. <br>**One check in this plan was wrong:** it expected `decision` on history items, but `PredictionOut` has never exposed it. The column is stored, the API does not return it; this was true before this release too. Recorded as backlog 16. <br>Note: the first attempt posted to `/api/v4/patients` without the trailing slash and got 307; nothing was written |
 | 6 archived_note | Nothing to check: there is no `DATABASE_URL` secret (Yahya, 2026-10-06), so the rebuild wiped the SQLite DB and no BRFSS rows exist on the Space. Covered by tests |
 
-**Declared done:** not yet. Yahya chose to skip the DB write + read for now (2026-10-06), so the release stays not-declared-done. Phase C has not been run, and `chore/retire-brfss` is added to its delete list only once the release is declared done.
+**Declared done: 2026-10-06.** Every step-6 check passed (the `decision` expectation above was a plan error, not a product failure). Live: GitHub `deploy/v2-platform`, Vercel production `8bbbfe9` (bundle `index-CSdJeAX2.js`), HF `c816150`. Rollbacks as in the table above. `chore/retire-brfss` is now on the Phase C delete list.
 
 ### Step 3 — Phase C, branch clean-up (only after step 2 is declared done)
 
@@ -353,7 +353,11 @@ V3-advanced-DL 16318c72427f77da2b62f2aceedce468b44e7769
 main1 8018ec56bbc1040d2277165876923ea9b2f28efc
 EOF
 ```
-Stop on any `MOVED`.
+Stop on any `MOVED`. `chore/retire-brfss` was added after the release; it is checked against
+`deploy/v2-platform` rather than a fixed hash:
+```
+[ "$(git rev-parse origin/chore/retire-brfss)" = "$(git rev-parse origin/deploy/v2-platform)" ] && echo "OK    chore/retire-brfss (same commit as deploy/v2-platform)" || echo "MOVED chore/retire-brfss"
+```
 
 **3.2 Tags for the tag-then-delete branches** (annotated, pinned to the recorded commits), then push them:
 ```
@@ -374,7 +378,7 @@ The last command must list all 7 tags, each pointing to an annotated tag whose t
 2026-10-06. `chore/post-expo-cleanup` is the same commit as `deploy/v2-platform` (`f22b469`), which is the
 confirmation its table row asked for.
 ```
-git push origin --delete fix/demo-blockers fix/feature-verification fix/heart-retrain-candidate merge/heart-retrain-plus-phase9 monitoring/request-metrics chore/post-expo-cleanup
+git push origin --delete fix/demo-blockers fix/feature-verification fix/heart-retrain-candidate merge/heart-retrain-plus-phase9 monitoring/request-metrics chore/post-expo-cleanup chore/retire-brfss
 ```
 
 **3.3b Delete `main`, only after Yahya confirms the Vercel Production Branch is `deploy/v2-platform`** (3.0):
@@ -387,12 +391,9 @@ git push origin --delete main
 git push origin --delete phase9/diabetes-nhanes-ebm feature/diabetes-module-integration feature/omni-platform-final production-final-v3 V2-advanced-model V3-advanced-DL main1
 ```
 
-**3.5 Check:** `git ls-remote --heads origin` lists `deploy/v2-platform` and `chore/retire-brfss`, and
-nothing else.
+**3.5 Check:** `git ls-remote --heads origin` lists only `deploy/v2-platform`, plus `main` until 3.3b has run.
 
 **Not in the approved table, so left alone:**
-- `chore/retire-brfss`: after step 1.2 it is merged (the same commit as `deploy/v2-platform`). Deleting
-  it is a separate decision.
 - Local worktrees (`Heart_Disease_Project.worktrees/merge-p9`, `phase9`,
   `agents-mermaid-er-diagram-db-models`) and local branches: these commands delete remote branches only.
 
@@ -422,10 +423,9 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
   - `screens.mjs` applies the frontend logic to two probes. Its B6 result against both backends is `baselines/screens_B6.json`.
 - **Lint baseline:** `frontend/src` = 389 problems (`npx eslint src`).
 
-## Open verification (before release)
-- Visual browser check not done in B6. Yahya will check the Vercel preview of chore/retire-brfss
-  (picker, What-If, AL queue read-only items + Archived card, error banner, history archived note)
-  against the production backend before release.
+## Open verification (closed at release, 2026-10-06)
+- ~~Visual browser check not done in B6~~: Yahya checked the Vercel preview of chore/retire-brfss
+  against the production backend before the merge, and it was correct (heart + NHANES only).
 - PDF for history rows: not reachable from the current frontend. The archived banner reaches users
   only through report text and the backend export.
 
@@ -453,6 +453,12 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
 14. LOW: `/batch` checks the file type and `chest_pain_coding` before the retired-module check, so
     `POST /api/v4/diabetes/batch?chest_pain_coding=…` answers 400 `CODING_NOT_APPLICABLE` instead of 410.
     Still a refusal, nothing is scored; found in B7 area 6 (the test that relied on it now uses NHANES).
+15. LOW (accepted risk, Yahya's decision, 2026-10-06; not a finding): set the `ADMIN_PASSWORD` /
+    `DOCTOR_PASSWORD` Space secrets before any external demo or sharing. Until then the live Space uses
+    the seeded defaults from `backend/main.py`.
+16. LOW: the history API (`PredictionOut`) does not return the stored `decision`, nor the Venn-Abers
+    interval, so a conformal row reads back with `prediction`/`diagnosis` only. Found in the release
+    smoke test; pre-existing.
 
 ## Findings and lessons
 - W-08 (closed in B3): retrain for a retired disease would have overwritten production BRFSS weights.
