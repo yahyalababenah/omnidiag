@@ -3,9 +3,9 @@ Tests — model-family registry (backend/model_backends/)
 ========================================================
 Sections
   A. registry: fail-fast on unknown / missing families
-  B. the two built-in families: the model-level interface agrees with the
-     router-facing output it wraps (heart = sklearn_pipeline,
-     diabetes = stacking_ensemble)
+  B. the built-in heart family: the model-level interface agrees with the
+     router-facing output it wraps (the BRFSS stacking_ensemble family went
+     with that module, gates B4 and B7)
   C. PROOF: a third disease, `demo_logreg`, in a NON-tree family
      (sklearn_generic), registered by YAML only in a temporary configs dir
      and served through the real router and the real FastAPI app
@@ -65,13 +65,6 @@ HEART_PATIENT = {
     "Age": 63, "Sex": "M", "ChestPainType": "ASY", "RestingBP": 145,
     "Cholesterol": 233, "FastingBS": 1, "RestingECG": "LVH", "MaxHR": 108,
     "ExerciseAngina": "Y", "Oldpeak": 2.6, "ST_Slope": "Flat",
-}
-DIABETES_PATIENT = {
-    "HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 34.0, "Smoker": 1,
-    "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 0, "Fruits": 0,
-    "Veggies": 1, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0,
-    "GenHlth": 4, "MentHlth": 5, "PhysHlth": 10, "DiffWalk": 1, "Sex": 1,
-    "Age": 10, "Education": 4, "Income": 3,
 }
 
 
@@ -249,18 +242,11 @@ class TestBuiltinFamiliesInterface:
         assert caps.supports_vectorized_batch
         assert caps.explainer == "linear" and not caps.supports_tree_shap
 
-    @pytest.mark.brfss
-    def test_diabetes_capabilities(self, real_router):
-        caps = real_router._get_loader("diabetes").capabilities
-        assert caps.supports_tree_shap and not caps.supports_vectorized_batch
-        assert caps.supports_counterfactuals and caps.explainer == "tree"
-
     def test_heart_predict_proba_is_the_raw_model_scale(self, real_router):
         """`predict_proba` is the model's own output, as the interface says.
 
         For this family the served probability is the Venn-Abers calibration of
-        that score, so the two are related but not equal — the same split the
-        diabetes ensemble has between its raw and prevalence-corrected scales.
+        that score, so the two are related but not equal.
         """
         backend = real_router._get_loader("heart_disease")
         raw = float(backend.predict_proba(pd.DataFrame([HEART_PATIENT]))[0])
@@ -276,25 +262,6 @@ class TestBuiltinFamiliesInterface:
         assert sr.feature_names == list(backend.bundle["features_model"])
         assert [by_name[f] for f in sr.feature_names] == sr.values.tolist()
         assert sr.base_value == explained["base_value"]
-
-    @pytest.mark.brfss
-    def test_diabetes_predict_proba_is_the_raw_scale(self, real_router):
-        backend = real_router._get_loader("diabetes")
-        out = real_router.predict("diabetes", dict(DIABETES_PATIENT))
-        proba = backend.predict_proba(pd.DataFrame([DIABETES_PATIENT]))
-        assert float(proba[0]) == out["probability_raw"]
-        assert len(backend.feature_names) == 21
-
-    @pytest.mark.brfss
-    def test_diabetes_shap_values_match_explain(self, real_router):
-        backend = real_router._get_loader("diabetes")
-        sr = backend.shap_values(pd.DataFrame([DIABETES_PATIENT]))
-        explained = real_router.explain("diabetes", dict(DIABETES_PATIENT))
-        by_name = {c["feature"]: c["shap_value"] for c in explained["chart_data"]}
-        assert sorted(sr.feature_names) == sorted(by_name)
-        assert [by_name[f] for f in sr.feature_names] == sr.values.tolist()
-        assert sr.base_value == explained["base_value_raw"]
-
 
 # ═════════════════════════════════════════════════════════════════════════════
 # C. Third disease in a non-tree family, served through the real app
@@ -356,16 +323,6 @@ class TestDemoLogregThroughRealApp:
         assert info["demo_logreg"]["available"] is True
         assert info["demo_logreg"]["supports_counterfactuals"] is False
         assert info["heart_disease"]["supports_counterfactuals"] is True
-
-    @pytest.mark.brfss
-    async def test_brfss_listed_by_diseases_endpoint(self, demo_client):
-        # Split out of the test above: /diseases omits a module whose model
-        # files are absent, so this half needs the BRFSS weights.
-        resp = await demo_client.get("/api/v4/diseases")
-        assert resp.status_code == 200, resp.text
-        info = {d["name"]: d["info"] for d in resp.json()["diseases"]}
-        assert info["diabetes"]["supports_counterfactuals"] is True
-
 
 # ═════════════════════════════════════════════════════════════════════════════
 # D. Nothing under backend/ except the backend class knows about any of this

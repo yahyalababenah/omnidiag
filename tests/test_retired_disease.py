@@ -23,11 +23,10 @@ from tests.conftest import TestSessionLocal
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RETIRED = "diabetes"
 
-BRFSS_ROW = {"HighBP": 1, "HighChol": 0, "CholCheck": 1, "BMI": 29, "Smoker": 0, "Stroke": 0,
-             "HeartDiseaseorAttack": 0, "PhysActivity": 1, "Fruits": 1, "Veggies": 1,
-             "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0, "GenHlth": 3,
-             "MentHlth": 0, "PhysHlth": 2, "DiffWalk": 0, "Sex": 1, "Age": 6, "Education": 5,
-             "Income": 6}
+# Placeholder inputs. Every retired route answers 410 before it reads a feature
+# (with these names a route that validated first would answer 422 instead), and
+# stored rows are read back as stored, so the retired schema is not needed.
+RETIRED_ROW = {"BMI": 29, "Sex": 1, "Age": 6, "field_a": 1, "field_b": 0}
 HEART_ROW = {"Age": 54, "Sex": "M", "ChestPainType": "ATA", "RestingBP": 140, "Cholesterol": 289,
              "FastingBS": 0, "RestingECG": "Normal", "MaxHR": 122, "ExerciseAngina": "N",
              "Oldpeak": 0, "ST_Slope": "Flat"}
@@ -74,7 +73,7 @@ async def records(db_tables):
         await s.flush()
         s.add_all([
             Prediction(id=ids["pred"], patient_id=ids["pt"], disease=RETIRED,
-                       input_features=BRFSS_ROW, prediction=1, confidence=0.41,
+                       input_features=RETIRED_ROW, prediction=1, confidence=0.41,
                        diagnosis="Positive", probability_scale="corrected",
                        shap_chart_data=[{"feature": "BMI", "shap_value": 0.12}]),
             Prediction(id=ids["hpred"], patient_id=ids["hpt"], disease="heart_disease",
@@ -83,7 +82,7 @@ async def records(db_tables):
         ])
         await s.flush()
         s.add_all([
-            PatientVisit(patient_id=ids["pt"], disease=RETIRED, features=BRFSS_ROW,
+            PatientVisit(patient_id=ids["pt"], disease=RETIRED, features=RETIRED_ROW,
                          risk_score=0.41, prediction=1),
             ReviewQueue(id=ids["rq"], prediction_id=ids["pred"], uncertainty_score=0.97,
                         status="pending"),
@@ -124,12 +123,12 @@ async def test_diseases_lists_exactly_the_live_modules(c):
 
 @pytest.mark.parametrize("route", ["predict", "explain", "counterfactuals"])
 async def test_scoring_routes_answer_410(c, doctor_token, route):
-    _assert_retired(await c.post(f"/api/v4/{RETIRED}/{route}", json=BRFSS_ROW,
+    _assert_retired(await c.post(f"/api/v4/{RETIRED}/{route}", json=RETIRED_ROW,
                                  headers=_auth(doctor_token)))
 
 
 async def test_batch_answers_410(c, doctor_token):
-    csv = ",".join(BRFSS_ROW) + "\n" + ",".join(str(v) for v in BRFSS_ROW.values()) + "\n"
+    csv = ",".join(RETIRED_ROW) + "\n" + ",".join(str(v) for v in RETIRED_ROW.values()) + "\n"
     _assert_retired(await c.post(f"/api/v4/{RETIRED}/batch", headers=_auth(doctor_token),
                                  files={"file": ("b.csv", csv, "text/csv")}))
 
@@ -220,7 +219,7 @@ async def test_visits_of_a_retired_disease_stay_readable(c, doctor_token, record
 async def test_a_report_renders_from_a_stored_retired_row(c, records):
     resp = await c.post("/api/v4/generate-report", json={
         "disease": RETIRED, "label": "Positive", "probability_corrected": 0.41,
-        "shap_values": [{"feature": "BMI", "shap_value": 0.12}], "features": BRFSS_ROW,
+        "shap_values": [{"feature": "BMI", "shap_value": 0.12}], "features": RETIRED_ROW,
     })
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -243,7 +242,7 @@ async def test_a_retired_row_never_reaches_the_llm(c, monkeypatch, records):
     monkeypatch.setattr(main_module, "_generate_report", boom)
     resp = await c.post("/api/v4/generate-report", json={
         "disease": RETIRED, "label": "Negative", "probability_corrected": 0.08,
-        "shap_values": [], "features": BRFSS_ROW,
+        "shap_values": [], "features": RETIRED_ROW,
     })
     assert resp.status_code == 200, resp.text
     assert resp.json()["source"] == "archived"
@@ -276,7 +275,7 @@ async def test_a_new_visit_is_refused(c, doctor_token, records):
     before = await _count(PatientVisit, disease=RETIRED)
     _assert_retired(await c.post(
         f"/api/v4/patients/{records['pt']}/visits", headers=_auth(doctor_token),
-        json={"disease": RETIRED, "features": BRFSS_ROW, "risk_score": 0.3, "prediction": 1}))
+        json={"disease": RETIRED, "features": RETIRED_ROW, "risk_score": 0.3, "prediction": 1}))
     assert await _count(PatientVisit, disease=RETIRED) == before
 
 

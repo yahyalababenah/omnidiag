@@ -60,7 +60,7 @@ TestSessionLocal = async_sessionmaker(
 # ── Mock OmniDiagRouter ───────────────────────────────────────────────────────
 def _make_mock_router():
     mock = MagicMock()
-    mock.get_available_diseases.return_value = ["heart_disease", "diabetes"]
+    mock.get_available_diseases.return_value = ["heart_disease", "diabetes_nhanes"]
     mock.get_disease_info.return_value = {
         "name": "heart_disease",
         "display_name": "Coronary Artery Disease Risk",

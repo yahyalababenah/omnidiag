@@ -76,7 +76,7 @@
       "language": "ar+en",
       "disease": "diabetes",
       "trap": "mixed script -- only BMI / BP style tokens parse",
-      "text": "مريض عمره 47 سنة، BMI 26، BP مرتفع، لا يمارس الرياضة. GenHlth fair."
+      "text": "مريض عمره 47 سنة، BMI 26، BP مرتفع، لا يمارس الرياضة. General health fair."
     },
     {
       "id": "D-AR-3",

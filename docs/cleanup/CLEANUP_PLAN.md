@@ -23,7 +23,7 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 | B4 | BRFSS loader, schemas and legacy retrain writer removed; non-candidate families get `unsupported` | `3eb4c84`, W-26 docs `4ba08c8` | 〃 |
 | B5 | BRFSS CF tables, scale/correction, notes map and report bands removed; archived report for retired rows | `8186c4d` | 〃 |
 | B6 | Frontend: BRFSS removed, retired items read-only, history archived note | heart Age/Sex `83b3576`; B6 `6be40b0` | 〃 |
-| B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4): this commit | 〃; areas 6–8 in progress |
+| B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4) `99a2bac`; 6 tests: this commit | 〃; areas 7–8 in progress |
 | Tools | Verification and maintenance scripts | — | folded into B7 area 7 |
 | Docs | README and module docs | — | folded into B7 area 8 |
 | Release | Frontend (Vercel) first, then the HF snapshot | — | not started |
@@ -200,6 +200,9 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
     cryptography <47, packaging <26, rich <15, typer <0.21), with a test run on the new versions (CL-4).
 13. Add a lock file (pip-compile or similar) and align the local venv with the image, so tests run on
     production versions. Today they diverge: SQLAlchemy 2.0.51 locally vs 2.1.3 in the image (CL-4).
+14. LOW: `/batch` checks the file type and `chest_pain_coding` before the retired-module check, so
+    `POST /api/v4/diabetes/batch?chest_pain_coding=…` answers 400 `CODING_NOT_APPLICABLE` instead of 410.
+    Still a refusal, nothing is scored; found in B7 area 6 (the test that relied on it now uses NHANES).
 
 ## Findings and lessons
 - W-08 (closed in B3): retrain for a retired disease would have overwritten production BRFSS weights.
@@ -218,6 +221,11 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
   the image). Caught by the dependency-resolution diff, not by the import blocker.
 - Hollow tests caught: the cached-schema test (cache disabled in tests), and the F9-32 regression
   initially caught only by the policy pin. Both fixed by testing behaviour directly.
+- B7 area 6, mutation check of the renamed helper tests (`docs/cleanup/tools/mutate.py`, 8 mutations,
+  all caught). Two gaps found on the way: the privacy test checked `build_prompt()`, a copy of
+  `generate_report()`'s prompt assembly, so `generate_report()` forwarding the raw values went
+  unnoticed (a test now captures the prompt actually sent); and dropping only the rule-based report's
+  "Top contributing factors" line is not caught, because the same names appear in its drivers list.
 
 The cross-layer items above are recorded in `docs/phase9/FINDINGS_REGISTER.md` as W-08, W-26,
 F9-40, CL-1, CL-2, CL-3 and CL-4.

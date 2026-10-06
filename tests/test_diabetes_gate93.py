@@ -245,23 +245,6 @@ def test_nhanes_is_the_configured_diabetes_module():
     assert RETIRED_DISEASES["diabetes"]["replaced_by"] == "diabetes_nhanes"
 
 
-@pytest.mark.brfss
-def test_the_two_modules_share_no_weights(config):
-    with open("configs/diabetes.yaml") as handle:
-        brfss = yaml.safe_load(handle)
-    assert brfss["model"]["weights_path"] != config["model"]["weights_path"]
-
-
-@pytest.mark.brfss
-def test_brfss_keeps_its_threshold_and_bands():
-    """Whatever Phase 9 does, the legacy module keeps deciding the way it always
-    has. Its threshold and bands are not ours to retire yet."""
-    with open("configs/diabetes.yaml") as handle:
-        brfss = yaml.safe_load(handle)
-    assert brfss["model"]["inference_threshold"] == pytest.approx(0.108184)
-    assert brfss["model"]["risk_bands"] == {"high": 0.70, "moderate": 0.40}
-
-
 def test_nhanes_declares_no_threshold_and_no_bands(config):
     assert config["model"]["inference_threshold"] is None
     assert config["model"]["risk_bands"] is None

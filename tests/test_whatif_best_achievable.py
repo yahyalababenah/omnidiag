@@ -2,7 +2,8 @@
 Tests — What-If best_achievable never exceeds the baseline
 ==========================================================
 "Best achievable" used to be every allowed lever pushed at once. A lever can
-raise the model's estimate (PhysActivity does in the diabetes model), so on
+raise the model's estimate (a physical-activity lever did in the retired BRFSS
+module), so on
 the live Space Case C showed "49.4% -> 50.4%" as its best achievable. The
 estimate reported under that name must be strictly below the baseline, and
 when no allowed change lowers it the response says so instead.
@@ -26,12 +27,14 @@ from tests.test_whatif_policy import (
     _validated,
 )
 
+# Neutral lever names: these are unit tests of the shared helpers, not of any
+# module's policy. lever_a is the one that raises the estimate in the cases below.
 POLICY = {
     "BMI": ("decrease", 18.5),
-    "PhysActivity": ("to", 1),
-    "Fruits": ("to", 1),
+    "lever_a": ("to", 1),
+    "lever_b": ("to", 1),
 }
-PATIENT = {"BMI": 33, "PhysActivity": 0, "Fruits": 0, "Age": 9}
+PATIENT = {"BMI": 33, "lever_a": 0, "lever_b": 0, "Age": 9}
 
 
 def _scorer(effects):
@@ -47,25 +50,25 @@ def _scorer(effects):
 
 class TestLowestAchievable:
     def test_harmful_lever_is_left_out(self):
-        # PhysActivity raises the estimate; the best combination skips it.
-        score = _scorer({"BMI": -0.10, "PhysActivity": +0.30, "Fruits": -0.05})
+        # lever_a raises the estimate; the best combination skips it.
+        score = _scorer({"BMI": -0.10, "lever_a": +0.30, "lever_b": -0.05})
         best, p = lowest_achievable(PATIENT, POLICY, score, 0.50)
         assert p == pytest.approx(0.35)
-        assert best["PhysActivity"] == 0
-        assert best["BMI"] == 18.5 and best["Fruits"] == 1
+        assert best["lever_a"] == 0
+        assert best["BMI"] == 18.5 and best["lever_b"] == 1
 
     def test_every_lever_at_once_would_have_exceeded_baseline(self):
-        score = _scorer({"BMI": -0.10, "PhysActivity": +0.30, "Fruits": -0.05})
+        score = _scorer({"BMI": -0.10, "lever_a": +0.30, "lever_b": -0.05})
         assert score(all_improvements(PATIENT, POLICY)) > 0.50   # the old behaviour
         _, p = lowest_achievable(PATIENT, POLICY, score, 0.50)
         assert p < 0.50
 
     def test_nothing_lowers_the_estimate_returns_none(self):
-        score = _scorer({"BMI": +0.01, "PhysActivity": +0.30, "Fruits": 0.0})
+        score = _scorer({"BMI": +0.01, "lever_a": +0.30, "lever_b": 0.0})
         assert lowest_achievable(PATIENT, POLICY, score, 0.50) is None
 
     def test_no_lever_returns_none(self):
-        done = {"BMI": 18.5, "PhysActivity": 1, "Fruits": 1}
+        done = {"BMI": 18.5, "lever_a": 1, "lever_b": 1}
         assert lowest_achievable(done, POLICY, lambda r: 0.5, 0.5) is None
 
 

@@ -17,12 +17,13 @@ from backend.llm.report_generator import (
 _SHAP_VALUES = [
     {"feature": "Age", "shap_value": 0.35},
     {"feature": "BMI", "shap_value": -0.22},
-    {"feature": "HighBP", "shap_value": 0.18},
-    {"feature": "Smoker", "shap_value": 0.05},
-    {"feature": "PhysActivity", "shap_value": -0.01},
+    {"feature": "factor_c", "shap_value": 0.18},
+    {"feature": "factor_d", "shap_value": 0.05},
+    {"feature": "factor_e", "shap_value": -0.01},
 ]
 
-_FEATURES = {"Age": 55, "BMI": 34.0, "HighBP": 1, "Smoker": 0}
+# Neutral names past the top two: the report helpers are module-agnostic.
+_FEATURES = {"Age": 55, "BMI": 34.0, "factor_c": 1, "factor_d": 0}
 
 
 class TestRuleBasedFallback:

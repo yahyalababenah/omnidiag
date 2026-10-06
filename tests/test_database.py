@@ -115,7 +115,7 @@ class TestForeignKeyBehavior:
         prediction = Prediction(
             patient_id=None,
             disease="diabetes",
-            input_features={"HighBP": 1},
+            input_features={"field_a": 1},
             prediction=0,
             confidence=0.3,
             diagnosis="Negative",

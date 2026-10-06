@@ -23,7 +23,7 @@ DIABETES_THRESHOLD = 0.108184
 # Deliberately memorable values — easy to spot if they leak into a prompt.
 RAW_FEATURES = {
     "Age": 62, "Sex": "F", "RestingBP": 187, "Cholesterol": 341,
-    "BMI": 43, "GenHlth": 5, "Income": 3, "Education": 2,
+    "BMI": 43, "extra_a": 5, "extra_b": 3, "extra_c": 2,
 }
 
 SHAP = [
@@ -82,6 +82,38 @@ class TestNoRawValuesLeaveTheServer:
         assert "never" in rg._SYSTEM_PROMPT.lower()
         lowered = rg._SYSTEM_PROMPT.lower()
         assert "not given the patient's measured values" in lowered
+
+    async def test_the_prompt_generate_report_sends_carries_no_measured_value(self, monkeypatch):
+        """build_prompt() above re-assembles the prompt the way generate_report()
+        does, so it cannot see generate_report() itself forwarding the values.
+        This captures what is actually handed to the client."""
+        import openai
+
+        sent = []
+
+        class _Completions:
+            async def create(self, **kwargs):
+                sent.append(kwargs["messages"])
+                msg = type("M", (), {"content": "Total cholesterol is the largest contributor."})()
+                return type("R", (), {"choices": [type("C", (), {"message": msg})()]})()
+
+        class _Client:
+            def __init__(self, **_kwargs):
+                self.chat = type("Chat", (), {"completions": _Completions()})()
+
+        monkeypatch.setattr(rg, "_get_api_key", lambda: "test-key")
+        monkeypatch.setattr(openai, "AsyncOpenAI", _Client)
+        features = dict(RAW_FEATURES, extra_a=9137)
+        result = await rg.generate_report(
+            disease_display="Coronary Artery Disease Risk", probability_corrected=0.63,
+            label="Positive", shap_values=SHAP, features=features,
+        )
+        assert result["source"] == "llm" and len(sent) == 1, result
+        outbound = "\n".join(m["content"] for m in sent[0])
+        for value in ("187", "341", "9137"):
+            assert value not in outbound, f"the measured value {value} reached the outbound prompt"
+        for name in ("extra_a", "extra_b", "extra_c"):
+            assert name not in outbound, f"the unscored input {name} reached the outbound prompt"
 
     def test_features_are_still_accepted_so_existing_clients_keep_working(self):
         """The parameter stays; it is simply not forwarded."""

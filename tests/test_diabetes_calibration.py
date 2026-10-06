@@ -8,9 +8,9 @@ Pins the two diabetes decision fixes:
 Sections
   A. correction formula — pure unit tests, no model
   B. decision invariance — correction changes the scale, never the decision
-  C. /predict integration with the REAL router (diabetes + heart)
+  C. /predict integration with the REAL router (heart; the BRFSS cases were
+     deleted with that module, gate B7)
   D. heart non-regression — golden outputs captured before the change
-  E. extreme and malformed diabetes input
 
 The real models are loaded once per module (module-scoped fixture; the
 shared `app` fixture is module-scoped, so the real router can be swapped in
@@ -184,29 +184,6 @@ class TestDecisionInvariance:
 # Shared real-model fixtures
 # ═════════════════════════════════════════════════════════════════════════════
 
-DIABETES_LOW = {
-    "HighBP": 0, "HighChol": 0, "CholCheck": 1, "BMI": 22.0, "Smoker": 0,
-    "Stroke": 0, "HeartDiseaseorAttack": 0, "PhysActivity": 1, "Fruits": 1,
-    "Veggies": 1, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0,
-    "GenHlth": 1, "MentHlth": 0, "PhysHlth": 0, "DiffWalk": 0, "Sex": 0,
-    "Age": 3, "Education": 6, "Income": 8,
-}
-DIABETES_HIGH = {
-    "HighBP": 1, "HighChol": 1, "CholCheck": 1, "BMI": 38.0, "Smoker": 1,
-    "Stroke": 0, "HeartDiseaseorAttack": 1, "PhysActivity": 0, "Fruits": 0,
-    "Veggies": 0, "HvyAlcoholConsump": 0, "AnyHealthcare": 1, "NoDocbcCost": 0,
-    "GenHlth": 4, "MentHlth": 5, "PhysHlth": 15, "DiffWalk": 1, "Sex": 1,
-    "Age": 10, "Education": 4, "Income": 3,
-}
-_BINARY = ["HighBP", "HighChol", "CholCheck", "Smoker", "Stroke", "HeartDiseaseorAttack",
-           "PhysActivity", "Fruits", "Veggies", "HvyAlcoholConsump", "AnyHealthcare",
-           "NoDocbcCost", "DiffWalk", "Sex"]
-# Bounds from backend/schemas.py::DiabetesInput
-DIABETES_MIN = {**{k: 0 for k in _BINARY}, "BMI": 10.0, "MentHlth": 0, "PhysHlth": 0,
-                "GenHlth": 1, "Age": 1, "Education": 1, "Income": 1}
-DIABETES_MAX = {**{k: 1 for k in _BINARY}, "BMI": 100.0, "MentHlth": 30, "PhysHlth": 30,
-                "GenHlth": 5, "Age": 13, "Education": 6, "Income": 8}
-
 # Case names state the CLINICAL meaning of the chest pain and the API code that
 # carries it, because the previous names did not and one of them was wrong in
 # exactly the way HF-1 was: "typical_up_slope" sends ChestPainType "ATA", which
@@ -268,11 +245,6 @@ RISK_BANDS_RAW = {"high": 0.7, "moderate": 0.4}
 @pytest.fixture(scope="module")
 def real_router():
     return _RealOmniDiagRouter(configs_dir=_CONFIGS_DIR)
-
-
-@pytest.fixture(scope="module")
-def diabetes_loader(real_router):
-    return real_router._get_loader("diabetes")
 
 
 def _flush_cache_sync():
@@ -337,77 +309,10 @@ async def _post_predict(client, disease, payload):
 # C. /predict integration
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestDiabetesPredictApi:
-    @pytest.mark.brfss
-    @pytest.mark.parametrize("payload", [DIABETES_LOW, DIABETES_HIGH], ids=["low", "high"])
-    async def test_response_carries_audit_fields(self, live_client, payload):
-        resp = await _post_predict(live_client, "diabetes", payload)
-        assert resp.status_code == 200, resp.text
-        data = resp.json()
-        for key in ("probability_raw", "probability_corrected", "inference_threshold",
-                    "prevalence_correction_applied", "confidence", "prediction"):
-            assert key in data, key
-        assert data["prevalence_correction_applied"] is True
-        assert data["prevalence_train"] == PI_TRAIN
-        assert data["prevalence_deploy"] == PI_DEPLOY
-        assert data["inference_threshold"] == pytest.approx(THRESHOLD_DEPLOYED)
-        # The number the UI shows is the corrected one.
-        assert data["confidence"] == data["probability_corrected"]
-
-    @pytest.mark.brfss
-    @pytest.mark.parametrize("payload", [DIABETES_LOW, DIABETES_HIGH], ids=["low", "high"])
-    async def test_corrected_is_formula_of_raw_and_lower(self, live_client, payload):
-        data = (await _post_predict(live_client, "diabetes", payload)).json()
-        raw, cor = data["probability_raw"], data["probability_corrected"]
-        assert 0.0 < raw < 1.0
-        assert cor < raw
-        assert cor == pytest.approx(correct(raw), abs=1e-12)
-
-    @pytest.mark.brfss
-    @pytest.mark.parametrize(
-        "payload", [DIABETES_LOW, DIABETES_HIGH, DIABETES_MIN, DIABETES_MAX],
-        ids=["low", "high", "min", "max"],
-    )
-    async def test_decision_matches_corrected_probability(self, live_client, payload):
-        data = (await _post_predict(live_client, "diabetes", payload)).json()
-        expected = int(data["probability_corrected"] >= data["inference_threshold"])
-        assert data["prediction"] == expected
-        assert data["diagnosis"] == ("Positive" if expected else "Negative")
-        # ... and the raw pair gives the same decision.
-        assert expected == int(data["probability_raw"] >= data["inference_threshold_raw"])
-
-    @pytest.mark.brfss
-    async def test_risk_bands_are_returned_on_the_displayed_scale(self, live_client):
-        # The UI colours the badge with these; they must be on the same scale as
-        # `confidence`, i.e. corrected, or a Positive patient reads LOW.
-        data = (await _post_predict(live_client, "diabetes", DIABETES_HIGH)).json()
-        assert data["risk_bands_raw"] == pytest.approx(RISK_BANDS_RAW)
-        for band, raw_value in RISK_BANDS_RAW.items():
-            assert data["risk_bands"][band] == pytest.approx(correct(raw_value))
-            assert data["risk_bands"][band] < raw_value
-        assert data["risk_bands"]["moderate"] < data["risk_bands"]["high"]
-
-    @pytest.mark.brfss
-    async def test_band_membership_is_unchanged_by_the_correction(self, live_client):
-        # Same patient, same band before and after: the correction rescales.
-        for payload in (DIABETES_LOW, DIABETES_HIGH, DIABETES_MIN, DIABETES_MAX):
-            d = (await _post_predict(live_client, "diabetes", payload)).json()
-            def band(p, cuts):
-                return "HIGH" if p >= cuts["high"] else "MODERATE" if p >= cuts["moderate"] else "LOW"
-            assert band(d["probability_corrected"], d["risk_bands"]) == \
-                   band(d["probability_raw"], d["risk_bands_raw"])
-
+class TestHeartPredictApi:
     def test_heart_disease_info_declares_no_bands(self, real_router):
         # Heart keeps the frontend default constants; nothing leaked into it.
         assert real_router.get_disease_info("heart_disease")["risk_bands"] is None
-
-    @pytest.mark.brfss
-    async def test_fixtures_exercise_both_decisions(self, live_client):
-        # Guards the test above against passing trivially on one class only.
-        low = (await _post_predict(live_client, "diabetes", DIABETES_LOW)).json()
-        high = (await _post_predict(live_client, "diabetes", DIABETES_HIGH)).json()
-        assert low["prediction"] == 0
-        assert high["prediction"] == 1
 
     @pytest.mark.parametrize("case", sorted(HEART_CASES))
     async def test_heart_response_has_no_correction_fields(self, live_client, case):
@@ -624,42 +529,6 @@ class TestHeartNonRegression:
             cells.update(original)  # real_router is module-scoped
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# E. Extreme and malformed input
-# ═════════════════════════════════════════════════════════════════════════════
-
-@pytest.mark.brfss
-class TestDiabetesEdgeInputs:
-    @pytest.mark.parametrize("payload", [DIABETES_MIN, DIABETES_MAX], ids=["min", "max"])
-    def test_schema_bounds_do_not_raise(self, diabetes_loader, payload):
-        out = diabetes_loader.predict(dict(payload))
-        for key in ("probability_raw", "probability_corrected", "confidence"):
-            assert np.isfinite(out[key])
-            assert 0.0 <= out[key] <= 1.0
-        assert out["prediction"] in (0, 1)
-
-    async def test_missing_column_is_a_clear_client_error(self, live_client):
-        payload = {k: v for k, v in DIABETES_HIGH.items() if k != "BMI"}
-        resp = await _post_predict(live_client, "diabetes", payload)
-        assert 400 <= resp.status_code < 500, (resp.status_code, resp.text)
-        assert "BMI" in resp.text
-
-    def test_missing_column_at_loader_names_the_column(self, diabetes_loader):
-        payload = {k: v for k, v in DIABETES_HIGH.items() if k != "HighBP"}
-        with pytest.raises(Exception) as exc:
-            diabetes_loader.predict(payload)
-        assert "HighBP" in str(exc.value)
-
-    def test_loader_refuses_config_without_priors(self):
-        from backend.ensemble_loader import EnsembleModelLoader
-
-        with open(_ARCHIVED_DIABETES_CFG) as f:
-            model_cfg = yaml.safe_load(f)["model"]
-        cfg = {"model": {k: v for k, v in model_cfg.items() if k != "prevalence_deploy"}}
-        with pytest.raises(KeyError, match="prevalence_deploy"):
-            EnsembleModelLoader(cfg)
-
-
 class TestBatchChestPainCodingGuard:
     """
     Gate 8.2 — the two guards on the batch upload path.
@@ -781,8 +650,8 @@ class TestBatchChestPainCodingGuard:
         unchanged.
         """
         resp = await live_client.post(
-            "/api/v4/diabetes/batch",
-            files={"file": ("d.csv", b"BMI\n25.0\n", "text/csv")},
+            "/api/v4/diabetes_nhanes/batch",
+            files={"file": ("d.csv", b"BMXBMI\n25.0\n", "text/csv")},
             headers={"Authorization": f"Bearer {doctor_token}"},
             params={"chest_pain_coding": "uci_raw"},
         )
