@@ -1473,3 +1473,30 @@ The shared `Age` and `Sex` dictionary entries described the BRFSS coding: 5-year
 0/1 sex. Heart's `Age` is in years and its `Sex` is M/F, so the SHAP tooltip and the Variable
 Scales view gave heart patients the retired module's meanings. Fixed in its own commit, because
 it changes heart-visible text.
+
+## CL-4 — FIXED in B7 (area 5) — greenlet reached the image only through an unused package
+
+The backend uses SQLAlchemy's async engine (`backend/database.py`), which needs `greenlet`.
+`requirements.txt` asked for plain `sqlalchemy>=2.0.0`, and the image resolves SQLAlchemy 2.1.3, where
+greenlet is only installed with the `asyncio` extra. The image had greenlet solely because `flwr`
+(Flower, unused since the federated prototype was archived) depends on it. Removing flwr, as planned,
+would have shipped an image whose first database query fails with
+`ValueError: the greenlet library is required to use this function`, while the local suite stayed
+green. The same flwr pin was also holding fastapi <0.139, starlette <1.4, uvicorn <0.50,
+cryptography <47, packaging <26, rich <15 and typer <0.21; without it the image would have moved all
+seven to untested versions.
+
+**Why local tests could not see it:** the local venv has SQLAlchemy 2.0.51, where greenlet is a hard
+dependency. The local environment and the image resolve different versions of the same requirement.
+
+**Fix:** `sqlalchemy[asyncio]` is declared, and the seven upper bounds are explicit in
+`requirements.txt`. `pip install --dry-run` of the old and new requirements: only flwr and its own
+dependencies disappear; greenlet stays; no other version moves.
+
+**Proof:** `tests/test_async_db_dependency.py` imports greenlet and round-trips an async session; it
+fails with greenlet blocked (import blocker) and with the extra removed from `requirements.txt`.
+Found with the dependency-resolution diff, not with the tests: an import check only proves that a
+package is unused, not that nothing depends on it transitively.
+
+**Follow-up (backlog):** lift the seven bounds with a test run; add a lock file and align the local
+venv with the image, so tests run on production versions.

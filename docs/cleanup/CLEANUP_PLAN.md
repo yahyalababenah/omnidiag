@@ -23,9 +23,9 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 | B4 | BRFSS loader, schemas and legacy retrain writer removed; non-candidate families get `unsupported` | `3eb4c84`, W-26 docs `4ba08c8` | 〃 |
 | B5 | BRFSS CF tables, scale/correction, notes map and report bands removed; archived report for retired rows | `8186c4d` | 〃 |
 | B6 | Frontend: BRFSS removed, retired items read-only, history archived note | heart Age/Sex `83b3576`; B6 `6be40b0` | 〃 |
-| B7 | Docker/data | — | plan written, awaiting approval |
-| Tools | Verification and maintenance scripts | — | not started |
-| Docs | README and module docs | — | not started |
+| B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4): this commit | 〃; areas 6–8 in progress |
+| Tools | Verification and maintenance scripts | — | folded into B7 area 7 |
+| Docs | README and module docs | — | folded into B7 area 8 |
 | Release | Frontend (Vercel) first, then the HF snapshot | — | not started |
 
 ## Decisions that stand (do not relitigate)
@@ -37,7 +37,7 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 - **No prevalence correction.** A config declaring `prevalence_train`, `prevalence_deploy` or non-null `risk_bands` fails at load with `prevalence correction is not supported (removed in B5)`. `Scale.CORRECTED` stays as the legal value of the DB column for old rows.
 - **Retired rows never reach the LLM.** They render through `archived_report()`, which is rule-based and starts with the banner "ARCHIVED MODULE — replaced by NHANES dysglycaemia module". `archived_note` appears on export and history items.
 - **Frontend `RETIRED_DISEASES` constant**, kept equal to the backend list by `tests/test_frontend_retired_contract.py`. It is removed after the HF release.
-- **Release order.** The frontend ships first; it must work against both backends. Then the HF snapshot, with a rollback commit recorded and `docs/**/*.png` excluded.
+- **Release order.** The frontend ships first; it must work against both backends. Then the HF snapshot, with a rollback commit recorded and `docs/**/*.png` excluded. After the HF build, a real DB write + read is smoke-tested on the live Space (create a patient, predict, read the history) before the release is declared done (CL-4).
 
 ## Remaining gates
 
@@ -78,7 +78,7 @@ Scope, as defined under "Remaining gates" above plus backlog item 10. One commit
 | 2 | models/diabetes JSON | `git mv` the 6 files to `archive/post_expo_2026-10/models/diabetes/` (the docs cite their numbers) + INDEX rows; remove `_PROFILE_PATHS["diabetes"]` | rule comparison → heart's profile (R); `TestDiabetesReferenceIsReweighted` deleted (D) |
 | 3 | BRFSS CSV | `git rm --cached` (the file stays on disk and becomes ignored by `*.csv`) and remove its `.gitignore` exception; remove `_REFERENCE_PATHS["diabetes"]` | — |
 | 4 | lightgbm | remove from requirements.txt | — |
-| 5 | flwr | remove from requirements.txt | — |
+| 5 | flwr | remove from requirements.txt. **Executed differently (approved 2026-10-06):** flwr was the only source of greenlet in the image and capped 7 packages (CL-4), so the commit also declares `sqlalchemy[asyncio]` and the 7 upper bounds | `tests/test_async_db_dependency.py` added (A) |
 
 **Acceptance (each commit):**
 - `-m "not brfss"`: 0 failures, in the normal tree and in a clean worktree with no BRFSS files.
@@ -194,8 +194,12 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
 8. The frontend has no export screen. Decide later whether one is needed; not part of cleanup.
 9. 4 anonymous predictions in the local DB (no patient link): pre-existing; they never appear in
    history. Decide whether that's intended.
-10. Remove flwr/lightgbm from requirements.txt if not done in B7.
+10. ~~Remove flwr/lightgbm from requirements.txt~~: done in B7 (lightgbm `601ee57`, flwr in area 5).
 11. HF model repo `yahyoha/omnidiag-models`: the BRFSS files are still hosted there. Keep them for reproducibility of the archived docs, or remove them later.
+12. Lift the 7 upper bounds flwr used to impose (fastapi <0.139, starlette <1.4, uvicorn <0.50,
+    cryptography <47, packaging <26, rich <15, typer <0.21), with a test run on the new versions (CL-4).
+13. Add a lock file (pip-compile or similar) and align the local venv with the image, so tests run on
+    production versions. Today they diverge: SQLAlchemy 2.0.51 locally vs 2.1.3 in the image (CL-4).
 
 ## Findings and lessons
 - W-08 (closed in B3): retrain for a retired disease would have overwritten production BRFSS weights.
@@ -209,8 +213,11 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
 - B6: the shared `Age`/`Sex` dictionary entries showed BRFSS meanings on heart tooltips (pre-existing).
 - Process: the scratchpad under /tmp was wiped at midnight and the plan was lost. Plans, harness
   scripts, and baselines now live in the repo.
+- B7 (CL-4): greenlet reached the image only through the unused flwr; removing it would have broken
+  the first DB query in the image while local tests stayed green (local SQLAlchemy 2.0.51 vs 2.1.3 in
+  the image). Caught by the dependency-resolution diff, not by the import blocker.
 - Hollow tests caught: the cached-schema test (cache disabled in tests), and the F9-32 regression
   initially caught only by the policy pin. Both fixed by testing behaviour directly.
 
 The cross-layer items above are recorded in `docs/phase9/FINDINGS_REGISTER.md` as W-08, W-26,
-F9-40, CL-1, CL-2 and CL-3.
+F9-40, CL-1, CL-2, CL-3 and CL-4.
