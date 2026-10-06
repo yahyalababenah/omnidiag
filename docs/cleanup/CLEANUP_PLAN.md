@@ -23,10 +23,10 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 | B4 | BRFSS loader, schemas and legacy retrain writer removed; non-candidate families get `unsupported` | `3eb4c84`, W-26 docs `4ba08c8` | 〃 |
 | B5 | BRFSS CF tables, scale/correction, notes map and report bands removed; archived report for retired rows | `8186c4d` | 〃 |
 | B6 | Frontend: BRFSS removed, retired items read-only, history archived note | heart Age/Sex `83b3576`; B6 `6be40b0` | 〃 |
-| B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4) `99a2bac`; 6 tests `ee78539`; 7 tools `264e1df`; 8 docs: this commit | 〃; B7 done, final acceptance below |
+| B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4) `99a2bac`; 6 tests `ee78539`; 7 tools `264e1df`; 8 docs `9421253` | 〃; **B7 done** (final acceptance below) |
 | Tools | Verification and maintenance scripts | — | folded into B7 area 7 |
 | Docs | README and module docs | — | folded into B7 area 8 |
-| Release | Frontend (Vercel) first, then the HF snapshot | — | not started |
+| Release | Frontend (Vercel) first, then the HF snapshot | — | **plan written (below), awaiting approval** |
 
 ## Decisions that stand (do not relitigate)
 
@@ -145,6 +145,97 @@ Scope, as defined under "Remaining gates" above plus backlog item 10. One commit
 - 0 BRFSS field names in live code (backend, features, configs, frontend/src), in tests, and in the Dockerfile.
 
 After that: the release plan (plan only).
+
+## B7 final acceptance (2026-10-06, HEAD `9421253`)
+
+- Full suite, no marker filter: **879 passed, 1 skipped, 0 failed**, in the normal tree and in a clean
+  worktree with no BRFSS files (the skip: `tests/test_notes_spacy_context.py`, spaCy / en_core_web_sm not
+  installed in `backend/.venv`).
+- `crosscheck.py`: **IDENTICAL** to `baselines/crosscheck_B4.txt` in both trees.
+- Build steps traced in the clean worktree: `train_heart_glm.py --verify` and
+  `build_drift_reference.py --verify` exit 0; 25 reads, all inside the Docker context; none is a BRFSS
+  file; the Dockerfile names no `models/diabetes/`.
+- BRFSS field names (the 19 listed under "B7, added areas"), whole-word, in `backend`, `features`,
+  `configs`, `frontend/src`, `tests` and `Dockerfile`: **0**. (A substring search finds only the English
+  word "smoker" in clinical-note text.)
+- Not verified here: a full Docker build (the laptop cannot). The HF build in the release is the first
+  full image build of B7; that is why the rollback below is recorded before the push.
+
+## Release plan (PLAN, 2026-10-06, awaiting approval — nothing below has been executed)
+
+State recorded on 2026-10-06, before any release step:
+- Live Space `yahyoha/omnidiag` (remote `hf`): `main` = `d6fb3238de7974dc7c43e8ed49420cfc291e4641`.
+  It still serves `diabetes` (BRFSS): `/api/v4/diseases` lists `diabetes`, `diabetes_nhanes`, `heart_disease`.
+- Live frontend `omnidiag-delta.vercel.app`: bundle `assets/index-BNeSlGQM.js`.
+
+### Step 1 — frontend first (Vercel)
+
+The B6 frontend works against both backends (verified in B6 against both, `baselines/screens_B6.json`), so
+it can go live while the Space still serves BRFSS.
+
+1. **Before merging:** Yahya checks the Vercel preview of `chore/retire-brfss` against the production
+   backend (the item under "Open verification"): picker without BRFSS, What-If, the AL queue with
+   read-only archived items and the Archived card, the error banner, the history archived note.
+2. **Merge:** Yahya merges `chore/retire-brfss` into `deploy/v2-platform` through a PR. The merge
+   deploys nothing to the Space (it is a separate snapshot push).
+3. **Confirm the deploy happened:** the live bundle name must change from `assets/index-BNeSlGQM.js`.
+   Vercel deploys cannot be triggered or seen from this machine, so an unchanged name means a stale
+   frontend, not a passed check.
+4. **Live check against the old backend** (`d6fb323`): the same list as step 1.1, on the production URL.
+5. **Frontend rollback:** in the Vercel dashboard, promote the previous production deployment (the one
+   serving `index-BNeSlGQM.js`). In git: revert the merge commit on `deploy/v2-platform`.
+
+### Step 2 — HF snapshot (backend)
+
+Preconditions: step 1 is done and checked, and `git ls-remote hf main` still returns `d6fb323`. If it
+does not, someone deployed in between: stop, and record the new hash as the rollback instead.
+
+1. **Build the snapshot without touching the working tree.** Use a temporary index:
+   - `read-tree` of the merged `deploy/v2-platform` commit;
+   - `git rm --cached` of every file git treats as binary, i.e. the `-  -` rows of
+     `git diff --numstat <empty-tree> <commit>`. Today that is 54 files: every `docs/**/*.png`,
+     `docs/fl_report`, `reports/monitoring_local`, `archive/stale_2026-09`, the `frontend/public`
+     icons, and `models/diabetes_nhanes/diabetes_nhanes_ebm.joblib`. The Dockerfile downloads that
+     joblib and checks its sha256. HF rejects any binary in a push, whatever its size, and the live
+     tree has none;
+   - `write-tree`, then `commit-tree -p d6fb323`, so the push is a fast-forward.
+2. **Check before pushing:**
+   - 0 binary files in the snapshot (the same numstat check);
+   - `README.md` starts with the HF front matter (`sdk: docker`, `app_port: 7860`);
+   - the snapshot tree equals the merged commit's tree minus exactly that file list.
+3. **Push:** `git push hf <snapshot>:refs/heads/main`. This is a plain fast-forward, without `--force`.
+4. **Rollback (recorded now):**
+   `git push --force hf d6fb3238de7974dc7c43e8ed49420cfc291e4641:refs/heads/main`.
+5. **Build log:** it must show
+   - the heart bundle built and `--verify` OK, and the drift reference `--verify` OK;
+   - the NHANES joblib `sha256sum -c` OK;
+   - no BRFSS download;
+   - `greenlet` among the installed packages (CL-4).
+
+   If the build fails: roll back and report.
+6. **Smoke test on the live Space, before the release is declared done (CL-4):**
+   - **A real database write and read, with a clinician account** (credentials from Yahya, not stored
+     in the repo):
+     - create a patient (`POST /api/v4/patients`);
+     - `POST /api/v4/heart_disease/predict?patient_id=<id>` and `POST /api/v4/diabetes_nhanes/predict?patient_id=<id>`;
+     - read the history (`GET /api/v4/patients/<id>/predictions`): both rows present, each with its
+       `decision` and `probability_scale`.
+
+     This is the path that greenlet guards. The local tests run on SQLAlchemy 2.0.51; the image runs 2.1.3.
+   - **Retirement:**
+     - `/api/v4/diseases` lists exactly `heart_disease` and `diabetes_nhanes`;
+     - `POST /api/v4/diabetes/predict` answers 410 `DISEASE_RETIRED` with `replaced_by: diabetes_nhanes`;
+     - if the live database holds BRFSS rows, their history items carry `archived_note`.
+   - **Parity:** `scripts/verify_live.py` (default URL = the live Space) exits 0: 6 demo patients ×
+     predict/explain/counterfactuals, identical to the local app within 1e-6.
+   - **Frontend against the new backend:** the step 1.1 list again, plus one report generation for a
+     heart result.
+7. **Done:** only when all of step 6 passes. Then record the new live hash and close "Open
+   verification". Next comes backlog item 2: remove the frontend `RETIRED_DISEASES` constant and its
+   contract test.
+
+**Not covered by this plan:** the HF model repo (`yahyoha/omnidiag-models`) keeps the BRFSS files
+(backlog 11). The image no longer downloads them, so they are inert.
 
 ## Phase C — remote branches (report only; nothing deleted)
 

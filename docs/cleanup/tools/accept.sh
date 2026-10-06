@@ -17,7 +17,7 @@ run_cross() { rm -f "$WORK/x.db"; DATABASE_URL="sqlite+aiosqlite:///$WORK/x.db" 
 echo "== normal tree, pytest ${MARK}"; run_tests; run_cross normal
 W=$WORK/wt; git worktree remove --force "$W" 2>/dev/null; rm -rf "$W"
 git worktree add -q --detach "$W" HEAD 2>&1 | grep -v -i lfs
-git diff --cached --binary | (cd "$W" && git apply --index) || { echo "PATCH FAILED"; exit 1; }
+if ! git diff --cached --quiet; then git diff --cached --binary | (cd "$W" && git apply --index) || { echo "PATCH FAILED"; exit 1; }; fi
 for f in $(git ls-files --others --ignored --exclude-standard models/heart_disease data | grep -v -E "diabetes/|__pycache__|\.bak"); do [ -e "$W/$f" ] || { mkdir -p "$W/$(dirname "$f")"; ln -s "$ROOT/$f" "$W/$f"; }; done
 echo "== clean worktree (no BRFSS files: $(ls "$W"/models/diabetes/*.pkl 2>/dev/null | wc -l) pkl), pytest ${MARK}"
 (cd "$W" && run_tests && run_cross worktree)
