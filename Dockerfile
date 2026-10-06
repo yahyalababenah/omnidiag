@@ -29,25 +29,19 @@ COPY . .
 # Download model weights + preprocessors at BUILD time so they're baked into
 # the image. Zero download delay at startup — port 7860 responds instantly.
 #
-# heart_disease is a single self-contained bundle (dict: pipeline, features,
-# threshold, ...) — the Pipeline's ColumnTransformer does its own
-# encoding/scaling/imputation, so there is no separate label_encoders.pkl /
-# standard_scaler.pkl to fetch for it (unlike diabetes, below).
-RUN mkdir -p models/heart_disease models/diabetes/preprocessors && \
+# heart_full_tuned.pkl is the previous heart model, kept in the image so that
+# reverting to it stays a two-line config change (see below). It is a single
+# self-contained bundle, so there is nothing else to fetch for it. The retired
+# BRFSS diabetes weights are no longer downloaded (gate B7).
+RUN mkdir -p models/heart_disease && \
     HF="https://huggingface.co/yahyoha/omnidiag-models/resolve/main" && \
-    echo "=== heart_disease ===" && \
+    echo "=== heart_disease (revert path) ===" && \
     curl -fsSL "${HF}/heart_full_tuned.pkl"   -o models/heart_disease/heart_full_tuned.pkl && \
-    echo "=== diabetes ===" && \
-    curl -fsSL "${HF}/diabetes/omni_diag_xgb_optimized.pkl"       -o models/diabetes/omni_diag_xgb_optimized.pkl && \
-    curl -fsSL "${HF}/diabetes/omni_diag_lgb_optimized.pkl"       -o models/diabetes/omni_diag_lgb_optimized.pkl && \
-    curl -fsSL "${HF}/diabetes/omni_diag_rf.pkl"                  -o models/diabetes/omni_diag_rf.pkl && \
-    curl -fsSL "${HF}/diabetes/meta_learner.pkl"                  -o models/diabetes/meta_learner.pkl && \
-    curl -fsSL "${HF}/diabetes/preprocessors/standard_scaler.pkl" -o models/diabetes/preprocessors/standard_scaler.pkl && \
-    echo "=== all models downloaded ==="
+    echo "=== downloaded ==="
 
 # NHANES dysglycaemia bundle (Phase 9). HF rejects any binary in a git push, so the
-# .joblib cannot travel in the Space repository and is fetched here like the BRFSS
-# weights above. The sha256 is checked: the bundle carries the conformal quantiles
+# .joblib cannot travel in the Space repository and is fetched here like the heart
+# file above. The sha256 is checked: the bundle carries the conformal quantiles
 # and the calibration, so a different file would silently change every decision.
 # A local or GitHub checkout has this file already; the download overwrites it with
 # the same bytes or fails the build.

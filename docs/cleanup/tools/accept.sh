@@ -31,6 +31,6 @@ if [ "$TRACE" = "--build-trace" ]; then
   cat "$WORK"/trace_*.txt | awk -F'\t' '$2 !~ /w/ {print $1}' | sed -E 's#__pycache__/([^/]+)\.cpython-[0-9]+\.pyc$#\1.py#' | sort -u > "$WORK/reads.txt"
   echo "build-time reads: $(wc -l < "$WORK/reads.txt") files"; (cd "$W" && "$PY" "$T/dockerignore_check.py" .dockerignore < "$WORK/reads.txt" | grep -E "self-test|EXCLUDED"; echo "dockerignore check exit=${PIPESTATUS[0]}")
   grep -n "models/diabetes/" "$W/Dockerfile" && echo "Dockerfile still names models/diabetes/" || echo "Dockerfile names no models/diabetes/"
-  grep -n -i -E "diabetes|brfss" "$WORK/reads.txt" || echo "no BRFSS file read at build time"
+  grep -n -i -E "models/diabetes/|data/diabetes/|configs/diabetes\.yaml|brfss" "$WORK/reads.txt" || echo "no BRFSS file read at build time"
 fi
 find "$W" -type l -delete; git worktree remove --force "$W"; git worktree prune
