@@ -1,0 +1,1011 @@
+{
+ "heart_disease": {
+  "fields": [
+   "Age",
+   "Sex",
+   "ChestPainType",
+   "RestingECG",
+   "ExerciseAngina",
+   "RestingBP",
+   "Cholesterol",
+   "FastingBS",
+   "MaxHR",
+   "Oldpeak",
+   "ST_Slope"
+  ],
+  "categories": [
+   [
+    "Vitals & Signs",
+    [
+     "Age",
+     "ChestPainType",
+     "RestingBP",
+     "Cholesterol",
+     "FastingBS",
+     "MaxHR",
+     "Oldpeak",
+     "ST_Slope"
+    ]
+   ],
+   [
+    "Medical History",
+    [
+     "RestingECG"
+    ]
+   ],
+   [
+    "Lifestyle",
+    [
+     "ExerciseAngina"
+    ]
+   ],
+   [
+    "Demographics",
+    [
+     "Sex"
+    ]
+   ]
+  ],
+  "profiles": {
+   "Age": {
+    "min": 35,
+    "typical": 55,
+    "max": 78
+   },
+   "Sex": null,
+   "ChestPainType": null,
+   "RestingECG": null,
+   "ExerciseAngina": null,
+   "RestingBP": {
+    "min": 100,
+    "typical": 130,
+    "max": 175
+   },
+   "Cholesterol": {
+    "min": 150,
+    "typical": 220,
+    "max": 320
+   },
+   "FastingBS": null,
+   "MaxHR": {
+    "min": 95,
+    "typical": 150,
+    "max": 190
+   },
+   "Oldpeak": {
+    "min": 0,
+    "typical": 0.8,
+    "max": 4
+   },
+   "ST_Slope": null
+  },
+  "random": [
+   {
+    "Age": 44,
+    "Sex": "F",
+    "ChestPainType": "ASY",
+    "RestingECG": "Normal",
+    "ExerciseAngina": "Y",
+    "RestingBP": 111,
+    "Cholesterol": 257,
+    "FastingBS": 0,
+    "MaxHR": 172,
+    "Oldpeak": 2.3,
+    "ST_Slope": "Up"
+   },
+   {
+    "Age": 48,
+    "Sex": "M",
+    "ChestPainType": "ASY",
+    "RestingECG": "LVH",
+    "ExerciseAngina": "Y",
+    "RestingBP": 128,
+    "Cholesterol": 170,
+    "FastingBS": 0,
+    "MaxHR": 125,
+    "Oldpeak": 2.7,
+    "ST_Slope": "Up"
+   },
+   {
+    "Age": 69,
+    "Sex": "M",
+    "ChestPainType": "ASY",
+    "RestingECG": "LVH",
+    "ExerciseAngina": "Y",
+    "RestingBP": 140,
+    "Cholesterol": 229,
+    "FastingBS": 1,
+    "MaxHR": 172,
+    "Oldpeak": 1.1,
+    "ST_Slope": "Down"
+   },
+   {
+    "Age": 71,
+    "Sex": "F",
+    "ChestPainType": "TA",
+    "RestingECG": "LVH",
+    "ExerciseAngina": "N",
+    "RestingBP": 128,
+    "Cholesterol": 185,
+    "FastingBS": 0,
+    "MaxHR": 150,
+    "Oldpeak": 0.9,
+    "ST_Slope": "Up"
+   },
+   {
+    "Age": 76,
+    "Sex": "M",
+    "ChestPainType": "NAP",
+    "RestingECG": "LVH",
+    "ExerciseAngina": "N",
+    "RestingBP": 134,
+    "Cholesterol": 217,
+    "FastingBS": 0,
+    "MaxHR": 136,
+    "Oldpeak": 2.1,
+    "ST_Slope": "Up"
+   }
+  ],
+  "dictionary": {
+   "ChestPainType": "Type of chest pain experienced. Values: Typical Angina, Atypical Angina, Non-Anginal Pain, Asymptomatic.",
+   "RestingECG": "Resting Electrocardiogram results. Values: Normal, ST-T wave abnormality, Left ventricular hypertrophy.",
+   "ExerciseAngina": "Exercise-Induced Angina — Chest pain brought on by physical exertion. Scale: 0 = No angina, 1 = Exercise-induced angina.",
+   "RestingBP": "Resting Blood Pressure — Systolic blood pressure measured at rest. Range: 80–220 mmHg.",
+   "Cholesterol": "Serum total cholesterol level — includes LDL, HDL, and other lipid components. Range: 100–600 mg/dL.",
+   "FastingBS": "Fasting Blood Sugar — Glucose level after an overnight fast; key for metabolic assessment. Scale: 0 = Normal (<120 mg/dL), 1 = Elevated (≥120 mg/dL).",
+   "MaxHR": "Maximum Heart Rate — Highest heart rate achieved during clinical assessment. Range: 60–220 bpm.",
+   "Oldpeak": "ST depression induced by exercise relative to rest — indicates exercise-induced ischemia. Range: 0.0–6.0.",
+   "ST_Slope": "Slope of the ST segment during peak exercise — a key ECG marker for coronary artery disease. Values: Up, Flat, Down."
+  },
+  "dictionaryByLabel": {
+   "Chest pain type": "Type of chest pain experienced. Values: Typical Angina, Atypical Angina, Non-Anginal Pain, Asymptomatic.",
+   "Resting ECG": "Resting Electrocardiogram results. Values: Normal, ST-T wave abnormality, Left ventricular hypertrophy.",
+   "Exercise-induced angina": "Exercise-Induced Angina — Chest pain brought on by physical exertion. Scale: 0 = No angina, 1 = Exercise-induced angina.",
+   "Resting blood pressure": "Resting Blood Pressure — Systolic blood pressure measured at rest. Range: 80–220 mmHg.",
+   "Serum cholesterol": null,
+   "Fasting blood sugar > 120 mg/dl": null,
+   "Maximum heart rate achieved": null,
+   "Oldpeak": "ST depression induced by exercise relative to rest — indicates exercise-induced ischemia. Range: 0.0–6.0.",
+   "ST slope": "Slope of the ST segment during peak exercise — a key ECG marker for coronary artery disease. Values: Up, Flat, Down."
+  },
+  "direction": {
+   "Age": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "Sex": [
+    null,
+    true,
+    false,
+    null
+   ],
+   "ChestPainType": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "RestingECG": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "ExerciseAngina": [
+    null,
+    false,
+    false,
+    [
+     "Y"
+    ]
+   ],
+   "RestingBP": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "Cholesterol": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "FastingBS": [
+    0,
+    false,
+    false,
+    null
+   ],
+   "MaxHR": [
+    null,
+    false,
+    true,
+    null
+   ],
+   "Oldpeak": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "ST_Slope": [
+    null,
+    false,
+    false,
+    null
+   ]
+  }
+ },
+ "diabetes_nhanes": {
+  "fields": [
+   "RIDAGEYR",
+   "BMXBMI",
+   "ADIPOSITY_BAND",
+   "LBDHDD",
+   "PAQ650",
+   "PAQ665",
+   "RIAGENDR",
+   "SBP",
+   "DBP",
+   "BPXPLS",
+   "MCQ300C",
+   "CVD_ANY",
+   "LBXSCH",
+   "LBXSTR",
+   "LBXSATSI",
+   "LBXSGTSI",
+   "LBXSCR",
+   "LBXSBU",
+   "LBXSAL",
+   "LBXSUA"
+  ],
+  "categories": [
+   [
+    "Vitals & Signs",
+    [
+     "RIDAGEYR",
+     "BMXBMI",
+     "ADIPOSITY_BAND",
+     "SBP",
+     "DBP",
+     "BPXPLS"
+    ]
+   ],
+   [
+    "Laboratory",
+    [
+     "LBDHDD",
+     "LBXSCH",
+     "LBXSTR",
+     "LBXSATSI",
+     "LBXSGTSI",
+     "LBXSCR",
+     "LBXSBU",
+     "LBXSAL",
+     "LBXSUA"
+    ]
+   ],
+   [
+    "Medical History",
+    [
+     "MCQ300C",
+     "CVD_ANY"
+    ]
+   ],
+   [
+    "Lifestyle",
+    [
+     "PAQ650",
+     "PAQ665"
+    ]
+   ],
+   [
+    "Demographics",
+    [
+     "RIAGENDR"
+    ]
+   ]
+  ],
+  "profiles": {
+   "RIDAGEYR": null,
+   "BMXBMI": null,
+   "ADIPOSITY_BAND": null,
+   "LBDHDD": null,
+   "PAQ650": null,
+   "PAQ665": null,
+   "RIAGENDR": null,
+   "SBP": null,
+   "DBP": null,
+   "BPXPLS": null,
+   "MCQ300C": null,
+   "CVD_ANY": null,
+   "LBXSCH": null,
+   "LBXSTR": null,
+   "LBXSATSI": null,
+   "LBXSGTSI": null,
+   "LBXSCR": null,
+   "LBXSBU": null,
+   "LBXSAL": null,
+   "LBXSUA": null
+  },
+  "random": [
+   {
+    "RIDAGEYR": 50.5,
+    "BMXBMI": 40.1,
+    "ADIPOSITY_BAND": "increased",
+    "LBDHDD": 65.6,
+    "PAQ650": 0,
+    "PAQ665": 0,
+    "RIAGENDR": 1,
+    "SBP": 166.7,
+    "DBP": 88.8,
+    "BPXPLS": 91.2,
+    "MCQ300C": 1,
+    "CVD_ANY": 0,
+    "LBXSCH": 212.2,
+    "LBXSTR": 1166.5,
+    "LBXSATSI": 483,
+    "LBXSGTSI": 419.8,
+    "LBXSCR": 8.5,
+    "LBXSBU": 104.4,
+    "LBXSAL": 2.7,
+    "LBXSUA": 11.6
+   },
+   {
+    "RIDAGEYR": 51.3,
+    "BMXBMI": 52.6,
+    "ADIPOSITY_BAND": "normal",
+    "LBDHDD": 98.9,
+    "PAQ650": 1,
+    "PAQ665": 1,
+    "RIAGENDR": 0,
+    "SBP": 186.2,
+    "DBP": 114.1,
+    "BPXPLS": 115.5,
+    "MCQ300C": 0,
+    "CVD_ANY": 0,
+    "LBXSCH": 235.6,
+    "LBXSTR": 1343.7,
+    "LBXSATSI": 480.7,
+    "LBXSGTSI": 588.7,
+    "LBXSCR": 10.3,
+    "LBXSBU": 88.2,
+    "LBXSAL": 3.3,
+    "LBXSUA": 9.1
+   },
+   {
+    "RIDAGEYR": 52.3,
+    "BMXBMI": 44.3,
+    "ADIPOSITY_BAND": "increased",
+    "LBDHDD": 88.9,
+    "PAQ650": 1,
+    "PAQ665": 1,
+    "RIAGENDR": 1,
+    "SBP": 167.4,
+    "DBP": 88.6,
+    "BPXPLS": 123.1,
+    "MCQ300C": 1,
+    "CVD_ANY": 0,
+    "LBXSCH": 197.6,
+    "LBXSTR": 1760.4,
+    "LBXSATSI": 569.1,
+    "LBXSGTSI": 655.9,
+    "LBXSCR": 11,
+    "LBXSBU": 91.6,
+    "LBXSAL": 2.9,
+    "LBXSUA": 11.8
+   },
+   {
+    "RIDAGEYR": 61.9,
+    "BMXBMI": 50.8,
+    "ADIPOSITY_BAND": "increased",
+    "LBDHDD": 60.2,
+    "PAQ650": 1,
+    "PAQ665": 1,
+    "RIAGENDR": 0,
+    "SBP": 122.3,
+    "DBP": 88.5,
+    "BPXPLS": 129.8,
+    "MCQ300C": 0,
+    "CVD_ANY": 1,
+    "LBXSCH": 300.2,
+    "LBXSTR": 1180.3,
+    "LBXSATSI": 307.2,
+    "LBXSGTSI": 638.4,
+    "LBXSCR": 10.9,
+    "LBXSBU": 126.5,
+    "LBXSAL": 3.1,
+    "LBXSUA": 12.8
+   },
+   {
+    "RIDAGEYR": 49.5,
+    "BMXBMI": 50,
+    "ADIPOSITY_BAND": "normal",
+    "LBDHDD": 93.9,
+    "PAQ650": 0,
+    "PAQ665": 0,
+    "RIAGENDR": 0,
+    "SBP": 166.6,
+    "DBP": 108.9,
+    "BPXPLS": 138.6,
+    "MCQ300C": 1,
+    "CVD_ANY": 0,
+    "LBXSCH": 296.7,
+    "LBXSTR": 1505.4,
+    "LBXSATSI": 560.7,
+    "LBXSGTSI": 489.5,
+    "LBXSCR": 11.3,
+    "LBXSBU": 123,
+    "LBXSAL": 2.3,
+    "LBXSUA": 7.9
+   }
+  ],
+  "dictionary": {
+   "RIDAGEYR": null,
+   "BMXBMI": null,
+   "ADIPOSITY_BAND": null,
+   "LBDHDD": null,
+   "PAQ650": null,
+   "PAQ665": null,
+   "RIAGENDR": null,
+   "SBP": null,
+   "DBP": null,
+   "BPXPLS": null,
+   "MCQ300C": null,
+   "CVD_ANY": null,
+   "LBXSCH": null,
+   "LBXSTR": null,
+   "LBXSATSI": null,
+   "LBXSGTSI": null,
+   "LBXSCR": null,
+   "LBXSBU": null,
+   "LBXSAL": null,
+   "LBXSUA": null
+  },
+  "dictionaryByLabel": {
+   "Age in years. Adults only; the cohort is 20-80.": null,
+   "Body mass index, kg/m^2.": null,
+   "A D I P O S I T Y  B A N D": null,
+   "HDL cholesterol, mg/dL.": null,
+   "Vigorous recreational activity in a typical week": null,
+   "Moderate recreational activity in a typical week": null,
+   "Sex": "Recorded sex — used as a demographic covariate in the risk model. Coding: M / F in the heart module; 1 = male, 0 = female in the NHANES module.",
+   "Systolic blood pressure, mmHg": null,
+   "Diastolic blood pressure, mmHg": null,
+   "Resting pulse, beats per minute.": null,
+   "Close blood relative with diabetes": null,
+   "C V D  A N Y": null,
+   "Total cholesterol, mg/dL.": null,
+   "Triglycerides, mg/dL.": null,
+   "ALT": null,
+   "GGT": null,
+   "Serum creatinine, mg/dL.": null,
+   "Blood urea nitrogen, mg/dL.": null,
+   "Serum albumin, g/dL.": null,
+   "Uric acid, mg/dL.": null
+  },
+  "direction": {
+   "RIDAGEYR": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "BMXBMI": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "ADIPOSITY_BAND": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBDHDD": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "PAQ650": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "PAQ665": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "RIAGENDR": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "SBP": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "DBP": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "BPXPLS": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "MCQ300C": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "CVD_ANY": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSCH": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSTR": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSATSI": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSGTSI": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSCR": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSBU": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSAL": [
+    null,
+    false,
+    false,
+    null
+   ],
+   "LBXSUA": [
+    null,
+    false,
+    false,
+    null
+   ]
+  }
+ },
+ "cf": {
+  "heart_disease/P-001": {
+   "scen": [
+    {
+     "scenario_id": 1,
+     "probability": 0.30085959885386815,
+     "changes": [
+      {
+       "feature": "RestingBP",
+       "original_value": 140,
+       "counterfactual_value": 110,
+       "direction": "decrease"
+      },
+      {
+       "feature": "Cholesterol",
+       "original_value": 289,
+       "counterfactual_value": 150,
+       "direction": "decrease"
+      }
+     ],
+     "crosses_threshold": true
+    }
+   ],
+   "best": null,
+   "probs": [
+    0.30085959885386815
+   ],
+   "red": [
+    37
+   ],
+   "summary": {
+    "state": "scenarios",
+    "headline": "What-If Scenarios",
+    "message": null,
+    "detail": null,
+    "scenarios": [
+     {
+      "changes": [
+       {
+        "feature": "RestingBP",
+        "original_value": 140,
+        "counterfactual_value": 110,
+        "direction": "decrease"
+       },
+       {
+        "feature": "Cholesterol",
+        "original_value": 289,
+        "counterfactual_value": 150,
+        "direction": "decrease"
+       }
+      ],
+      "after": 0.30085959885386815,
+      "reductionPct": 37
+     }
+    ],
+    "best": null,
+    "referral": false
+   }
+  },
+  "heart_disease/P-002": {
+   "scen": [],
+   "best": {
+    "scenario_id": 1,
+    "probability": 0.13461538461538464,
+    "changes": [
+     {
+      "feature": "RestingBP",
+      "original_value": 158,
+      "counterfactual_value": 110,
+      "direction": "decrease"
+     },
+     {
+      "feature": "Cholesterol",
+      "original_value": 340,
+      "counterfactual_value": 150,
+      "direction": "decrease"
+     },
+     {
+      "feature": "FastingBS",
+      "original_value": 1,
+      "counterfactual_value": 0,
+      "direction": "decrease"
+     }
+    ],
+    "risk_reduction_relative_pct": 71.03,
+    "risk_reduction_absolute_pp": 33,
+    "crosses_threshold": false
+   },
+   "probs": [],
+   "red": [],
+   "summary": {
+    "state": "no_crossing",
+    "headline": "What-If Scenarios",
+    "message": "Even with every modifiable factor improved, the estimated risk remains above the threshold. The dominant factors are not modifiable. Referral is recommended.",
+    "detail": null,
+    "scenarios": [],
+    "best": {
+     "changes": [
+      {
+       "feature": "RestingBP",
+       "original_value": 158,
+       "counterfactual_value": 110,
+       "direction": "decrease"
+      },
+      {
+       "feature": "Cholesterol",
+       "original_value": 340,
+       "counterfactual_value": 150,
+       "direction": "decrease"
+      },
+      {
+       "feature": "FastingBS",
+       "original_value": 1,
+       "counterfactual_value": 0,
+       "direction": "decrease"
+      }
+     ],
+     "after": 0.13461538461538464,
+     "relativePct": 71.03,
+     "absolutePp": 33
+    },
+    "referral": true
+   }
+  },
+  "heart_disease/P-003": {
+   "scen": [],
+   "best": null,
+   "probs": [],
+   "red": [],
+   "summary": {
+    "state": "low_risk",
+    "headline": "Low Clinical Risk",
+    "message": "Patient is currently at low clinical risk. No counterfactual interventions are necessary.",
+    "detail": null,
+    "scenarios": [],
+    "best": null,
+    "referral": false
+   }
+  },
+  "diabetes_nhanes/N-001": {
+   "scen": [],
+   "best": null,
+   "probs": [],
+   "red": [],
+   "summary": {
+    "state": "low_risk",
+    "headline": "Low Clinical Risk",
+    "message": "Patient is currently at low clinical risk. No counterfactual interventions are necessary.",
+    "detail": null,
+    "scenarios": [],
+    "best": null,
+    "referral": false
+   }
+  },
+  "diabetes_nhanes/N-002": {
+   "scen": [
+    {
+     "scenario_id": 1,
+     "probability": 0.1820236789793421,
+     "changes": [
+      {
+       "feature": "BMXBMI",
+       "original_value": 30,
+       "counterfactual_value": 24.9,
+       "direction": "decrease"
+      },
+      {
+       "feature": "ADIPOSITY_BAND",
+       "original_value": "high",
+       "counterfactual_value": "normal",
+       "direction": "decrease"
+      },
+      {
+       "feature": "SBP",
+       "original_value": 126,
+       "counterfactual_value": 120,
+       "direction": "decrease"
+      },
+      {
+       "feature": "LBDHDD",
+       "original_value": 46,
+       "counterfactual_value": 60,
+       "direction": "increase"
+      },
+      {
+       "feature": "PAQ650",
+       "original_value": 0,
+       "counterfactual_value": 1,
+       "direction": "to"
+      }
+     ],
+     "crosses_threshold": true
+    }
+   ],
+   "best": null,
+   "probs": [
+    0.1820236789793421
+   ],
+   "red": [
+    48
+   ],
+   "summary": {
+    "state": "scenarios",
+    "headline": "What-If Scenarios",
+    "message": null,
+    "detail": null,
+    "scenarios": [
+     {
+      "changes": [
+       {
+        "feature": "BMXBMI",
+        "original_value": 30,
+        "counterfactual_value": 24.9,
+        "direction": "decrease"
+       },
+       {
+        "feature": "ADIPOSITY_BAND",
+        "original_value": "high",
+        "counterfactual_value": "normal",
+        "direction": "decrease"
+       },
+       {
+        "feature": "SBP",
+        "original_value": 126,
+        "counterfactual_value": 120,
+        "direction": "decrease"
+       },
+       {
+        "feature": "LBDHDD",
+        "original_value": 46,
+        "counterfactual_value": 60,
+        "direction": "increase"
+       },
+       {
+        "feature": "PAQ650",
+        "original_value": 0,
+        "counterfactual_value": 1,
+        "direction": "to"
+       }
+      ],
+      "after": 0.1820236789793421,
+      "reductionPct": 48
+     }
+    ],
+    "best": null,
+    "referral": false
+   }
+  },
+  "diabetes_nhanes/N-003": {
+   "scen": [],
+   "best": {
+    "scenario_id": 1,
+    "probability": 0.33931011513158776,
+    "changes": [
+     {
+      "feature": "BMXBMI",
+      "original_value": 33,
+      "counterfactual_value": 24.9,
+      "direction": "decrease"
+     },
+     {
+      "feature": "ADIPOSITY_BAND",
+      "original_value": "high",
+      "counterfactual_value": "normal",
+      "direction": "decrease"
+     },
+     {
+      "feature": "SBP",
+      "original_value": 138,
+      "counterfactual_value": 120,
+      "direction": "decrease"
+     },
+     {
+      "feature": "DBP",
+      "original_value": 84,
+      "counterfactual_value": 80,
+      "direction": "decrease"
+     },
+     {
+      "feature": "LBXSTR",
+      "original_value": 240,
+      "counterfactual_value": 150,
+      "direction": "decrease"
+     },
+     {
+      "feature": "LBXSGTSI",
+      "original_value": 52,
+      "counterfactual_value": 40,
+      "direction": "decrease"
+     },
+     {
+      "feature": "LBXSUA",
+      "original_value": 6.8,
+      "counterfactual_value": 6,
+      "direction": "decrease"
+     },
+     {
+      "feature": "LBDHDD",
+      "original_value": 38,
+      "counterfactual_value": 60,
+      "direction": "increase"
+     },
+     {
+      "feature": "PAQ650",
+      "original_value": 0,
+      "counterfactual_value": 1,
+      "direction": "to"
+     },
+     {
+      "feature": "PAQ665",
+      "original_value": 0,
+      "counterfactual_value": 1,
+      "direction": "to"
+     }
+    ],
+    "risk_reduction_relative_pct": 47.5,
+    "risk_reduction_absolute_pp": 30.7,
+    "crosses_threshold": false
+   },
+   "probs": [],
+   "red": [],
+   "summary": {
+    "state": "no_crossing",
+    "headline": "What-If Scenarios",
+    "message": "Even with every modifiable factor improved, the estimated risk remains above the threshold. The dominant factors are not modifiable. Referral is recommended.",
+    "detail": null,
+    "scenarios": [],
+    "best": {
+     "changes": [
+      {
+       "feature": "BMXBMI",
+       "original_value": 33,
+       "counterfactual_value": 24.9,
+       "direction": "decrease"
+      },
+      {
+       "feature": "ADIPOSITY_BAND",
+       "original_value": "high",
+       "counterfactual_value": "normal",
+       "direction": "decrease"
+      },
+      {
+       "feature": "SBP",
+       "original_value": 138,
+       "counterfactual_value": 120,
+       "direction": "decrease"
+      },
+      {
+       "feature": "DBP",
+       "original_value": 84,
+       "counterfactual_value": 80,
+       "direction": "decrease"
+      },
+      {
+       "feature": "LBXSTR",
+       "original_value": 240,
+       "counterfactual_value": 150,
+       "direction": "decrease"
+      },
+      {
+       "feature": "LBXSGTSI",
+       "original_value": 52,
+       "counterfactual_value": 40,
+       "direction": "decrease"
+      },
+      {
+       "feature": "LBXSUA",
+       "original_value": 6.8,
+       "counterfactual_value": 6,
+       "direction": "decrease"
+      },
+      {
+       "feature": "LBDHDD",
+       "original_value": 38,
+       "counterfactual_value": 60,
+       "direction": "increase"
+      },
+      {
+       "feature": "PAQ650",
+       "original_value": 0,
+       "counterfactual_value": 1,
+       "direction": "to"
+      },
+      {
+       "feature": "PAQ665",
+       "original_value": 0,
+       "counterfactual_value": 1,
+       "direction": "to"
+      }
+     ],
+     "after": 0.33931011513158776,
+     "relativePct": 47.5,
+     "absolutePp": 30.7
+    },
+    "referral": true
+   }
+  }
+ }
+}

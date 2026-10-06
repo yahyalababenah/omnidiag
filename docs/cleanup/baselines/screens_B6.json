@@ -1,0 +1,106 @@
+{
+ "production backend (4c916e6)": {
+  "picker": [
+   "diabetes_nhanes",
+   "heart_disease"
+  ],
+  "api": {
+   "schema/heart_disease": 200,
+   "predict/heart_disease/P-001": 200,
+   "explain/heart_disease/P-001": 200,
+   "predict/heart_disease/P-002": 200,
+   "explain/heart_disease/P-002": 200,
+   "predict/heart_disease/P-003": 200,
+   "explain/heart_disease/P-003": 200,
+   "schema/diabetes_nhanes": 200,
+   "predict/diabetes_nhanes/N-001": 200,
+   "explain/diabetes_nhanes/N-001": 200,
+   "predict/diabetes_nhanes/N-002": 200,
+   "explain/diabetes_nhanes/N-002": 200,
+   "predict/diabetes_nhanes/N-003": 200,
+   "explain/diabetes_nhanes/N-003": 200
+  },
+  "whatIf": {
+   "heart_disease/P-001": "200 scenarios",
+   "heart_disease/P-002": "200 no_crossing",
+   "heart_disease/P-003": "200 low_risk",
+   "diabetes_nhanes/N-001": "200 low_risk",
+   "diabetes_nhanes/N-002": "200 scenarios",
+   "diabetes_nhanes/N-003": "200 no_crossing"
+  },
+  "alQueue": {
+   "items_listed": 19,
+   "read_only_cards": [],
+   "labellable_cards_by_disease": {
+    "heart_disease": 14,
+    "diabetes": 4,
+    "diabetes_nhanes": 1
+   },
+   "stats_cards": "Pending / Reviewed / Skipped",
+   "pending_card": 19,
+   "archived_card": "(not shown)",
+   "pending_plus_archived_equals_listed": true
+  },
+  "annotateRetiredItem": "200 -> accepted (no message)",
+  "skipHeartItem": 200,
+  "history": {
+   "518153dd": "200: 1 rows (diabetes), archived note shown on 0",
+   "cf743346": "200: 1 rows (diabetes), archived note shown on 0",
+   "e58de2fd": "200: 2 rows (heart_disease), archived note shown on 0"
+  },
+  "adminRetrainHeart": 200
+ },
+ "chore/retire-brfss backend": {
+  "picker": [
+   "diabetes_nhanes",
+   "heart_disease"
+  ],
+  "api": {
+   "schema/heart_disease": 200,
+   "predict/heart_disease/P-001": 200,
+   "explain/heart_disease/P-001": 200,
+   "predict/heart_disease/P-002": 200,
+   "explain/heart_disease/P-002": 200,
+   "predict/heart_disease/P-003": 200,
+   "explain/heart_disease/P-003": 200,
+   "schema/diabetes_nhanes": 200,
+   "predict/diabetes_nhanes/N-001": 200,
+   "explain/diabetes_nhanes/N-001": 200,
+   "predict/diabetes_nhanes/N-002": 200,
+   "explain/diabetes_nhanes/N-002": 200,
+   "predict/diabetes_nhanes/N-003": 200,
+   "explain/diabetes_nhanes/N-003": 200
+  },
+  "whatIf": {
+   "heart_disease/P-001": "200 scenarios",
+   "heart_disease/P-002": "200 no_crossing",
+   "heart_disease/P-003": "200 low_risk",
+   "diabetes_nhanes/N-001": "200 low_risk",
+   "diabetes_nhanes/N-002": "200 scenarios",
+   "diabetes_nhanes/N-003": "200 no_crossing"
+  },
+  "alQueue": {
+   "items_listed": 17,
+   "read_only_cards": [
+    "diabetes",
+    "diabetes"
+   ],
+   "labellable_cards_by_disease": {
+    "heart_disease": 14,
+    "diabetes_nhanes": 1
+   },
+   "stats_cards": "Pending / Archived / Reviewed / Skipped",
+   "pending_card": 15,
+   "archived_card": 2,
+   "pending_plus_archived_equals_listed": true
+  },
+  "annotateRetiredItem": "410 -> shown: \"Disease 'diabetes' has been retired. The BRFSS 2015 diabetes module has been retired and replaced by the NHANES dysglycaemia module (diabetes_nhanes). Existing records remain readable; new predictions, labels and retraining are not accepted.\"",
+  "skipHeartItem": 200,
+  "history": {
+   "518153dd": "200: 1 rows (diabetes), archived note shown on 1",
+   "cf743346": "200: 1 rows (diabetes), archived note shown on 1",
+   "e58de2fd": "200: 2 rows (heart_disease), archived note shown on 0"
+  },
+  "adminRetrainHeart": 200
+ }
+}

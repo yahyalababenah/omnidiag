@@ -1434,3 +1434,42 @@ path (`sklearn_pipeline`) loads a different file. Every family outside the candi
 runs NHANES and the heart `sklearn_pipeline` revert with sample reading and candidate building
 replaced by functions that fail if called; `test_the_legacy_xgboost_writer_is_gone` asserts the
 function is absent. Routing those families back to a builder makes the first test fail.
+
+# 2026-10-06 — cross-layer findings from the BRFSS retirement (gates B5-B6)
+
+## CL-1 — CLOSED in B5 (8186c4d) — a config declaring priors would have been mislabelled CORRECTED
+
+B5 removed the router branch that mapped a config's risk bands onto a deployment prior, and
+nothing corrects a probability any more. `scale_of_disease_config` still answered CORRECTED for
+any config that declared both priors. So a future config with priors would have been served
+and stored as "corrected" while no correction was applied: a silent mislabel across the API, the
+database and the report.
+
+**Fix:** such a config is refused when the router loads it. This covers `prevalence_train`,
+`prevalence_deploy` and non-null `risk_bands`. The error is `PrevalenceCorrectionUnsupported`:
+"prevalence correction is not supported (removed in B5)". A result that claims a correction is
+refused too. `Scale.CORRECTED` stays a legal stored value for rows written by the retired module.
+
+**Proof:** `tests/test_probability_scale_contract.py::TestConfigsDeclaringACorrectionAreRefused`,
+including `test_the_router_fails_at_load`.
+
+## CL-2 — FIXED in B6 (83b3576) — shared lookups keyed by display label
+
+The frontend dictionary (`frontend/src/utils/medicalDictionary.js`) matches a field by its name
+**or its display label**, case-insensitively. Heart's field `Sex` and NHANES's field `RIAGENDR`,
+whose label is "Sex", therefore resolve to one entry. The two modules code it differently: heart
+uses M/F; NHANES uses 1 = male, 0 = female. A first fix written for heart silently made the NHANES
+tooltip wrong. It was caught before the push, by a before/after snapshot of every heart and NHANES
+lookup by name and by label (`docs/cleanup/tools/frontend_snapshot/`). The entry now states both
+codings.
+
+**The general hazard:** any lookup keyed by display text can join two modules' fields that merely
+share a label. A change to such an entry must be checked against every module's labels, not
+only the module being fixed.
+
+## CL-3 — FIXED in B6 (83b3576) — heart tooltips showed BRFSS meanings (pre-existing)
+
+The shared `Age` and `Sex` dictionary entries described the BRFSS coding: 5-year age bands, and
+0/1 sex. Heart's `Age` is in years and its `Sex` is M/F, so the SHAP tooltip and the Variable
+Scales view gave heart patients the retired module's meanings. Fixed in its own commit, because
+it changes heart-visible text.

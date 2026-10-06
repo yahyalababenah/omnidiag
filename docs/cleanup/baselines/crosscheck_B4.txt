@@ -1,0 +1,44 @@
+OK   200 GET /diseases
+      registered: ['diabetes_nhanes', 'heart_disease']
+OK   200 predict  heart_disease/P-001
+OK   200 explain  heart_disease/P-001
+OK   200 cf       heart_disease/P-001
+OK   200 report   heart_disease/P-001
+OK   200 predict  heart_disease/P-002
+OK   200 explain  heart_disease/P-002
+OK   200 cf       heart_disease/P-002
+OK   200 report   heart_disease/P-002
+OK   200 predict  heart_disease/P-003
+OK   200 explain  heart_disease/P-003
+OK   200 cf       heart_disease/P-003
+OK   200 report   heart_disease/P-003
+OK   200 drift status heart_disease
+OK   200 drift run    heart_disease
+OK   200 retrain      heart_disease (min_samples unreachable)
+      retrain body: {"status":"skipped","disease":"heart_disease","samples_used":0,"model_path":null,"reason":"Fewer than 10000 annotated samples available","outcome":null,"mlflow_run_id":null,"rows_total":null,"rows_rejected":null,"moved_o
+OK   200 predict  diabetes_nhanes/N-001
+OK   200 explain  diabetes_nhanes/N-001
+OK   200 cf       diabetes_nhanes/N-001
+OK   200 report   diabetes_nhanes/N-001
+OK   200 predict  diabetes_nhanes/N-002
+OK   200 explain  diabetes_nhanes/N-002
+OK   200 cf       diabetes_nhanes/N-002
+OK   200 report   diabetes_nhanes/N-002
+OK   200 predict  diabetes_nhanes/N-003
+OK   200 explain  diabetes_nhanes/N-003
+OK   200 cf       diabetes_nhanes/N-003
+OK   200 report   diabetes_nhanes/N-003
+OK   200 drift status diabetes_nhanes
+OK   200 drift run    diabetes_nhanes
+OK   200 retrain      diabetes_nhanes (min_samples unreachable)
+      retrain body: {"status":"unsupported","disease":"diabetes_nhanes","samples_used":0,"model_path":null,"reason":"retrain not yet supported for ebm_platt_conformal","outcome":null,"mlflow_run_id":null,"rows_total":null,"rows_rejected":nu
+OK   200 AL queue
+      queued: ['diabetes_nhanes', 'heart_disease']
+OK   200 AL stats
+DIGEST heart_disease/P-001 predict=afe159bde21d explain=ce235f47d9a6 cf={'status': 'success', 'n': 1} report_bucket=4
+DIGEST heart_disease/P-002 predict=589cc96ec718 explain=bd4576c16e9a cf={'status': 'no_valid_counterfactuals', 'n': 0} report_bucket=4
+DIGEST heart_disease/P-003 predict=53e7d9459b61 explain=1f3250961854 cf={'status': 'not_applicable', 'n': 0} report_bucket=2
+DIGEST diabetes_nhanes/N-001 predict=49a5cf0da51a explain=f02d8fe046a3 cf={'status': 'not_applicable', 'n': 0} report_bucket=2
+DIGEST diabetes_nhanes/N-002 predict=703ad815bed7 explain=a0443ec6a055 cf={'status': 'success', 'n': 1} report_bucket=3
+DIGEST diabetes_nhanes/N-003 predict=295bac5ca2b0 explain=7e9b8d00a040 cf={'status': 'no_valid_counterfactuals', 'n': 0} report_bucket=2
+RESULT PASS
