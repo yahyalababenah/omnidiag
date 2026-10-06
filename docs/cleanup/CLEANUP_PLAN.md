@@ -23,7 +23,7 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 | B4 | BRFSS loader, schemas and legacy retrain writer removed; non-candidate families get `unsupported` | `3eb4c84`, W-26 docs `4ba08c8` | 〃 |
 | B5 | BRFSS CF tables, scale/correction, notes map and report bands removed; archived report for retired rows | `8186c4d` | 〃 |
 | B6 | Frontend: BRFSS removed, retired items read-only, history archived note | heart Age/Sex `83b3576`; B6 `6be40b0` | 〃 |
-| B7 | Docker/data | — | not started |
+| B7 | Docker/data | — | plan written, awaiting approval |
 | Tools | Verification and maintenance scripts | — | not started |
 | Docs | README and module docs | — | not started |
 | Release | Frontend (Vercel) first, then the HF snapshot | — | not started |
@@ -54,6 +54,97 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
   - delete the 27 remaining `brfss`-marked tests, which fail by design.
 - **Docs:** README, `docs/DIABETES_AUDIT_REPORT.md`, `docs/FEATURE_VERIFICATION.md`, `evaluation_evidence/diabetes/`, `docs/ARCHITECTURE.md`.
 - **Release:** as stated above.
+
+## Gate B7 — Docker/data (PLAN, 2026-10-06, awaiting approval)
+
+Scope, as defined under "Remaining gates" above plus backlog item 10. One commit per area.
+
+**Measured state:**
+- **Dockerfile:** downloads 5 BRFSS files (`omni_diag_xgb/lgb/rf`, `meta_learner`, `preprocessors/standard_scaler`) and creates `models/diabetes/preprocessors`. `heart_full_tuned.pkl` (heart revert path) and the NHANES joblib are not BRFSS and stay.
+- **Tracked BRFSS files:** the CSV (6.3 MB, behind a `.gitignore` exception) and 6 JSON files in `models/diabetes/`.
+- **Readers left:**
+  - `backend/monitoring/drift.py`: `_REFERENCE_PATHS["diabetes"]` (Evidently, not live) and `_PROFILE_PATHS["diabetes"]`. Both are dead since B3, because drift for `diabetes` answers 410 before reaching them.
+  - `tests/test_drift_stats.py::TestDiabetesReferenceIsReweighted` (2 tests; JSON + CSV).
+  - `tests/test_diabetes_monitoring.py::test_the_rule_matches_the_other_modules`, which compares the NHANES rule with the BRFSS profile.
+  - `ensemble_metrics.json`, `metrics*.json` and `preprocessors/*.json`: no reader.
+- **requirements:** `lightgbm==4.6.0` and `flwr>=1.0.0`. Nothing imports either. A byte scan of every artifact the image ships finds 0 references to either; `xgboost` is in `heart_full_tuned.pkl`, so it stays.
+
+**Commits:**
+
+| # | Area | Change | Tests touched |
+|---|---|---|---|
+| 0 | tools | build-trace (`trace.py`) and `.dockerignore` matcher (`dockerignore_check.py`) into `docs/cleanup/tools/` (they were lost with `/tmp`) | — |
+| 1 | Dockerfile | remove the 5 BRFSS downloads and the `models/diabetes` mkdir; reword the comments that point to them | — |
+| 2 | models/diabetes JSON | `git mv` the 6 files to `archive/post_expo_2026-10/models/diabetes/` (the docs cite their numbers) + INDEX rows; remove `_PROFILE_PATHS["diabetes"]` | rule comparison → heart's profile (R); `TestDiabetesReferenceIsReweighted` deleted (D) |
+| 3 | BRFSS CSV | `git rm --cached` (the file stays on disk and becomes ignored by `*.csv`) and remove its `.gitignore` exception; remove `_REFERENCE_PATHS["diabetes"]` | — |
+| 4 | lightgbm | remove from requirements.txt | — |
+| 5 | flwr | remove from requirements.txt | — |
+
+**Acceptance (each commit):**
+- `-m "not brfss"`: 0 failures, in the normal tree and in a clean worktree with no BRFSS files.
+- `docs/cleanup/tools/crosscheck.py`: identical to `baselines/crosscheck_B4.txt`.
+- `-m brfss`: the set change reported.
+
+**Acceptance (specific):**
+- **Commits 1–3:** the two build steps (`train_heart_glm.py --verify`, `build_drift_reference.py --verify`) are traced in a clean worktree without BRFSS files; every file they read must be inside the Docker context. A static check confirms no Dockerfile line refers to `models/diabetes`. No full Docker build (the laptop can't).
+- **Commits 4–5:** an import blocker makes `lightgbm` / `flwr` raise on import while the full suite, the cross-layer check and both build steps run, which proves nothing needs them. Plus a dependency-resolution check, `pip install --dry-run --ignore-installed --report` for the old vs the new requirements, listing which packages disappear and showing that resolution has no conflicts.
+
+**Not verified:**
+- **`pip check` on a fresh install:** a fresh environment would download several GB (transformers, spacy, mlflow…), and the disk has ~6 GB free. Resolution with `--dry-run` is the substitute.
+- **The HF model repo `yahyoha/omnidiag-models`:** it still hosts the BRFSS files. It's external, so I'm leaving it.
+
+### B7, added areas (PLAN, awaiting approval)
+
+**BRFSS field names (definition used throughout):** HighBP, HighChol, CholCheck, GenHlth, MentHlth, PhysHlth, DiffWalk, HvyAlcoholConsump, NoDocbcCost, AnyHealthcare, HeartDiseaseorAttack, Fruits, Veggies, PhysActivity, Smoker, Education, Income, Diabetes_binary, Diabetes_Clinical_Risk. Generic names (Age, Sex, BMI, Stroke) are not counted.
+
+**Area 6, tests:**
+- **Delete the 27 `brfss`-marked tests:**
+  - `test_diabetes_calibration`: 16 (`TestDiabetesPredictApi` ×6 groups, `TestDiabetesEdgeInputs`);
+  - `test_clinical::TestDiabetes`: 5;
+  - `test_model_family_registry`: 4;
+  - `test_diabetes_gate93`: 2.
+- **Also delete** the fixtures and constants that only they use (`DIABETES_LOW/HIGH/MIN/MAX`, `DIABETES_PAYLOAD`, `DIABETES_PATIENT`, `RISK_BANDS_RAW` where unused, the archived-config read).
+- **Remove the `brfss` marker** from `pytest.ini`.
+- **Rewrite** the BRFSS field names that remain in unmarked tests:
+  - neutral lever names in the unit tests of the shared What-If helpers (`test_whatif_best_achievable`) and of the report (`test_llm_report`, `test_report_privacy_and_bands`);
+  - placeholder features in the retired-row fixtures (`test_retired_disease`, `test_database`); a retired route answers 410 before reading any feature, so their names don't matter;
+  - the leftovers in `test_notes_parser` and `fixtures/clinical_notes.json`.
+- **From this commit on**, acceptance = the full suite, no marker filter, 0 failures.
+
+**Area 7, tools:**
+
+| Tool | Decision | Why |
+|---|---|---|
+| `scripts/retrain.py` | delete `load_reference_data`, `load_production_metrics`, `retrain_xgboost`, `promote_model`, `flush_cache` and the legacy steps after the exit-2 refusal | unreachable since B4; only the candidate path remains |
+| `scripts/golden_master.py` | **rework** for heart + NHANES: NHANES edge cases and batch rows replace `DIABETES_EDGE` and the BRFSS bounds | `verify_live.py` imports its demo loader, and a full-output golden master (incl. /batch, /schema) still has value. Check: two captures in the same environment diff to 0 |
+| `scripts/verify_live.py` | **keep**, docstring only (it is generic over the demo patients) | it is the release check (live Space vs local). Check: run against a local server, exit 0 |
+| `scripts/ui_verify.py` | **archive** | Playwright against live URLs, 22 BRFSS references and none for NHANES, tied to the FEATURE_VERIFICATION items archived in area 8; a rework cannot be verified on this laptop |
+| `scripts/data/make_sample_batches.py` | diabetes sample → **NHANES** fields (inside the schema bounds; a few deliberately invalid rows, as the heart sample has); `max_batch_rows` 100 | a demo file for the live module is useful; the BRFSS one cannot be uploaded anywhere now |
+| `frontend/eslint.config.js` | `ignores: ['dist']` becomes a global ignore (its own config object) | `dist/` is linted today (~954 of the problems); new total reported; `frontend/src` must stay ≤ 389 |
+
+**Area 8, docs:**
+- **Archive:** `docs/DIABETES_AUDIT_REPORT.md` and `docs/FEATURE_VERIFICATION.md` go to `archive/post_expo_2026-10/docs/`, with INDEX rows.
+- **Update the references** to them: the `README.md:216` link, the text at `docs/EVIDENTLY_COST.md:77`, the docstrings of 3 tests, and the `_about` of `tests/fixtures/clinical_notes.json`.
+- **README:** everything that presents BRFSS as registered or current gets rewritten:
+  - "Three modules are currently registered…";
+  - the architecture mermaids (`EnsembleLoader`, `configs/diabetes.yaml`, the stacking path);
+  - the retrain paragraph about `retrain_xgb`, and the `EnsembleModelLoader` predict path;
+  - the project-tree rows (`ensemble_loader.py`, `stacking_ensemble.py`, `models/diabetes/`, `configs/diabetes.yaml`, "BRFSS DM" in mockPatients);
+  - the API section on the correction scale and its field table;
+  - the technology-table row "Model v2 (DM)".
+
+  Historical mentions stay where they are clearly historical (e.g. "BRFSS diabetes is superseded"). Every changed README line will be listed.
+- **`docs/ARCHITECTURE.md`, `docs/ADDING_A_MODEL_FAMILY.md`:** corrected; they are current guides (the `stacking_ensemble` family row, the BRFSS nodes).
+- **`docs/MODEL_FAMILY_REGISTRY_DESIGN.md`, `docs/data_quality/*`:** dated records, so a dated status note goes at the top, without rewriting their history (the same pattern as the registry addendum already there).
+- **`evaluation_evidence/diabetes/`:** evidence, not a doc; a short README in the folder states it belongs to the archived module.
+- **`docs/phase9/*`:** a research record; BRFSS appears there as the predecessor, so it stays untouched.
+
+**Final B7 acceptance:**
+- the full suite with 0 failures;
+- `crosscheck.py` identical to the baseline;
+- 0 BRFSS field names in live code (backend, features, configs, frontend/src), in tests, and in the Dockerfile.
+
+After that: the release plan (plan only).
 
 ## Phase C — remote branches (report only; nothing deleted)
 
@@ -94,6 +185,7 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
 2. Remove the frontend RETIRED_DISEASES constant after the HF release (keep the contract test until then).
 3. Run pytest in CI (CI currently runs no tests).
 4. Add a JS test runner to the frontend (none exists; B6 relied on Node checks of pure functions).
+   Rebuild UI verification for heart + NHANES (replaces the archived ui_verify.py).
 5. Fix the ESLint config: dist/ is linted despite `ignores: ['dist']` (~954 of the problems).
    Lint baseline for frontend/src: 389.
 6. Active Learning on NHANES: wire build_candidate for ebm_platt_conformal (retrain currently returns
@@ -103,6 +195,7 @@ The default branch is `deploy/v2-platform`, and it is the only protected branch.
 9. 4 anonymous predictions in the local DB (no patient link): pre-existing; they never appear in
    history. Decide whether that's intended.
 10. Remove flwr/lightgbm from requirements.txt if not done in B7.
+11. HF model repo `yahyoha/omnidiag-models`: the BRFSS files are still hosted there. Keep them for reproducibility of the archived docs, or remove them later.
 
 ## Findings and lessons
 - W-08 (closed in B3): retrain for a retired disease would have overwritten production BRFSS weights.
