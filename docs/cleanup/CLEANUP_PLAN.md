@@ -26,7 +26,7 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 | B7 | Docker/data (areas 0–5), tests (6), tools (7), docs (8) | 0 tools `c292333`; 1 Dockerfile `40163fb`; 2 models/diabetes JSON `9852c56`; 3 BRFSS CSV `66190c5`; 4 lightgbm `601ee57`; 5 flwr + greenlet (CL-4) `99a2bac`; 6 tests `ee78539`; 7 tools `264e1df`; 8 docs `9421253` | 〃; **B7 done** (final acceptance below) |
 | Tools | Verification and maintenance scripts | — | folded into B7 area 7 |
 | Docs | README and module docs | — | folded into B7 area 8 |
-| Release | Frontend (Vercel) first, then the HF snapshot | — | **plan written (below), awaiting approval** |
+| Release | Frontend (Vercel) first, then the HF snapshot, then Phase C | — | **plan approved 2026-10-06, not executed** |
 
 ## Decisions that stand (do not relitigate)
 
@@ -55,7 +55,7 @@ Rebuilt in the repository on 2026-10-06. The original lived in a session scratch
 - **Docs:** README, `docs/DIABETES_AUDIT_REPORT.md`, `docs/FEATURE_VERIFICATION.md`, `evaluation_evidence/diabetes/`, `docs/ARCHITECTURE.md`.
 - **Release:** as stated above.
 
-## Gate B7 — Docker/data (PLAN, 2026-10-06, awaiting approval)
+## Gate B7 — Docker/data (approved and executed 2026-10-06)
 
 Scope, as defined under "Remaining gates" above plus backlog item 10. One commit per area.
 
@@ -93,7 +93,7 @@ Scope, as defined under "Remaining gates" above plus backlog item 10. One commit
 - **`pip check` on a fresh install:** a fresh environment would download several GB (transformers, spacy, mlflow…), and the disk has ~6 GB free. Resolution with `--dry-run` is the substitute.
 - **The HF model repo `yahyoha/omnidiag-models`:** it still hosts the BRFSS files. It's external, so I'm leaving it.
 
-### B7, added areas (PLAN, awaiting approval)
+### B7, added areas (approved and executed 2026-10-06)
 
 **BRFSS field names (definition used throughout):** HighBP, HighChol, CholCheck, GenHlth, MentHlth, PhysHlth, DiffWalk, HvyAlcoholConsump, NoDocbcCost, AnyHealthcare, HeartDiseaseorAttack, Fruits, Veggies, PhysActivity, Smoker, Education, Income, Diabetes_binary, Diabetes_Clinical_Risk. Generic names (Age, Sex, BMI, Stroke) are not counted.
 
@@ -161,12 +161,26 @@ After that: the release plan (plan only).
 - Not verified here: a full Docker build (the laptop cannot). The HF build in the release is the first
   full image build of B7; that is why the rollback below is recorded before the push.
 
-## Release plan (PLAN, 2026-10-06, awaiting approval — nothing below has been executed)
+## Release plan (APPROVED 2026-10-06 with four additions; nothing below has been executed)
 
 State recorded on 2026-10-06, before any release step:
 - Live Space `yahyoha/omnidiag` (remote `hf`): `main` = `d6fb3238de7974dc7c43e8ed49420cfc291e4641`.
   It still serves `diabetes` (BRFSS): `/api/v4/diseases` lists `diabetes`, `diabetes_nhanes`, `heart_disease`.
 - Live frontend `omnidiag-delta.vercel.app`: bundle `assets/index-BNeSlGQM.js`.
+
+**Rollback targets (recorded before any step):**
+
+| Layer | Target | How |
+|---|---|---|
+| Backend (HF Space) | `d6fb3238de7974dc7c43e8ed49420cfc291e4641` | `git push --force hf d6fb3238de7974dc7c43e8ed49420cfc291e4641:refs/heads/main` |
+| Frontend (Vercel) | the production deployment serving `assets/index-BNeSlGQM.js` (`index.html` last-modified Fri 2026-10-02 16:14:19 GMT, etag `86704c8f1bcadc129929094836ac3ef5`) | Vercel dashboard → Deployments → that deployment → **Instant Rollback** |
+| GitHub `deploy/v2-platform` | `f22b4695f14e42f9cc3c1eaa29d71c3e783bb87f` | `git revert` of the pushed range; never a force push |
+
+The Vercel deployment **ID** is not visible from this machine: the response headers carry no deployment
+identifier, and there is no Vercel CLI here. Before step 1.2, Yahya writes the ID of the current
+production deployment (Deployments → Current) into this table. Per Vercel's documentation, after an
+Instant Rollback new deployments are not promoted automatically until the rollback is undone in the
+dashboard.
 
 ### Step 1 — frontend first (Vercel)
 
@@ -176,8 +190,23 @@ it can go live while the Space still serves BRFSS.
 1. **Before merging:** Yahya checks the Vercel preview of `chore/retire-brfss` against the production
    backend (the item under "Open verification"): picker without BRFSS, What-If, the AL queue with
    read-only archived items and the Archived card, the error banner, the history archived note.
-2. **Merge:** Yahya merges `chore/retire-brfss` into `deploy/v2-platform` through a PR. The merge
-   deploys nothing to the Space (it is a separate snapshot push).
+2. **Merge, as a fast-forward push.** It deploys nothing to the Space, which is a separate snapshot push.
+   - **Checked 2026-10-06:** `origin/deploy/v2-platform` = `f22b469`;
+     `git merge-base --is-ancestor origin/deploy/v2-platform chore/retire-brfss` is true, and the branch is
+     21 commits ahead at `79e9262` (one more with this record) and 0 behind. So this is a fast-forward, and no merge commit is needed.
+   - **Re-check immediately before pushing.** Both commands must succeed:
+     ```
+     git fetch origin
+     test "$(git rev-parse origin/deploy/v2-platform)" = f22b4695f14e42f9cc3c1eaa29d71c3e783bb87f && git merge-base --is-ancestor origin/deploy/v2-platform origin/chore/retire-brfss && echo FAST-FORWARD-OK
+     ```
+   - **The push** (no `--force`; git refuses it if it is not a fast-forward):
+     ```
+     git push origin origin/chore/retire-brfss:refs/heads/deploy/v2-platform
+     ```
+   - **Branch protection:** `deploy/v2-platform` is marked protected. The public API shows no required
+     status checks, but it cannot show whether a pull request is required. If the push is refused for
+     that reason, stop. A web-UI merge would not be a fast-forward of these exact commits, so that path
+     needs your decision.
 3. **Confirm the deploy happened:** the live bundle name must change from `assets/index-BNeSlGQM.js`.
    Vercel deploys cannot be triggered or seen from this machine, so an unchanged name means a stale
    frontend, not a passed check.
@@ -197,7 +226,19 @@ does not, someone deployed in between: stop, and record the new hash as the roll
      `docs/fl_report`, `reports/monitoring_local`, `archive/stale_2026-09`, the `frontend/public`
      icons, and `models/diabetes_nhanes/diabetes_nhanes_ebm.joblib`. The Dockerfile downloads that
      joblib and checks its sha256. HF rejects any binary in a push, whatever its size, and the live
-     tree has none;
+     tree has none.
+
+     Dockerfile lines 48–51, as committed:
+     ```
+     RUN mkdir -p models/diabetes_nhanes && \
+         curl -fsSL "https://huggingface.co/yahyoha/omnidiag-models/resolve/main/diabetes_nhanes/diabetes_nhanes_ebm.joblib" \
+             -o models/diabetes_nhanes/diabetes_nhanes_ebm.joblib && \
+         echo "fcceeb37b53295f115e5fe41b9a8618117263ef6ddb7898f9a90ad7b50b2c408  models/diabetes_nhanes/diabetes_nhanes_ebm.joblib" | sha256sum -c -
+     ```
+
+     Checked 2026-10-06: the hash in the Dockerfile matches the git-tracked file, and the file
+     downloaded from that URL passes `sha256sum -c`. A mismatch fails the build (`-c` returns
+     non-zero), so a wrong file cannot ship silently;
    - `write-tree`, then `commit-tree -p d6fb323`, so the push is a fast-forward.
 2. **Check before pushing:**
    - 0 binary files in the snapshot (the same numstat check);
@@ -216,12 +257,31 @@ does not, someone deployed in between: stop, and record the new hash as the roll
 6. **Smoke test on the live Space, before the release is declared done (CL-4):**
    - **A real database write and read, with a clinician account** (credentials from Yahya, not stored
      in the repo):
-     - create a patient (`POST /api/v4/patients`);
+     - create a patient: `POST /api/v4/patients` with `{"mrn": "RELEASE-TEST-2026-10", "full_name":
+       "RELEASE TEST 2026-10 (not a patient)"}`. MRNs are unique; if a rerun is refused, use
+       `RELEASE-TEST-2026-10-2`;
+     - use the demo inputs P-003 (heart) and N-001 (NHANES). Both are confident decisions, so neither adds
+       a row to the review queue; check that neither response carries a `review_id`. If one does,
+       skip that queue item afterwards (`POST /api/v4/review/<id>/skip`), so no doctor is asked to
+       label a test patient;
      - `POST /api/v4/heart_disease/predict?patient_id=<id>` and `POST /api/v4/diabetes_nhanes/predict?patient_id=<id>`;
      - read the history (`GET /api/v4/patients/<id>/predictions`): both rows present, each with its
        `decision` and `probability_scale`.
 
      This is the path that greenlet guards. The local tests run on SQLAlchemy 2.0.51; the image runs 2.1.3.
+   - **After the check, the test patient is soft-deleted:** `DELETE /api/v4/patients/<id>` with an admin
+     or super_admin account. The API has no hard delete. The patient row stays with `deleted_at` set
+     and disappears from lists; its two prediction rows and audit rows stay, as for any patient. This
+     follows the standing rule that records are never deleted, and the MRN marks them as a test.
+   - **Database persistence on the Space (checked 2026-10-06):**
+     - The Space has **no persistent storage** (HF API: `runtime.storage = null`, hardware `cpu-basic`).
+     - The app uses `DATABASE_URL` if it is set, and SQLite at `./omnidiag_dev.db` inside the container
+       otherwise. Whether a `DATABASE_URL` secret points to an external database is not visible from
+       here; Yahya checks Space Settings → Variables and secrets.
+     - **Without that secret, the database is lost on every restart and rebuild, including this
+       release's build.** The test patient would then vanish at the next restart anyway, and any BRFSS
+       rows in the live database will be gone after the push. The `archived_note` check below then has
+       nothing to look at; the tests cover it.
    - **Retirement:**
      - `/api/v4/diseases` lists exactly `heart_disease` and `diabetes_nhanes`;
      - `POST /api/v4/diabetes/predict` answers 410 `DISEASE_RETIRED` with `replaced_by: diabetes_nhanes`;
@@ -236,6 +296,71 @@ does not, someone deployed in between: stop, and record the new hash as the roll
 
 **Not covered by this plan:** the HF model repo (`yahyoha/omnidiag-models`) keeps the BRFSS files
 (backlog 11). The image no longer downloads them, so they are inert.
+
+### Step 3 — Phase C, branch clean-up (only after step 2 is declared done)
+
+Commands only; Yahya runs them. They follow the approved Phase C table. Tags come first for the
+tag-then-delete branches, `main1` included. `hf/main` (the live Space) and `deploy/v2-platform` are
+not touched. Each tag pins the commit recorded on 2026-10-06; a branch that moved since then fails
+the check in 3.1.
+
+**3.1 Check that every branch is still where it was recorded** (prints `OK` per branch, or `MOVED`):
+```
+git fetch origin --prune
+while read b sha; do [ "$(git rev-parse origin/$b)" = "$sha" ] && echo "OK    $b" || echo "MOVED $b"; done <<'EOF'
+fix/demo-blockers c21fb50bfa1289c51f4b5fa48a855f56c541d068
+fix/feature-verification 7d01d63564158bfcf3771973f4c3375cb0af94cd
+fix/heart-retrain-candidate e19c8f60c3c9ef97f112ee2a4f6f5e0e52361b66
+merge/heart-retrain-plus-phase9 75a79756745bf46fed2084699d2f02e06170a347
+monitoring/request-metrics eb5ecb51530e8ba88f690dd11428b2b4cc0e2028
+main 52a1ab7a329ac3cde5a43187e2a36820529fa7b3
+chore/post-expo-cleanup f22b4695f14e42f9cc3c1eaa29d71c3e783bb87f
+phase9/diabetes-nhanes-ebm b796155967ead944bdc39e429480c3eebb5e0dc7
+feature/diabetes-module-integration e9aeaf2e3753cd0a53922cff5969bbd0f394d482
+feature/omni-platform-final 779db957efa0af36b0c9dde4af28720dc3464d2c
+production-final-v3 401cf5d54a77f6f5c35d05f1b1428bd923534353
+V2-advanced-model 25c16dcd1750b94a7e888c60fc0877aaed0294b3
+V3-advanced-DL 16318c72427f77da2b62f2aceedce468b44e7769
+main1 8018ec56bbc1040d2277165876923ea9b2f28efc
+EOF
+```
+Stop on any `MOVED`.
+
+**3.2 Tags for the tag-then-delete branches** (annotated, pinned to the recorded commits), then push them:
+```
+git tag -a archive/phase9/diabetes-nhanes-ebm b796155967ead944bdc39e429480c3eebb5e0dc7 -m "Phase 9 research milestone (NHANES EBM); branch deleted in Phase C, 2026-10"
+git tag -a archive/feature/diabetes-module-integration e9aeaf2e3753cd0a53922cff5969bbd0f394d482 -m "Unmerged; branch deleted in Phase C, 2026-10"
+git tag -a archive/feature/omni-platform-final 779db957efa0af36b0c9dde4af28720dc3464d2c -m "Unmerged; branch deleted in Phase C, 2026-10"
+git tag -a archive/production-final-v3 401cf5d54a77f6f5c35d05f1b1428bd923534353 -m "Unmerged; branch deleted in Phase C, 2026-10"
+git tag -a archive/V2-advanced-model 25c16dcd1750b94a7e888c60fc0877aaed0294b3 -m "Unrelated history; branch deleted in Phase C, 2026-10"
+git tag -a archive/V3-advanced-DL 16318c72427f77da2b62f2aceedce468b44e7769 -m "Unrelated history; branch deleted in Phase C, 2026-10"
+git tag -a archive/main1 8018ec56bbc1040d2277165876923ea9b2f28efc -m "Unrelated history (old model + plots); branch deleted in Phase C, 2026-10"
+git push origin archive/phase9/diabetes-nhanes-ebm archive/feature/diabetes-module-integration archive/feature/omni-platform-final archive/production-final-v3 archive/V2-advanced-model archive/V3-advanced-DL archive/main1
+git ls-remote --tags origin 'archive/*'
+```
+The last command must list all 7 tags, each pointing to an annotated tag whose target is the commit above
+(`git rev-parse archive/main1^{commit}` and so on). Do not run 3.4 for a branch whose tag is missing.
+
+**3.3 Delete the merged branches.** All seven were confirmed to be ancestors of `deploy/v2-platform` on
+2026-10-06. `chore/post-expo-cleanup` is the same commit as `deploy/v2-platform` (`f22b469`), which is the
+confirmation its table row asked for.
+```
+git push origin --delete fix/demo-blockers fix/feature-verification fix/heart-retrain-candidate merge/heart-retrain-plus-phase9 monitoring/request-metrics main chore/post-expo-cleanup
+```
+
+**3.4 Delete the tag-then-delete branches** (only after 3.2 is confirmed):
+```
+git push origin --delete phase9/diabetes-nhanes-ebm feature/diabetes-module-integration feature/omni-platform-final production-final-v3 V2-advanced-model V3-advanced-DL main1
+```
+
+**3.5 Check:** `git ls-remote --heads origin` lists `deploy/v2-platform` and `chore/retire-brfss`, and
+nothing else.
+
+**Not in the approved table, so left alone:**
+- `chore/retire-brfss`: after step 1.2 it is merged (the same commit as `deploy/v2-platform`). Deleting
+  it is a separate decision.
+- Local worktrees (`Heart_Disease_Project.worktrees/merge-p9`, `phase9`,
+  `agents-mermaid-er-diagram-db-models`) and local branches: these commands delete remote branches only.
 
 ## Phase C — remote branches (report only; nothing deleted)
 
